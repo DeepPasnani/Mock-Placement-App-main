@@ -1,6 +1,7 @@
 const { query, getClient } = require('../db');
 const { setActiveSession, getActiveSession, deleteActiveSession, trackActiveUser, getActiveUserCount } = require('../db/redis');
-const { judgeSubmission } = require('../services/judge0');
+const { judgeSubmission: judge0Judge } = require('../services/judge0');
+const { judgeSubmission: dockerJudge, isDockerAvailable } = require('../services/runner');
 
 // POST /api/submissions/start
 async function startTest(req, res) {
@@ -149,9 +150,10 @@ async function submitTest(req, res) {
         const lang = Object.keys(sol).find(l => sol[l]?.trim());
         if (!lang || !sol[lang]?.trim()) continue;
 
-        // Run against hidden test cases asynchronously (non-blocking for speed)
+        // Run against hidden test cases using Docker runner, fallback to Judge0
         try {
-          const results = await judgeSubmission({
+          const runner = isDockerAvailable() ? dockerJudge : judge0Judge;
+          const results = await runner({
             code: sol[lang], language: lang,
             testCases: p.test_cases || [],
             timeLimit: p.time_limit_seconds,
@@ -163,11 +165,26 @@ async function submitTest(req, res) {
           totalScore += earned;
           detailedResults[p.id] = { earned, passed, total, results: results.filter(r => !r.hidden) };
         } catch (e) {
-          console.error('Judge0 error:', e.message);
-          // Give partial credit if code was submitted
-          const earned = Math.round(p.marks * 0.1);
-          totalScore += earned;
-          detailedResults[p.id] = { earned, error: 'Execution service unavailable' };
+          console.error('Runner error:', e.message);
+          // Fallback to Judge0 if Docker failed
+          try {
+            const results = await judge0Judge({
+              code: sol[lang], language: lang,
+              testCases: p.test_cases || [],
+              timeLimit: p.time_limit_seconds,
+              memoryLimit: p.memory_limit_mb,
+            });
+            const passed = results.filter(r => r.passed).length;
+            const total = results.length || 1;
+            const earned = Math.round((passed / total) * p.marks);
+            totalScore += earned;
+            detailedResults[p.id] = { earned, passed, total, results: results.filter(r => !r.hidden) };
+          } catch (e2) {
+            console.error('Judge0 fallback also failed:', e2.message);
+            const earned = Math.round(p.marks * 0.1);
+            totalScore += earned;
+            detailedResults[p.id] = { earned, error: 'Execution service unavailable' };
+          }
         }
       }
     }
@@ -242,11 +259,31 @@ async function getSubmission(req, res) {
 }
 
 // POST /api/submissions/run-code (live code testing)
+// Also supports testCases array for per-test-case results
 async function runCode(req, res) {
-  const { code, language, stdin } = req.body;
+  const { code, language, stdin, testCases, timeLimit, memoryLimit } = req.body;
   if (!code || !language) return res.status(400).json({ error: 'Code and language required' });
-  const { runCode: run } = require('../services/judge0');
-  const result = await run({ code, language, stdin: stdin || '', timeLimit: 5, memoryLimit: 256 });
+
+  if (testCases && Array.isArray(testCases) && testCases.length > 0) {
+    // Run against each visible test case
+    const runner = isDockerAvailable() ? dockerJudge : judge0Judge;
+    const results = await runner({
+      code, language,
+      testCases: testCases.filter(tc => !tc.isHidden),
+      timeLimit: timeLimit || 5,
+      memoryLimit: memoryLimit || 256,
+    });
+    return res.json({ results });
+  }
+
+  // Single execution (backward compatible)
+  if (isDockerAvailable()) {
+    const { runCode: dockerRun } = require('../services/runner');
+    const result = await dockerRun({ code, language, stdin: stdin || '', timeLimit: timeLimit || 5, memoryLimit: memoryLimit || 256 });
+    return res.json(result);
+  }
+  const { runCode: judgeRun } = require('../services/judge0');
+  const result = await judgeRun({ code, language, stdin: stdin || '', timeLimit: 5, memoryLimit: 256 });
   res.json(result);
 }
 

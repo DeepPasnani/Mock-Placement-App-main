@@ -45,6 +45,8 @@ export default function TestInterface() {
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [runResult, setRunResult] = useState(null);
   const [runLoading, setRunLoading] = useState(false);
+  const [testResults, setTestResults] = useState(null);
+  const [testLoading, setTestLoading] = useState(false);
   const [showPalette, setShowPalette] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [testStarted, setTestStarted] = useState(false);
@@ -211,6 +213,28 @@ export default function TestInterface() {
   }, [handleSubmit]);
 
   // ── Run code ──────────────────────────────────────────
+  const handleRunAllTests = async () => {
+    const q = section?.questions[currentQ];
+    if (!q || q.type !== 'coding') return;
+    const code = codeSolutions[q.id]?.[activeLang] || q.starter_code?.[activeLang] || '';
+    if (!code.trim()) { toast.error('Write some code first.'); return; }
+    setTestLoading(true);
+    setTestResults(null);
+    try {
+      const visibleTests = (q.test_cases || []).filter(tc => !tc.isHidden);
+      if (!visibleTests.length) {
+        toast.error('No visible test cases for this problem.');
+        setTestLoading(false);
+        return;
+      }
+      const result = await submissionsAPI.runCode({ code, language: activeLang, testCases: visibleTests });
+      setTestResults(result.results || []);
+    } catch {
+      toast.error('Test execution failed.');
+    }
+    setTestLoading(false);
+  };
+
   const handleRunCode = async () => {
     const q = section?.questions[currentQ];
     if (!q) return;
@@ -533,6 +557,9 @@ export default function TestInterface() {
                 runResult={runResult}
                 runLoading={runLoading}
                 onRunCode={handleRunCode}
+                testResults={testResults}
+                testLoading={testLoading}
+                onRunAllTests={handleRunAllTests}
                 onPrev={goPrev}
                 onNext={goNext}
                 isLast={isLastQuestion}
@@ -748,7 +775,7 @@ function AptitudeQuestion({
  * ═══════════════════════════════════════════════════════════ */
 function CodingQuestion({
   q, qi, section, codeSolutions, setCode, activeLang, setActiveLang,
-  allowedLangs, flagged, toggleFlag, runResult, runLoading, onRunCode,
+  allowedLangs, flagged, toggleFlag, runResult, runLoading, onRunCode, testResults, testLoading, onRunAllTests,
   onPrev, onNext, isLast, onConfirmSubmit,
 }) {
   const code = codeSolutions[q.id]?.[activeLang] || q.starter_code?.[activeLang] || '';
@@ -853,7 +880,51 @@ function CodingQuestion({
         />
 
         {/* Run result */}
-        {runResult && (
+        {/* Run All Tests button */}
+      <div className="flex gap-2 mb-3">
+        <Btn variant="primary" size="sm" onClick={onRunAllTests} disabled={testLoading || runLoading}>
+          {testLoading ? <Spinner size={14} /> : '▶ Run All Visible Tests'}
+        </Btn>
+      </div>
+
+      {/* Per-test-case results */}
+      {testResults && testResults.length > 0 && (
+        <div className="panel p-3 rounded-lg mb-3">
+          <div className="text-xs font-mono font-bold text-annotation mb-2">
+            Test Results ({testResults.filter(r => r.passed).length}/{testResults.length} passed)
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs font-mono">
+              <thead>
+                <tr className="text-annotation/60 border-b border-rim">
+                  <th className="text-left py-1 pr-2">#</th>
+                  <th className="text-left py-1 pr-2">Input</th>
+                  <th className="text-left py-1 pr-2">Expected</th>
+                  <th className="text-left py-1 pr-2">Got</th>
+                  <th className="text-right py-1">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {testResults.map((tr, i) => (
+                  <tr key={i} className="border-b border-rim/50">
+                    <td className="py-1.5 pr-2 text-annotation">{i + 1}</td>
+                    <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.input}</td>
+                    <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.expected}</td>
+                    <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.actual}</td>
+                    <td className="py-1.5 text-right">
+                      <span className={tr.passed ? 'text-verify' : 'text-alert'}>
+                        {tr.passed ? '✅ Pass' : '❌ Fail'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {runResult && (
           <div className={`panel mt-3 p-3 rounded-lg border ${
             runResult.output?.includes('error') || runResult.stderr
               ? 'border-alert/30 bg-alert/5'

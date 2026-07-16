@@ -307,6 +307,7 @@ function McqImportModal({ open, onClose }) {
 function CodingBankTab() {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
   const { data, isLoading } = useQuery(['question-bank', 'coding'], () => questionBankAPI.list({ type: 'coding' }));
@@ -318,7 +319,8 @@ function CodingBankTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Btn variant="ghost" onClick={() => setImportOpen(true)}>Import CSV</Btn>
         <Btn onClick={() => setCreateOpen(true)}>New Coding Question</Btn>
       </div>
       {isLoading ? (
@@ -347,6 +349,7 @@ function CodingBankTab() {
       )}
 
       <CodingCreateModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <McqImportModal open={importOpen} onClose={() => setImportOpen(false)} />
       <ConfirmModal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
