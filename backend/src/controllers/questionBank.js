@@ -1,5 +1,54 @@
 const { query } = require('../db');
 
+// ── CSV parsing (stdlib, no dependency) ──────────────────────
+function parseCsv(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return { rows: [], errors: [] };
+
+  const headers = parseCsvLine(lines[0]);
+  const rows = [];
+  const errors = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const values = parseCsvLine(line);
+    if (values.length !== headers.length) {
+      errors.push({ row: i + 1, message: `Expected ${headers.length} columns, got ${values.length}` });
+      continue;
+    }
+    const row = {};
+    headers.forEach((h, j) => { row[h.trim()] = (values[j] || '').trim(); });
+    rows.push(row);
+  }
+
+  return { rows, errors };
+}
+
+function parseCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
 /* ═══════════════════════════════════════════════════════════
  * Question Bank — reusable MCQ / coding questions that admins
  * can build up over time and pull into any test, instead of
@@ -81,4 +130,71 @@ async function deleteBank(req, res) {
   res.json({ message: 'Question removed from bank' });
 }
 
-module.exports = { listBank, createBank, bulkImportBank, deleteBank };
+// ── POST /api/question-bank/import-csv ───────────────────────
+async function importCsv(req, res) {
+  const csvText = req.body.csv;
+  if (!csvText) return res.status(400).json({ error: 'CSV content required' });
+
+  const { rows, errors: parseErrors } = parseCsv(csvText);
+  if (!rows.length) {
+    return res.status(400).json({ error: 'No valid rows found', parseErrors });
+  }
+
+  const inserted = [];
+  const importErrors = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    try {
+      if (row.type === 'mcq') {
+        if (!row.text || !row.optionA || !row.optionB || !row.optionC || !row.optionD || row.correctAnswer === undefined) {
+          importErrors.push({ row: i + 2, message: 'MCQ requires: text, optionA-D, correctAnswer' });
+          continue;
+        }
+        const data = {
+          text: row.text,
+          options: [row.optionA, row.optionB, row.optionC, row.optionD],
+          correctAnswer: parseInt(row.correctAnswer),
+        };
+        const { rows: [q] } = await query(
+          `INSERT INTO bank_questions (type, data, genre, difficulty, marks, tags, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+          ['mcq', JSON.stringify(data), row.genre || 'general', row.difficulty || 'medium',
+           parseInt(row.marks) || 2, null, req.user.id]
+        );
+        inserted.push(q);
+      } else if (row.type === 'coding') {
+        if (!row.title || !row.description) {
+          importErrors.push({ row: i + 2, message: 'Coding requires: title, description' });
+          continue;
+        }
+        const data = {
+          title: row.title,
+          description: row.description,
+          sampleInput: row.sampleInput || '',
+          sampleOutput: row.sampleOutput || '',
+          testCases: row.testCases ? JSON.parse(row.testCases) : [],
+        };
+        const { rows: [q] } = await query(
+          `INSERT INTO bank_questions (type, data, genre, difficulty, marks, tags, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+          ['coding', JSON.stringify(data), row.genre || 'general', row.difficulty || 'medium',
+           parseInt(row.marks) || 10, null, req.user.id]
+        );
+        inserted.push(q);
+      } else {
+        importErrors.push({ row: i + 2, message: `Unknown type "${row.type}" — must be "mcq" or "coding"` });
+      }
+    } catch (err) {
+      importErrors.push({ row: i + 2, message: err.message });
+    }
+  }
+
+  res.status(201).json({
+    message: `Imported ${inserted.length} question(s)`,
+    created: inserted.length,
+    errors: [...parseErrors, ...importErrors],
+  });
+}
+
+module.exports = { listBank, createBank, bulkImportBank, importCsv, deleteBank };

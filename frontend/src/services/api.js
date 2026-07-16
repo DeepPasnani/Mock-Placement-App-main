@@ -113,6 +113,7 @@ export const questionBankAPI = {
   list:    (params) => api.get('/question-bank', { params }).then(r => r.data),
   create:  (data)   => api.post('/question-bank', data).then(r => r.data),
   import:  (data)   => api.post('/question-bank/import', data).then(r => r.data),
+  importCsv: (data) => api.post('/question-bank/import-csv', data).then(r => r.data),
   delete:  (id)     => api.delete(`/question-bank/${id}`).then(r => r.data),
 };
 

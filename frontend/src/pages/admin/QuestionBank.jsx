@@ -185,12 +185,18 @@ function McqCreateModal({ open, onClose }) {
   );
 }
 
+const SAMPLE_CSV = `type,text,optionA,optionB,optionC,optionD,correctAnswer,title,description,sampleInput,sampleOutput,testCases,genre,difficulty,marks
+mcq,"What is 2+2?",3,4,5,6,1,,,,,,quantitative,easy,2
+mcq,"Capital of India?",Delhi,Mumbai,Kolkata,Chennai,0,,,,,,general,easy,2
+coding,,,,,,"Two Sum","Find indices summing to target","9\n[2,7,11,15]","[0,1]","[{ \"input\": \"9\", \"output\": \"0 1\" }]",,hard,10`;
+
 function McqImportModal({ open, onClose }) {
   const qc = useQueryClient();
   const [raw, setRaw] = useState('');
   const [error, setError] = useState(null);
+  const [importMode, setImportMode] = useState('json');
 
-  const importMut = useMutation(questionBankAPI.import, {
+  const jsonMut = useMutation(questionBankAPI.import, {
     onSuccess: (data) => {
       toast.success(data.message || 'Questions imported');
       qc.invalidateQueries(['question-bank', 'mcq']);
@@ -200,33 +206,95 @@ function McqImportModal({ open, onClose }) {
     onError: (e) => toast.error(e.response?.data?.error || 'Import failed'),
   });
 
-  const submit = () => {
+  const csvMut = useMutation(questionBankAPI.importCsv, {
+    onSuccess: (data) => {
+      toast.success(`${data.created || 0} question(s) imported`);
+      qc.invalidateQueries(['question-bank', 'mcq']);
+      qc.invalidateQueries(['question-bank', 'coding']);
+      setRaw(''); setError(null);
+      onClose();
+    },
+    onError: (e) => {
+      const err = e.response?.data;
+      const msg = err?.error || 'Import failed';
+      const details = err?.errors?.length ? ': ' + err.errors.slice(0, 3).map(e => e.message).join('; ') : '';
+      toast.error(msg + details);
+    },
+  });
+
+  const submitJson = () => {
     setError(null);
-    let items;
     try {
-      items = JSON.parse(raw);
+      const items = JSON.parse(raw);
       if (!Array.isArray(items)) throw new Error('JSON must be an array');
       items.forEach((it, i) => {
         if (!it.text || !Array.isArray(it.options) || typeof it.correctAnswer !== 'number') {
           throw new Error(`Item ${i + 1}: requires "text", "options" array, and numeric "correctAnswer"`);
         }
       });
+      jsonMut.mutate({ type: 'mcq', items });
     } catch (e) {
       setError(e.message);
-      return;
     }
-    importMut.mutate({ type: 'mcq', items });
   };
 
+  const submitCsv = () => {
+    setError(null);
+    csvMut.mutate({ csv: raw });
+  };
+
+  const isJson = importMode === 'json';
+  const loading = jsonMut.isLoading || csvMut.isLoading;
+
   return (
-    <Modal isOpen={open} onClose={onClose} title="Import MCQ Questions via JSON" width="max-w-2xl"
-      footer={<><Btn variant="ghost" onClick={onClose}>Cancel</Btn><Btn onClick={submit} disabled={!raw.trim() || importMut.isLoading}>{importMut.isLoading ? <Spinner size={14} /> : 'Import'}</Btn></>}>
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <label className="input-label">JSON</label>
-          <button className="text-xs text-accent hover:underline" onClick={() => setRaw(SAMPLE_JSON)}>Load sample</button>
+    <Modal isOpen={open} onClose={onClose} title="Import Questions" width="max-w-2xl"
+      footer={<><Btn variant="ghost" onClick={onClose}>Cancel</Btn><Btn onClick={isJson ? submitJson : submitCsv} disabled={!raw.trim() || loading}>{loading ? <Spinner size={14} /> : 'Import'}</Btn></>}>
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setImportMode('json')}
+            className={`text-xs px-3 py-1.5 rounded border transition-colors ${isJson ? 'border-accent bg-accent/10 text-accent' : 'border-rim text-annotation'}`}
+          >JSON</button>
+          <button
+            onClick={() => setImportMode('csv')}
+            className={`text-xs px-3 py-1.5 rounded border transition-colors ${!isJson ? 'border-accent bg-accent/10 text-accent' : 'border-rim text-annotation'}`}
+          >CSV</button>
         </div>
-        <Textarea rows={10} value={raw} onChange={e => setRaw(e.target.value)} placeholder={SAMPLE_JSON} className="font-mono text-xs" />
+
+        {isJson ? (
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="input-label">JSON</label>
+              <button className="text-xs text-accent hover:underline" onClick={() => setRaw(SAMPLE_JSON)}>Load sample</button>
+            </div>
+            <Textarea rows={10} value={raw} onChange={e => setRaw(e.target.value)} placeholder={SAMPLE_JSON} className="font-mono text-xs" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="input-label">CSV Data</label>
+              <button className="text-xs text-accent hover:underline" onClick={() => setRaw(SAMPLE_CSV)}>Load sample</button>
+            </div>
+            <Textarea rows={10} value={raw} onChange={e => setRaw(e.target.value)} placeholder="Paste CSV with type column (mcq/coding)..." className="font-mono text-xs" />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-annotation">or upload .csv:</span>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={e => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setRaw(ev.target.result);
+                    reader.readAsText(file);
+                  }
+                }}
+                className="text-xs text-annotation"
+              />
+            </div>
+          </div>
+        )}
+
         {error && <Alert type="error">{error}</Alert>}
       </div>
     </Modal>

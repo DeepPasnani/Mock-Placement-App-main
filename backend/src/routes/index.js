@@ -73,6 +73,7 @@ router.get   ('/question-bank',           authenticate, requireAdmin, bankCtrl.l
 router.post  ('/question-bank',           authenticate, requireAdmin, bankCtrl.createBank);
 router.post  ('/question-bank/import',    authenticate, requireAdmin, bankCtrl.bulkImportBank);
 router.delete('/question-bank/:id',       authenticate, requireAdmin, bankCtrl.deleteBank);
+router.post('/question-bank/import-csv',  authenticate, requireAdmin, bankCtrl.importCsv);
 
 // ── Email ─────────────────────────────────────────────────
 const emailCtrl = require('../controllers/email');
