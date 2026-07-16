@@ -15,6 +15,7 @@ const NAV_ICONS = {
   Students: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
   Admins: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z',
   'Question Bank': 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s4.332.477 5.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  'Send Email': 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
 };
 
 export default function AdminLayout() {
@@ -29,6 +30,7 @@ export default function AdminLayout() {
       { to: '/admin/tests', label: 'Tests' },
       { to: '/admin/question-bank', label: 'Question Bank' },
       { to: '/admin/results', label: 'Results' },
+      { to: '/admin/email', label: 'Send Email' },
       { to: '/admin/users', label: 'Students' },
     ];
     if (user?.role === 'super_admin') {

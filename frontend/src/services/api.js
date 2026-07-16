@@ -128,4 +128,9 @@ export const uploadAPI = {
   deleteImage: (publicId) => api.delete(`/upload/image/${encodeURIComponent(publicId)}`).then(r => r.data),
 };
 
+// ── Email ────────────────────────────────────────────────────
+export const emailAPI = {
+  send: (data) => api.post('/email/send', data).then(r => r.data),
+};
+
 export default api;

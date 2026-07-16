@@ -74,6 +74,10 @@ router.post  ('/question-bank',           authenticate, requireAdmin, bankCtrl.c
 router.post  ('/question-bank/import',    authenticate, requireAdmin, bankCtrl.bulkImportBank);
 router.delete('/question-bank/:id',       authenticate, requireAdmin, bankCtrl.deleteBank);
 
+// ── Email ─────────────────────────────────────────────────
+const emailCtrl = require('../controllers/email');
+router.post('/email/send', authenticate, requireAdmin, emailCtrl.sendBulkEmail);
+
 // ── Health check ──────────────────────────────────────────────
 router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

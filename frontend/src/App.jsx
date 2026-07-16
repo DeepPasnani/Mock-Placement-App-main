@@ -12,6 +12,7 @@ import AdminResults from './pages/admin/Results';
 import AdminUsers from './pages/admin/Users';
 import AdminAdmins from './pages/admin/Admins';
 import AdminQuestionBank from './pages/admin/QuestionBank';
+import SendEmail from './pages/admin/SendEmail';
 import Landing from './pages/Landing';
 
 import StudentLayout from './pages/student/Layout';
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="admins" element={<AdminAdmins />} />
         <Route path="question-bank" element={<AdminQuestionBank />} />
+        <Route path="email" element={<SendEmail />} />
       </Route>
 
       {/* Student routes */}

@@ -225,6 +225,35 @@ async function sendBulkImportEmail({ to, name, tempPassword }) {
   });
 }
 
+// ── Template library for admin email composer ─────────────
+const TEMPLATES = {
+  blank: {
+    label: 'Blank',
+    subject: '',
+    body: '',
+  },
+  welcome: {
+    label: 'Welcome',
+    subject: '🎓 Welcome to PlacementPro!',
+    body: '<p>Hi {name},</p><p>Your account has been successfully created on <strong>PlacementPro</strong> — your campus placement assessment platform.</p><p>You can now log in and access aptitude tests, coding challenges, and placement preparation resources.</p><p>Best of luck with your placement journey! 🚀</p>',
+  },
+  testScheduled: {
+    label: 'Test Scheduled',
+    subject: '📋 New Test Scheduled: {test_title}',
+    body: '<p>Hi {name},</p><p>A new placement test has been scheduled for your department. Please make sure you\'re prepared and available at the scheduled time.</p><p>Log in to PlacementPro to view the details.</p>',
+  },
+  testResults: {
+    label: 'Test Results Available',
+    subject: '📊 Your Results: {test_title}',
+    body: '<p>Hi {name},</p><p>Your results for <strong>{test_title}</strong> are now available. Log in to PlacementPro to view your detailed score breakdown.</p>',
+  },
+  passwordReset: {
+    label: 'Password Reset',
+    subject: '🔐 Password Reset OTP — PlacementPro',
+    body: '<p>Hi {name},</p><p>We received a request to reset your PlacementPro password. Use the OTP shown on screen to complete the process.</p><p>If you did not request a password reset, ignore this email.</p>',
+  },
+};
+
 module.exports = {
   sendWelcomeEmail,
   sendTestScheduledEmail,
@@ -232,4 +261,7 @@ module.exports = {
   sendPasswordResetEmail,
   sendAdminCreatedEmail,
   sendBulkImportEmail,
+  sendEmail,
+  wrap,
+  TEMPLATES,
 };
