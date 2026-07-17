@@ -881,18 +881,20 @@ function CodingQuestion({
 
         {/* Run result */}
         {/* Run All Tests button */}
-      <div className="flex gap-2 mb-3">
+      <div className="flex items-center gap-3 mb-3">
         <Btn variant="primary" size="sm" onClick={onRunAllTests} disabled={testLoading || runLoading}>
           {testLoading ? <Spinner size={14} /> : '▶ Run All Visible Tests'}
         </Btn>
+        {testResults && testResults.length > 0 && (
+          <span className="text-xs font-mono text-annotation">
+            {testResults.filter(r => r.passed).length}/{testResults.length} passed
+          </span>
+        )}
       </div>
 
       {/* Per-test-case results */}
       {testResults && testResults.length > 0 && (
-        <div className="panel p-3 rounded-lg mb-3">
-          <div className="text-xs font-mono font-bold text-annotation mb-2">
-            Test Results ({testResults.filter(r => r.passed).length}/{testResults.length} passed)
-          </div>
+        <div className="panel p-3 rounded-lg mb-3 animate-fade-in">
           <div className="overflow-x-auto">
             <table className="w-full text-xs font-mono">
               <thead>
@@ -906,14 +908,20 @@ function CodingQuestion({
               </thead>
               <tbody>
                 {testResults.map((tr, i) => (
-                  <tr key={i} className="border-b border-rim/50">
+                  <tr key={i} className="border-b border-rim/50 transition-colors hover:bg-sunken">
                     <td className="py-1.5 pr-2 text-annotation">{i + 1}</td>
-                    <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.input}</td>
+                    <td className="py-1.5 pr-2 text-ink max-w-24 truncate font-medium">{tr.input}</td>
                     <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.expected}</td>
                     <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.actual}</td>
                     <td className="py-1.5 text-right">
-                      <span className={tr.passed ? 'text-verify' : 'text-alert'}>
-                        {tr.passed ? '✅ Pass' : '❌ Fail'}
+                      <span
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold uppercase tracking-wider ${
+                          tr.passed
+                            ? 'bg-verify/12 text-verify'
+                            : 'bg-alert/12 text-alert'
+                        }`}
+                      >
+                        {tr.passed ? 'Pass' : 'Fail'}
                       </span>
                     </td>
                   </tr>
@@ -925,7 +933,7 @@ function CodingQuestion({
       )}
 
       {runResult && (
-          <div className={`panel mt-3 p-3 rounded-lg border ${
+          <div className={`panel mt-3 p-3 rounded-lg border animate-fade-in ${
             runResult.output?.includes('error') || runResult.stderr
               ? 'border-alert/30 bg-alert/5'
               : 'border-verify/30 bg-verify/5'

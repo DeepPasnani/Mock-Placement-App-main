@@ -1,24 +1,24 @@
 ---
 name: CampusTrack
-description: Placement assessment platform — galactic dark, cool-space, precision-instrument
+description: Placement assessment platform — warm bone, restrained ink, one deep pine accent
 colors:
-  deck: "#0A0A0F"
-  panel: "#14141E"
-  rim: "#2A2A3E"
-  ink: "#E8E0D8"
-  annotation: "#7A7A8A"
-  accent: "#4A9EFF"
-  accent-light: "#7CB8FF"
-  accent-dark: "#2D7DE0"
-  verify: "#2DDE78"
-  verify-light: "#5EED99"
-  verify-dark: "#1CB85E"
-  alert: "#FF3040"
-  alert-light: "#FF6B77"
-  alert-dark: "#D91A2A"
-  clarify: "#B37DFF"
-  clarify-light: "#CCA3FF"
-  clarify-dark: "#8F4FEB"
+  deck: "#F3EFE2"
+  panel: "#FBF9F2"
+  rim: "#DFD4B8"
+  ink: "#2A2419"
+  annotation: "#8A8066"
+  accent: "#2F5D56"
+  accent-light: "#4C8078"
+  accent-dark: "#1E4038"
+  verify: "#4B7B3F"
+  verify-light: "#6E9B60"
+  verify-dark: "#365C2C"
+  alert: "#AE4331"
+  alert-light: "#C96952"
+  alert-dark: "#8A3324"
+  clarify: "#565C86"
+  clarify-light: "#7A80A8"
+  clarify-dark: "#3F4566"
 typography:
   display:
     fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -36,59 +36,62 @@ rounded:
   md: "0.75rem"
   lg: "1rem"
   xl: "1.5rem"
-  glow: "1px"
-  toast: "10px"
+  full: "9999px"
 spacing:
   xs: "0.25rem"
   sm: "0.5rem"
   md: "1rem"
   lg: "1.5rem"
   xl: "2rem"
+  2xl: "2.5rem"
+  3xl: "3rem"
 components:
   button-primary:
     backgroundColor: "{colors.accent}"
-    textColor: "{colors.deck}"
+    textColor: "{colors.panel}"
     rounded: "{rounded.md}"
     padding: "0.5rem 1rem"
   button-primary-hover:
     backgroundColor: "{colors.accent-dark}"
-    textColor: "{colors.deck}"
+    textColor: "{colors.panel}"
     rounded: "{rounded.md}"
     padding: "0.5rem 1rem"
   button-ghost:
     backgroundColor: "transparent"
     textColor: "{colors.annotation}"
     rounded: "{rounded.md}"
-    padding: "0.5rem 0.75rem"
+    padding: "0.5rem 1rem"
+    border: "1px solid {colors.rim}"
   input-default:
-    backgroundColor: "{colors.deck}"
+    backgroundColor: "{colors.panel}"
     textColor: "{colors.ink}"
     rounded: "{rounded.md}"
-    padding: "0.625rem 0.875rem"
+    padding: "0.5rem 1rem"
+    border: "1px solid {colors.rim}"
   panel-default:
     backgroundColor: "{colors.panel}"
     textColor: "{colors.ink}"
     rounded: "{rounded.lg}"
     padding: "1rem"
+    border: "1px solid {colors.rim}"
 ---
 
-# Design System: CampusTrack — Galactic Command
+# Design System: CampusTrack — Bone & Ink
 
 ## 1. Overview
 
-**Creative North Star: "The Lab Bench"**
+**Creative North Star: "The Exam Hall at Dawn"**
 
-A well-lit laboratory work surface at dusk. The room is dim, but the task lamp casts focused warm light across a brushed-steel bench. Every instrument is deliberate — calibrated, clean, ready for precision work.
+A quiet examination hall in the early morning. Warm bone-coloured desks, soft natural light through tall windows, the faint smell of paper. Everything is still, serious, and purposeful. Students arrive, sit down, and focus — the room does not distract them.
 
-The palette has been adapted to a **cool deep-space theme** — deep navy-black surfaces (`#0A0A0F`), nebula-blue panels (`#14141E`), and a Jedi blue accent (`#4A9EFF`) that replaces the original warm amber. This is not a dark-void consumer theme; it is an instrument panel at night — precise, authoritative, the glow of screens in a quiet spacecraft.
+The palette is restrained: warm cream surfaces (`#F3EFE2`), off-white panels (`#FBF9F2`), deep warm ink text (`#2A2419`), and a single deep pine green accent (`#2F5D56`) that appears only where action is needed. This is not a "modern" or "tech" interface — it is an institutional tool designed for concentration during high-pressure exams.
 
 **Key Characteristics:**
-- Cool deep-space surfaces (navy-black, not near-black or warm charcoal)
-- Jedi blue accent used ≤10% of any screen — the active instrument, not decoration
-- Animated CSS starfield background (three-layer box-shadow technique) with shooting stars
-- Custom lightsaber cursor as a thematic signature (toggleable)
-- Flat panels with directional blue-tinged shadows
-- Technical typography — clean, precise, never decorative
+- Warm bone/cream backgrounds (not white, not dark)
+- Single pine green accent used ≤15% of any screen — the action signal, never decoration
+- Flat panels with soft, warm-tinted shadows on interaction
+- Typography-first: clear hierarchy without decorative elements
+- The interface disappears so the exam can happen
 
 **Explicit Rejections (from PRODUCT.md anti-references):**
 - Gradient text, glassmorphism, decorative blurs
@@ -99,148 +102,157 @@ The palette has been adapted to a **cool deep-space theme** — deep navy-black 
 - The hero-metric template (big number + small label + gradient accent)
 - Hand-drawn / sketchy SVG illustrations
 - Any pattern that reads as AI-generated rather than designed
+- Dark mode as default (exam halls are brightly lit — light theme reduces contrast fatigue)
 
-## 2. Colors: The Galactic Console Palette
+## 2. Colors: The Bone & Ink Palette
 
-The palette takes its character from a spacecraft instrument panel at night: deep cool blacks, faint nebula blues, and a single bright blue accent that reads as an active sensor reading.
+The palette is drawn from a physical exam room: bone-coloured desks, cream paper, ink, and the deep green of a blackboard or a marker board.
 
 ### Primary
-- **Jedi Blue** (`#4A9EFF` / `oklch(0.65 0.18 250)`): The single saturated accent. Used only for interactive elements — primary buttons, active states, focus rings, timer warnings. The active instrument on the panel.
+- **Pine Green** (`#2F5D56` / `oklch(0.39 0.04 190)`): The single saturated accent. Used for interactive elements — primary buttons, active states, focus rings, selected filters. Always intentional, never decorative.
 
 ### Neutral
-- **Deep Space** (`#0A0A0F` / `oklch(0.05 0.005 260)`): The foundational background — the dark of space. Used for body background, input fields, and the outermost canvas.
-- **Nebula Panel** (`#14141E` / `oklch(0.10 0.008 265)`): Slightly lifted cool dark. Used for cards, panels, sidebars, and surfaced containers — the instrument bezel.
-- **Star Glow Rim** (`#2A2A3E` / `oklch(0.18 0.01 270)`): Subtle cool gray for borders, dividers, and separators. Precise 1px. Never glowing.
-- **Warm Parchment Ink** (`#E8E0D8` / `oklch(0.90 0.01 75)`): Warm off-white with a trace of warmth to make it readable against cold backgrounds. Primary body text.
-- **Stardust Gray** (`#7A7A8A` / `oklch(0.50 0.015 280)`): Cool medium gray. Secondary text, placeholders, disabled states. Reads at ≥4.5:1 against Deep Space.
+- **Warm Deck** (`#F3EFE2` / `oklch(0.94 0.015 85)`): The foundational background — worn wooden desks. Body background, input fields, muted containers.
+- **Cream Panel** (`#FBF9F2` / `oklch(0.97 0.01 85)`): Slightly lighter lifted surface. Used for cards, panels, sidebars, modal content — the paper on the desk.
+- **Warm Rim** (`#DFD4B8` / `oklch(0.86 0.025 80)`): Subtle warm border for dividers, separators, input outlines. Precise 1px.
+- **Ink** (`#2A2419` / `oklch(0.18 0.01 55)`): Deep warm black — like good fountain pen ink on paper. Primary text, headings.
+- **Annotation** (`#8A8066` / `oklch(0.56 0.025 70)`): Muted warm gray. Secondary text, placeholders, disabled states. Reads at ≥4.5:1 against deck/panel.
 
 ### Semantic
-- **Yoda Green** (`#2DDE78`): Correct answers, completed items, success states. Paired with its light/dark variants for badges and fills.
-- **Sith Red** (`#FF3040`): Errors, warnings, urgent timer states, destructive actions.
-- **Mace Purple** (`#B37DFF`): Informational cues, links, help text.
+- **Verify Green** (`#4B7B3F`): Correct answers, completed items, success states. Paired with light/dark variants.
+- **Alert Red** (`#AE4331`): Errors, warnings, destructive actions, urgent timer states.
+- **Clarify Purple** (`#565C86`): Informational cues, help, secondary metadata.
 
 ### Named Rules
 
-**The Instrument Light Rule.** The blue accent covers ≤10% of any given screen. Its rarity is the point — when blue appears, the user knows something demands attention or action. Overuse turns the console into a Christmas tree.
+**The Pine Accent Rule.** The green accent covers ≤15% of any given screen. Its rarity is the point — when green appears, the user knows something is actionable.
 
-**The Cold Surface Rule.** Every surface carries a cool trace toward blue. The coolness is not decorative — it creates the physical sensation of a dark instrument panel.
+**The Warm Surface Rule.** Every surface carries a trace of warmth toward the deck hue. The warmth is not decorative — it creates the physical sensation of paper and wood, reducing eye strain in brightly-lit exam environments.
 
 ## 3. Typography
 
-**Display Font:** Plus Jakarta Sans, system-ui, sans-serif (700 weight, tight tracking)
+**Display Font:** Plus Jakarta Sans, system-ui, sans-serif (700 weight)
 **Body Font:** Inter, system-ui, sans-serif (400/500/600 weights)
 **Mono Font:** JetBrains Mono, Fira Code, monospace (all weights)
 
-**Character:** A technical sans pairing with a confident display face. Plus Jakarta Sans at 700 weight carries authority — it is the instrument label, the panel header. Inter at 0.875rem base is dense but legible, designed for data-dense screens where every row counts. JetBrains Mono brings precision to scores, timers, and code. Together they read as an engineer's notebook, not a marketing site.
+**Character:** A restrained technical pairing. Plus Jakarta Sans at 700 carries authority — panel headers, modal titles, the timer display. Inter at 0.875rem base is dense but legible for data-dense screens. JetBrains Mono brings precision to scores, timers, and code output.
 
 ### Hierarchy
 - **Display** (700, `clamp(1.25rem, 2.5vw, 2rem)`, 1.2): Page titles, empty-state headings, modal titles. `text-wrap: balance`.
 - **Headline** (600, `1.25rem`, 1.4): Section headers, panel titles. `text-wrap: balance`.
 - **Title** (600, `1rem`, 1.5): Card headers, sub-section labels.
-- **Body** (400, `0.875rem`, 1.375): The default reading size. Max line length 70ch in prose contexts.
+- **Body** (400, `0.875rem`, 1.375): The default reading size. Max line length 70ch.
 - **Label** (500, `0.75rem`): Input labels, table headers, metadata. Never uppercase.
 - **Caption** (400, `0.6875rem`): Tiny print, timestamps, secondary metadata.
+- **2xs** (400, `0.625rem`, 1.4): The smallest legible size — timestamps on badges, supplementary data.
 - **Mono Digit** (600, `tabular-nums`): Scores, timer values, rank numbers. Always `tabular-nums` for zero-width stability.
 
 ### Named Rules
 
-**The No-Eyebrow Rule.** Section kickers in tiny uppercase tracked text ("OVERVIEW", "FEATURES", "PRICING") are forbidden. If a section needs a label, use the natural heading hierarchy.
+**The No-Eyebrow Rule.** Section kickers in tiny uppercase tracked text ("OVERVIEW", "FEATURES", "PRICING") are forbidden.
 
-**The Lab Notebook Rule.** All numerical data (scores, percentages, timer values, ranks) uses monospace tabular-nums. The digits must not shift the layout when values change — this is a precision instrument, not a dashboard.
+**The Lab Notebook Rule.** All numerical data uses monospace tabular-nums. Digits must not shift the layout when values change.
 
 ## 4. Elevation
 
-The Galactic Console uses tight, directional shadows with a blue cast to create depth — the way cockpit instrument bezels cast shadows from overhead panel lighting.
+Bone & Ink uses warm, soft shadows with a parchment cast to create subtle depth — like paper cards resting on a desk.
 
 ### Shadow Vocabulary
-- **Surface** (`0 1px 3px rgba(0,0,0,0.6)`): Cards and panels at rest. A hairline lift that separates content from the deep-space background.
-- **Raised** (`0 4px 12px rgba(74,158,255,0.15)`): Hovered cards, dropdown menus, popovers. A blue-tinged step up.
-- **Modal** (`0 8px 24px rgba(74,158,255,0.2)`): Modal dialogs, slide-out panels. Blue glow suggests a floating instrument panel.
-- **Tooltip** (`0 12px 36px rgba(0,0,0,0.7)`): The highest layer — tooltips, toasts, notifications.
+- **Surface** (`0 1px 3px rgba(42,36,25,0.08)`): Cards and panels at rest. A hairline lift.
+- **Raised** (`0 4px 12px rgba(42,36,25,0.08)`): Hovered cards, dropdown menus, popovers.
+- **Modal** (`0 8px 30px rgba(42,36,25,0.16)`): Modal dialogs, slide-out panels.
+- **Tooltip** (`0 12px 36px rgba(42,36,25,0.22)`): The highest layer — tooltips, toasts.
 
 ### Named Rules
 
-**The Cast Shadow Rule.** Shadows fall directionally from an implied top-left light source. They carry a subtle blue tone from the accent. The asymmetry creates a physical reading of depth.
+**The Warm Shadow Rule.** Shadows use the ink color at low opacity (never pure black, never blue-tinted). They fall softly, as if from warm overhead lighting in a quiet hall.
 
-**The Flat-At-Rest Rule.** Panels and cards have no shadow at idle unless they are interactive containers. The instrument panel is flat until you touch it. Only modals, dropdowns, hovered items, and toasts cast shadows.
+**The Flat-At-Rest Rule.** Panels and cards have no shadow at idle unless they are interactive containers. The paper desk is flat until you touch it. Only modals, dropdowns, hovered items, and toasts cast shadows.
 
 ## 5. Components
 
 ### Buttons
-- **Shape:** Gently rounded corners (0.75rem / 12px). Generous internal padding.
-- **Primary (blue fill):** Background `--accent` (`#4A9EFF`), text `--deck`. Jedi blue: the most important action on screen. Hover darkens (`--accent-dark`), press scales slightly (transform: scale(0.98)). Blue glow shadow on primary.
-- **Ghost:** Transparent background, `--annotation` text, border `--rim` at rest. Hover gains `--panel` background and `--ink` text.
-- **Lightsaber effect:** On hover, a thin glowing line extends from the center bottom of the button outward — a subtle saber ignition. Uses `transform: scaleX` for performant animation.
-- **Semantic variants:** Verify (green fill), Alert (red fill), Clarify (purple fill) for their respective contexts.
+- **Shape:** Gently rounded corners (0.75rem / 12px). Generous padding.
+- **Primary (green fill):** Background `--accent` (`#2F5D56`), text `--panel`. The most important action on screen. Hover darkens (`--accent-dark`).
+- **Ghost:** Transparent, `--annotation` text, `--rim` border at rest. Hover gains `--panel` background and `--ink` text.
+- **Success (green fill):** Background `--verify`, text `--panel`.
+- **Danger (red fill):** Background `--alert`, text `--panel`.
+- **Clarify (purple fill):** Background `--clarify`, text `--panel`.
+- **Sizes:** sm (0.25/0.5rem padding), md (0.5/1rem padding), lg (1/1.5rem padding).
 
 ### Inputs & Fields
-- **Style:** Inset field with `--deck` background, `--rim` border, and `--ink` text.
-- **Focus:** Blue border (`--accent`) with subtle blue glow ring (`ring-1 ring-accent/20`).
+- **Style:** `--panel` background, `--rim` border, `--ink` text. Soft warm aesthetic.
+- **Focus:** Green border (`--accent`) with subtle green glow ring.
 - **Error:** Red border (`--alert`) with red ring.
+- **Placeholder:** `--annotation` at full opacity (not muted — 4.5:1 contrast against field bg).
+- **Textarea:** Same styling, `resize: vertical`.
 
 ### Cards / Panels
-- **Corner Style:** 1rem (16px) radius for container panels, 0.75rem (12px) for nested cards.
-- **Background:** `--panel` for container panels, `--deck` for muted variants.
-- **Border:** Subtle 1px `--rim` border at rest. No shadow at idle (Flat-At-Rest Rule).
-- **Internal Padding:** 1rem standard.
+- **Corner Style:** 1rem (16px) for container panels, 0.75rem (12px) for nested elements.
+- **Background:** `--panel` for container, `--sunken` (5% ink) for muted variants.
+- **Border:** Subtle 1px `--rim` border at rest. No shadow at idle.
+- **Padding:** 1rem standard.
 
 ### Tables
-- **Style:** Contained within a panel. Full-width with bordered header and row dividers.
-- **Header:** `--annotation` label text, `--rim` bottom border.
-- **Rows:** Hover gains a subtle blue tint (`bg-accent/5`).
+- **Style:** Contained within a `.table-wrap` panel. Full-width with bordered header and row dividers.
+- **Header:** Monospace uppercase tracking (0.625rem), `--annotation` color.
+- **Rows:** Hover gains `--panel` background highlight.
+- **Empty state:** Icon + message within the table panel.
 
 ### Modal
-- **Overlay:** Deep Space (`--deck`) at 80% with subtle blur.
-- **Content:** `--panel` background, `--rim` border, 1.5rem radius. Modal shadow with blue cast.
+- **Overlay:** `rgba(42, 36, 25, 0.45)` with `backdrop-filter: blur(4px)`.
+- **Content:** `--panel` background, `--rim` border, 1rem radius. Modal shadow.
+- **Padding:** 1rem horizontal/vertical header, 1.5rem padding body, standard footer.
 
 ### Badges
-- **Style:** Small rounded (0.375rem / 6px), all-caps monospace tracking.
-- **Colors mirror semantics:** Verify green (completed), Alert red (failed), Accent blue (warning/in-progress), Annotation gray (neutral), Clarify purple (info).
+- **Style:** Small rounded (0.5rem), all-caps monospace tracking, 0.625rem font.
+- **Colors:** Verify green, Alert red, Accent green, Annotation gray, Clarify purple.
 
 ### Timer
-- **The signature component of CampusTrack.** Three states: Calm (default), Warning (1-5 min, blue), Urgent (<1 min, red pulsing).
-- **Progress rail:** A thin colored bar under the timer fills from right to left.
+- **Signature component.** Three states: Calm (default ink on sunken), Warning (green tint, 1–5 min), Urgent (red tint, <1 min, pulsing rail).
+- **Rail:** A thin bar under the timer fills from right to left.
 - **Always monospace tabular-nums** for zero-width drift.
 
 ### Navigation (Admin Sidebar)
-- **Style:** Fixed-width (13rem / 208px) panel on the left. Full-height.
+- **Style:** Fixed left panel, full-height, `--panel` background.
 - **Items:** Icon + label, rounded highlight on active (`--accent/10` background, `--accent` text).
-- **User footer:** Bottom-anchored with avatar initial, name, email, and sign-out.
+- **User footer:** Bottom-anchored with avatar initial, name, email, sign-out.
 
 ### Question Palette (Student Exam)
-- **Grid:** 8×N buttons. Each button is 2rem (32px) square on desktop, 44px on mobile.
-- **States:** Default (dark), Answered (green tint), Flagged (blue tint), Current (blue fill).
+- **Grid:** 8×N buttons. Each button 2rem (32px) square on desktop, 44px on mobile.
+- **States:** Default (sunken), Answered (verify tint), Flagged (accent tint), Current (accent fill).
 
-### Lightsaber Cursor (Thematic Signature)
-- **Implementation:** Custom SVG cursor (32×48px) with hotspot at blade tip (16, 4).
-- **Scope:** Applied globally via `html { cursor: url(...) }`.
-- **Accessibility:** Respects `prefers-reduced-motion`; can be toggled off via user preference. Consider restricting to brand surfaces only for exam pages (small 32px targets need precise default cursor).
+### Tabs
+- **Style:** Contained within a sunken bar. Individual tab buttons with pill-style active state.
+- **Active:** Cream panel background with surface shadow — the tab feels "lifted."
+- **Inactive:** Transparent, annotation text, hover reveals ink color.
 
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** use the blue accent sparingly — ≤10% of any screen.
-- **Do** use cool deep-space surfaces for all backgrounds and panels. Never pure black or warm charcoal.
-- **Do** use directional shadows with a blue cast (top-left light source).
+- **Do** use the pine green accent sparingly — ≤15% of any screen.
+- **Do** use warm bone/cream surfaces for all backgrounds. Never white, never dark.
+- **Do** use warm-tinted shadows (ink at low opacity). Never pure black or blue shadows.
 - **Do** use monospace tabular-nums for all scores, timer values, and numerical data.
 - **Do** keep panels flat at rest — shadow only when interactive or modal.
 - **Do** use `text-wrap: balance` on headings for even line lengths.
 - **Do** provide a `prefers-reduced-motion` fallback for every animation.
-- **Do** use `transform` and `opacity` for animations, never layout properties like `width` or `height`.
+- **Do** use `transform` and `opacity` for animations, never layout properties.
+- **Do** use `::selection` styling with accent-tinted highlight.
 
 ### Don't:
-- **Don't** use gradient text (`background-clip: text` + gradient background) — ever.
-- **Don't** use glassmorphism (frosted glass, backdrop-blur on cards) as a default pattern.
-- **Don't** put tiny uppercase tracked eyebrows ("OVERVIEW", "FEATURES") above sections.
-- **Don't** use numbered section markers (01 / 02 / 03) as default scaffolding.
-- **Don't** use side-stripe borders (border-left > 1px colored accent) on cards or list items.
-- **Don't** build identical card grids with icon + heading + text repeated endlessly.
-- **Don't** use the hero-metric template (big number + small label + gradient accent).
+- **Don't** use gradient text — ever.
+- **Don't** use glassmorphism as a default pattern.
+- **Don't** put tiny uppercase tracked eyebrows above sections.
+- **Don't** use numbered section markers (01 / 02 / 03).
+- **Don't** use side-stripe borders on cards or list items.
+- **Don't** build identical card grids repeated endlessly.
+- **Don't** use the hero-metric template.
 - **Don't** use hand-drawn or sketchy SVG illustrations.
 - **Don't** use box-shadow AND border together on the same element as decoration — pick one.
-- **Don't** use border-radius above 1rem (16px) for containers or panels — full-pill is for tags only.
-- **Don't** animate layout properties (width, height, position, margin, padding).
+- **Don't** use border-radius above 1rem (16px) for containers — full-pill is for tags only.
+- **Don't** animate layout properties.
 - **Don't** nest cards inside cards — use tonal surfaces instead.
-- **Don't** use placeholder text at the same color as body text.
+- **Don't** use muted placeholder text that fails 4.5:1 contrast.
 - **Don't** clip dropdowns inside overflow:hidden containers.
-- **Don't** use the lightsaber cursor on high-precision exam surfaces (question palette buttons, 32px targets) — it reduces click accuracy. Reserve for brand/landing pages or make it toggleable.
+- **Don't** default to dark mode — exam halls are brightly lit environments.

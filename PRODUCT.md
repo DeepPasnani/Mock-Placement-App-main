@@ -22,11 +22,11 @@ Success looks like: a student opens the test, sees a clean full-screen interface
 
 ## Brand Personality
 
-**Technical. Confident. Sombre.**
+**Technical. Restrained. Authoritative.**
 
 - *Technical* — built by engineers for engineers; precision in every interaction, not decoration.
-- *Confident* — the interface never hesitates. No loading spinners where instant response is possible. No ambiguous labels.
-- *Sombre* — this is serious work, not a game. Dark, quiet, authoritative. The platform disappears so the test can take place.
+- *Restrained* — the interface never shouts. A single pine-green accent, warm bone surfaces, deliberate whitespace. Every element earns its place.
+- *Authoritative* — this is serious work, not a game. The platform disappears so the test can take place. Quiet confidence.
 
 ## Anti-references
 
@@ -45,9 +45,9 @@ The existing dark design already avoids most of these. The commitment is to stay
 
 ## Design Principles
 
-1. **Dark-first, not dark-by-default** — The dark theme is intentional: it reduces eye strain during long exam sessions (often 2–3 hours in a brightly-lit lab). Every surface choice serves this use case rather than being a stylistic preference.
+1. **Light-first, not light-by-default** — The warm bone-and-cream theme is intentional for brightly-lit exam halls. Pale surfaces reduce contrast fatigue over 2–3 hour sessions. Every surface choice serves this use case rather than being a stylistic preference.
 
-2. **Institutional confidence** — The interface communicates authority through restraint: muted borders, precise typography, selective use of the amber accent only for interactive or stateful elements. Nothing decorative.
+2. **Institutional confidence** — The interface communicates authority through restraint: warm cream backgrounds, precise typography, selective pine-green accent only for interactive or stateful elements. Nothing decorative.
 
 3. **Clarity under pressure** — Students in exam mode must understand their status (time remaining, questions answered, flagged items) at a glance. Every notification, timer state, and palette indicator follows one convention without exception.
 
@@ -59,6 +59,8 @@ The existing dark design already avoids most of these. The commitment is to stay
 
 - WCAG AA target (baseline)
 - `prefers-reduced-motion` respected — all animations degrade gracefully
-- Dark theme provides inherently good contrast ratios (light text on dark background)
-- Focus-visible ring styles applied consistently across interactive elements
+- Light theme with warm matte surfaces minimizes glare in brightly-lit environments
+- Focus-visible ring styles applied consistently across interactive elements (green accent ring)
 - Tabular-nums for all scores and timer digits to prevent layout shift
+- `::selection` highlight uses accent-tinted background for consistency
+- Input placeholder text at full annotation color (4.5:1 minimum) — never the default muted-gray

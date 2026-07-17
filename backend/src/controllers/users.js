@@ -85,8 +85,8 @@ async function getStats(req, res) {
     SELECT cp.difficulty,
       COUNT(DISTINCT cp.id) as total_problems,
       AVG(
-        CASE WHEN s.code_results->>cp.id::text IS NOT NULL
-          THEN ((s.code_results->cp.id->>'earned')::numeric / NULLIF((s.code_results->cp.id->>'total')::numeric, 0))
+        CASE WHEN s.code_results ? cp.id::text
+          THEN ((s.code_results -> cp.id::text ->> 'earned')::numeric / NULLIF((s.code_results -> cp.id::text ->> 'total')::numeric, 0))
           ELSE NULL
         END
       ) as avg_score_rate

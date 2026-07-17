@@ -249,48 +249,49 @@ function McqImportModal({ open, onClose }) {
   return (
     <Modal isOpen={open} onClose={onClose} title="Import Questions" width="max-w-2xl"
       footer={<><Btn variant="ghost" onClick={onClose}>Cancel</Btn><Btn onClick={isJson ? submitJson : submitCsv} disabled={!raw.trim() || loading}>{loading ? <Spinner size={14} /> : 'Import'}</Btn></>}>
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setImportMode('json')}
-            className={`text-xs px-3 py-1.5 rounded border transition-colors ${isJson ? 'border-accent bg-accent/10 text-accent' : 'border-rim text-annotation'}`}
-          >JSON</button>
-          <button
-            onClick={() => setImportMode('csv')}
-            className={`text-xs px-3 py-1.5 rounded border transition-colors ${!isJson ? 'border-accent bg-accent/10 text-accent' : 'border-rim text-annotation'}`}
-          >CSV</button>
-        </div>
+      <div className="space-y-4">
+        {/* Format toggle using shared Tabs component */}
+        <Tabs
+          tabs={[
+            { id: 'json', label: 'JSON' },
+            { id: 'csv', label: 'CSV' },
+          ]}
+          active={importMode}
+          onChange={setImportMode}
+        />
 
         {isJson ? (
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="input-label">JSON</label>
-              <button className="text-xs text-accent hover:underline" onClick={() => setRaw(SAMPLE_JSON)}>Load sample</button>
+              <label className="input-label">JSON data — array of question objects</label>
+              <button className="text-xs text-accent hover:underline focus-ring rounded px-1" onClick={() => setRaw(SAMPLE_JSON)}>Load sample</button>
             </div>
             <Textarea rows={10} value={raw} onChange={e => setRaw(e.target.value)} placeholder={SAMPLE_JSON} className="font-mono text-xs" />
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <label className="input-label">CSV Data</label>
-              <button className="text-xs text-accent hover:underline" onClick={() => setRaw(SAMPLE_CSV)}>Load sample</button>
+              <label className="input-label">CSV data — paste or upload a file</label>
+              <button className="text-xs text-accent hover:underline focus-ring rounded px-1" onClick={() => setRaw(SAMPLE_CSV)}>Load sample</button>
             </div>
-            <Textarea rows={10} value={raw} onChange={e => setRaw(e.target.value)} placeholder="Paste CSV with type column (mcq/coding)..." className="font-mono text-xs" />
+            <Textarea rows={8} value={raw} onChange={e => setRaw(e.target.value)} placeholder="Paste CSV with type column (mcq/coding)..." className="font-mono text-xs" />
             <div className="flex items-center gap-2">
-              <span className="text-xs text-annotation">or upload .csv:</span>
-              <input
-                type="file"
-                accept=".csv"
-                onChange={e => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => setRaw(ev.target.result);
-                    reader.readAsText(file);
-                  }
-                }}
-                className="text-xs text-annotation"
-              />
+              <span className="text-xs text-annotation">Or upload a .csv file:</span>
+              <label className="focus-ring">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={e => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => setRaw(ev.target.result);
+                      reader.readAsText(file);
+                    }
+                  }}
+                  className="text-xs text-annotation file:mr-2 file:py-0.5 file:px-2 file:rounded file:border file:border-rim file:text-xs file:bg-panel file:text-ink hover:file:bg-sunken transition-colors"
+                />
+              </label>
             </div>
           </div>
         )}

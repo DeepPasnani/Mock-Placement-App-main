@@ -12,6 +12,8 @@ const TEMPLATES = {
   passwordReset: { label: 'Password Reset', subject: '🔐 Password Reset OTP', body: '<p>Hi {name},</p><p>Use the OTP provided to reset your password.</p>' },
 };
 
+const DEPARTMENTS = ['CSE', 'IT', 'ECE', 'EEE', 'ME', 'CE', 'AI', 'CSIT'];
+
 export default function SendEmail() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -90,10 +92,13 @@ export default function SendEmail() {
     });
   };
 
-  const departments = ['CSE', 'IT', 'ECE', 'EEE', 'ME', 'CE', 'AI', 'CSIT'];
+  // Insert HTML snippet at cursor position in the body textarea
+  const insertAtCursor = (snippet) => {
+    setBody(b => b + snippet);
+  };
 
   return (
-    <div className="max-w-4xl animate-fade-up">
+    <div className="page-enter">
       <div className="section-header">
         <div>
           <h1 className="section-title">Send Email</h1>
@@ -101,16 +106,16 @@ export default function SendEmail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Left: composer */}
-        <div className="lg:col-span-3 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ── Left: Composer ───────────────────────────────── */}
+        <div className="lg:col-span-3 space-y-5">
           {/* Template selector */}
           <div>
             <label className="input-label">Template</label>
             <select
               value={template}
               onChange={e => handleTemplateChange(e.target.value)}
-              className="select-field w-full"
+              className="select-field"
             >
               {Object.entries(TEMPLATES).map(([key, tpl]) => (
                 <option key={key} value={key}>{tpl.label}</option>
@@ -124,7 +129,7 @@ export default function SendEmail() {
             <input
               value={subject}
               onChange={e => setSubject(e.target.value)}
-              className="input-field w-full"
+              className="input-field"
               placeholder="Email subject…"
             />
           </div>
@@ -132,33 +137,41 @@ export default function SendEmail() {
           {/* Body */}
           <div>
             <label className="input-label">Body (HTML)</label>
-            <div className="flex gap-1 mb-1.5">
+            <div className="flex gap-1 mb-2">
               <button
-                className="btn-ghost-icon text-xs px-2 py-1 rounded border border-rim"
-                onClick={() => setBody(b => b + '<strong></strong>')}
+                type="button"
+                className="btn-ghost-icon text-sm leading-none px-2"
+                onClick={() => insertAtCursor('<strong></strong>')}
                 title="Bold"
+                aria-label="Insert bold tags"
               ><strong>B</strong></button>
               <button
-                className="btn-ghost-icon text-xs px-2 py-1 rounded border border-rim"
-                onClick={() => setBody(b => b + '<em></em>')}
+                type="button"
+                className="btn-ghost-icon text-sm leading-none px-2"
+                onClick={() => insertAtCursor('<em></em>')}
                 title="Italic"
+                aria-label="Insert italic tags"
               ><em>I</em></button>
               <button
-                className="btn-ghost-icon text-xs px-2 py-1 rounded border border-rim"
-                onClick={() => setBody(b => b + '<a href=""></a>')}
+                type="button"
+                className="btn-ghost-icon text-sm leading-none px-2"
+                onClick={() => insertAtCursor('<a href=""></a>')}
                 title="Link"
+                aria-label="Insert link tag"
               >🔗</button>
               <button
-                className="btn-ghost-icon text-xs px-2 py-1 rounded border border-rim"
-                onClick={() => setBody(b => b + '<ul>\n<li></li>\n</ul>')}
+                type="button"
+                className="btn-ghost-icon text-sm leading-none px-2"
+                onClick={() => insertAtCursor('<ul>\n<li></li>\n</ul>')}
                 title="List"
+                aria-label="Insert list tags"
               >•</button>
             </div>
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
-              className="textarea-field w-full font-mono text-xs"
-              rows={12}
+              className="textarea-field"
+              rows={14}
               placeholder="<p>Hello {name},</p>..."
             />
           </div>
@@ -166,9 +179,12 @@ export default function SendEmail() {
           {/* Preview */}
           {body && (
             <div className="panel p-4">
-              <div className="text-xs text-annotation font-semibold mb-2">Preview</div>
-              <div className="border border-rim rounded-lg p-4 bg-white text-black text-sm max-h-64 overflow-y-auto">
-                <div dangerouslySetInnerHTML={{ __html: body }} />
+              <div className="text-label mb-2" style={{ color: 'var(--ct-annotation)' }}>Preview</div>
+              <div className="panel-muted p-4 text-ink" style={{ maxHeight: '16rem', overflowY: 'auto' }}>
+                <div
+                  className="text-sm leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: body }}
+                />
               </div>
             </div>
           )}
@@ -180,112 +196,136 @@ export default function SendEmail() {
               onClick={() => setShowConfirm(true)}
               disabled={!subject.trim() || !body.trim()}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               Send Email
             </Btn>
           </div>
         </div>
 
-        {/* Right: recipients */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="panel p-4">
-            <h3 className="text-sm font-display font-bold text-ink mb-3">Recipients</h3>
+        {/* ── Right: Recipients ────────────────────────────── */}
+        <div className="lg:col-span-2">
+          <div className="panel p-4 space-y-4">
+            <h3 className="text-title" style={{ fontSize: '0.875rem' }}>Recipients</h3>
 
-            {/* All students toggle */}
-            <label className="flex items-center gap-2 mb-3 pb-3 border-b border-rim">
+            {/* All students */}
+            <label className="flex items-center gap-2.5 pb-3" style={{ borderBottom: '1px solid var(--ct-rim)' }}>
               <input
                 type="checkbox"
                 checked={allStudents}
                 onChange={e => setAllStudents(e.target.checked)}
-                className="accent-accent w-4 h-4"
+                className="focus-ring"
+                style={{ accentColor: 'var(--ct-accent)', width: '1rem', height: '1rem' }}
               />
-              <span className="text-sm text-ink">All Students</span>
+              <span className="text-body">All Students</span>
             </label>
 
             {!allStudents && (
               <>
                 {/* Departments */}
-                <div className="mb-3">
-                  <p className="text-xs text-annotation font-semibold mb-1.5">Departments</p>
-                  <div className="flex flex-wrap gap-1">
-                    {departments.map(dept => (
-                      <button
-                        key={dept}
-                        onClick={() => toggleDept(dept)}
-                        className={`text-xs px-2 py-1 rounded border transition-colors ${
-                          selectedDepts.includes(dept)
-                            ? 'border-accent bg-accent/10 text-accent'
-                            : 'border-rim text-annotation hover:text-ink'
-                        }`}
-                      >
-                        {dept}
-                      </button>
-                    ))}
+                <div>
+                  <p className="text-label mb-2">Departments</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEPARTMENTS.map(dept => {
+                      const active = selectedDepts.includes(dept);
+                      return (
+                        <button
+                          key={dept}
+                          type="button"
+                          onClick={() => toggleDept(dept)}
+                          className={`focus-ring text-xs px-1.5 py-1 rounded-sm border cursor-pointer transition-all ${
+                            active
+                              ? 'border-accent bg-accent/10 text-accent'
+                              : 'border-rim text-annotation hover:bg-panel hover:text-ink'
+                          }`}
+                        >
+                          {dept}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Batches */}
-                <div className="mb-3">
-                  <p className="text-xs text-annotation font-semibold mb-1.5">Batches</p>
-                  <div className="flex flex-wrap gap-1">
-                    {(batchData?.batches || []).map(b => (
-                      <button
-                        key={b.id}
-                        onClick={() => toggleBatch(b.id)}
-                        className={`text-xs px-2 py-1 rounded border transition-colors ${
-                          selectedBatches.includes(b.id)
-                            ? 'border-accent bg-accent/10 text-accent'
-                            : 'border-rim text-annotation hover:text-ink'
-                        }`}
-                      >
-                        {b.name}
-                      </button>
-                    ))}
+                <div>
+                  <p className="text-label mb-2">Batches</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(batchData?.batches || []).map(b => {
+                      const active = selectedBatches.includes(b.id);
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => toggleBatch(b.id)}
+                          className={`focus-ring text-xs px-1.5 py-1 rounded-sm border cursor-pointer transition-all ${
+                            active
+                              ? 'border-accent bg-accent/10 text-accent'
+                              : 'border-rim text-annotation hover:bg-panel hover:text-ink'
+                          }`}
+                        >
+                          {b.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Individual students */}
                 <div>
-                  <p className="text-xs text-annotation font-semibold mb-1.5">Individual Students</p>
+                  <p className="text-label mb-2">Individual Students</p>
                   <input
                     value={studentSearch}
                     onChange={e => setStudentSearch(e.target.value)}
                     placeholder="Search by name or email…"
-                    className="input-field w-full text-xs mb-2"
+                    className="input-field text-sm mb-2"
                   />
-                  <div className="max-h-40 overflow-y-auto space-y-1">
-                    {(studentResults?.users || []).map(s => (
-                      <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-panel rounded px-2 py-1">
-                        <input
-                          type="checkbox"
-                          checked={selectedStudents.includes(s.id)}
-                          onChange={() => toggleStudent(s.id)}
-                          className="accent-accent w-3.5 h-3.5 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <div className="text-xs text-ink truncate">{s.name || s.email}</div>
-                          <div className="text-2xs text-annotation/60 truncate">{s.email}</div>
-                        </div>
-                      </label>
-                    ))}
+                  <div className="rounded-sm max-h-40 overflow-y-auto">
+                    {(studentResults?.users || []).map(s => {
+                      const selected = selectedStudents.includes(s.id);
+                      return (
+                        <label
+                          key={s.id}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer transition-colors ${
+                            selected ? 'bg-accent/[0.06]' : 'hover:bg-sunken'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleStudent(s.id)}
+                            style={{ accentColor: 'var(--ct-accent)', width: '0.875rem', height: '0.875rem', flexShrink: 0 }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div className="text-body" style={{ fontSize: '0.8125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.name || s.email}
+                            </div>
+                            <div className="text-caption" style={{ color: 'var(--ct-annotation)', opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.email}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                    {studentSearch.length >= 2 && (studentResults?.users || []).length === 0 && (
+                      <p className="text-caption" style={{ padding: '0.75rem 0.5rem', color: 'var(--ct-annotation)' }}>No students found</p>
+                    )}
                   </div>
                 </div>
               </>
             )}
 
             {/* Summary */}
-            <div className="mt-4 pt-3 border-t border-rim">
-              <div className="text-xs text-annotation">
-                Recipients: <span className="text-ink font-semibold">{getRecipientSummary()}</span>
+            <div className="pt-3" style={{ borderTop: '1px solid var(--ct-rim)' }}>
+              <div className="text-caption" style={{ color: 'var(--ct-annotation)' }}>
+                Recipients: <strong style={{ color: 'var(--ct-ink)' }}>{getRecipientSummary()}</strong>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Confirm modal */}
+      {/* ── Confirm modal ─────────────────────────────────── */}
       <Modal
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
@@ -303,7 +343,7 @@ export default function SendEmail() {
         <Alert type="warning" className="mb-3">
           This will email all selected recipients immediately.
         </Alert>
-        <div className="space-y-1 text-sm text-ink/80">
+        <div className="space-y-2" style={{ fontSize: '0.875rem', color: 'var(--ct-ink)' }}>
           <p><strong>Subject:</strong> {subject}</p>
           <p><strong>Recipients:</strong> {getRecipientSummary()}</p>
         </div>
