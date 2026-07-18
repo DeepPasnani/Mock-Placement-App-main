@@ -179,8 +179,8 @@ export default function SendEmail() {
           {/* Preview */}
           {body && (
             <div className="panel p-4">
-              <div className="text-label mb-2" style={{ color: 'var(--ct-annotation)' }}>Preview</div>
-              <div className="panel-muted p-4 text-ink" style={{ maxHeight: '16rem', overflowY: 'auto' }}>
+              <div className="text-label mb-2 text-annotation">Preview</div>
+              <div className="panel-muted p-4 text-ink max-h-64 overflow-y-auto">
                 <div
                   className="text-sm leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: body }}
@@ -207,16 +207,15 @@ export default function SendEmail() {
         {/* ── Right: Recipients ────────────────────────────── */}
         <div className="lg:col-span-2">
           <div className="panel p-4 space-y-4">
-            <h3 className="text-title" style={{ fontSize: '0.875rem' }}>Recipients</h3>
+            <h3 className="text-title text-sm">Recipients</h3>
 
             {/* All students */}
-            <label className="flex items-center gap-2.5 pb-3" style={{ borderBottom: '1px solid var(--ct-rim)' }}>
+            <label className="flex items-center gap-2.5 pb-3 border-b border-rim">
               <input
                 type="checkbox"
                 checked={allStudents}
                 onChange={e => setAllStudents(e.target.checked)}
-                className="focus-ring"
-                style={{ accentColor: 'var(--ct-accent)', width: '1rem', height: '1rem' }}
+                className="focus-ring accent-accent w-4 h-4"
               />
               <span className="text-body">All Students</span>
             </label>
@@ -294,13 +293,13 @@ export default function SendEmail() {
                             type="checkbox"
                             checked={selected}
                             onChange={() => toggleStudent(s.id)}
-                            style={{ accentColor: 'var(--ct-accent)', width: '0.875rem', height: '0.875rem', flexShrink: 0 }}
+                            className="accent-accent w-3.5 h-3.5 shrink-0"
                           />
-                          <div style={{ minWidth: 0 }}>
-                            <div className="text-body" style={{ fontSize: '0.8125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div className="min-w-0">
+                            <div className="text-body text-sm truncate">
                               {s.name || s.email}
                             </div>
-                            <div className="text-caption" style={{ color: 'var(--ct-annotation)', opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div className="text-caption text-annotation opacity-70 truncate">
                               {s.email}
                             </div>
                           </div>
@@ -308,7 +307,7 @@ export default function SendEmail() {
                       );
                     })}
                     {studentSearch.length >= 2 && (studentResults?.users || []).length === 0 && (
-                      <p className="text-caption" style={{ padding: '0.75rem 0.5rem', color: 'var(--ct-annotation)' }}>No students found</p>
+                      <p className="text-caption px-2 py-3 text-annotation">No students found</p>
                     )}
                   </div>
                 </div>
@@ -316,9 +315,9 @@ export default function SendEmail() {
             )}
 
             {/* Summary */}
-            <div className="pt-3" style={{ borderTop: '1px solid var(--ct-rim)' }}>
-              <div className="text-caption" style={{ color: 'var(--ct-annotation)' }}>
-                Recipients: <strong style={{ color: 'var(--ct-ink)' }}>{getRecipientSummary()}</strong>
+            <div className="pt-3 border-t border-rim">
+              <div className="text-caption text-annotation">
+                Recipients: <strong className="text-ink">{getRecipientSummary()}</strong>
               </div>
             </div>
           </div>
@@ -343,7 +342,7 @@ export default function SendEmail() {
         <Alert type="warning" className="mb-3">
           This will email all selected recipients immediately.
         </Alert>
-        <div className="space-y-2" style={{ fontSize: '0.875rem', color: 'var(--ct-ink)' }}>
+        <div className="space-y-2 text-sm text-ink">
           <p><strong>Subject:</strong> {subject}</p>
           <p><strong>Recipients:</strong> {getRecipientSummary()}</p>
         </div>

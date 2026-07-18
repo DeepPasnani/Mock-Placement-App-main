@@ -181,7 +181,7 @@ export default function AdminLayout() {
 
     <div className="flex h-screen bg-deck overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-52 bg-panel border-r border-rim shrink-0">
+      <aside className="hidden lg:flex flex-col w-52 bg-panel border-r border-rim shrink-0" role="navigation" aria-label="Admin navigation">
         <SidebarContent />
       </aside>
 

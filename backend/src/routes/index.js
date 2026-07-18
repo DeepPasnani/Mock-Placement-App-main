@@ -1,8 +1,9 @@
 const express = require('express');
 const router  = express.Router();
 const { authenticate, requireAdmin, requireSuperAdmin } = require('../middleware/auth');
-const { authLimiter, codeLimiter } = require('../middleware/rateLimit');
+const { authLimiter, codeLimiter, bulkImportLimiter, emailLimiter } = require('../middleware/rateLimit');
 const { upload } = require('../services/cloudinary');
+const { validate, bulkImportSchema, createTestSchema, submitTestSchema, sendEmailSchema } = require('../middleware/validate');
 
 const authCtrl = require('../controllers/auth');
 const testCtrl = require('../controllers/tests');
@@ -23,15 +24,15 @@ router.post('/auth/reset-password',   authLimiter,  authCtrl.resetPassword);    
 // ── Tests ─────────────────────────────────────────────────────
 router.get   ('/tests',                   authenticate, testCtrl.listTests);
 router.get   ('/tests/:id',               authenticate, testCtrl.getTest);
-router.post  ('/tests',                   authenticate, requireAdmin, testCtrl.createTest);
-router.put   ('/tests/:id',               authenticate, requireAdmin, testCtrl.updateTest);
+router.post  ('/tests',                   authenticate, requireAdmin, validate(createTestSchema), testCtrl.createTest);
+router.put   ('/tests/:id',               authenticate, requireAdmin, validate(createTestSchema), testCtrl.updateTest);
 router.delete('/tests/:id',               authenticate, requireAdmin, testCtrl.deleteTest);
 router.post  ('/tests/:id/duplicate',     authenticate, requireAdmin, testCtrl.duplicateTest);
 
 // ── Submissions ───────────────────────────────────────────────
 router.post('/submissions/start',          authenticate, subCtrl.startTest);
 router.post('/submissions/save',           authenticate, subCtrl.saveAnswers);
-router.post('/submissions/submit',         authenticate, subCtrl.submitTest);
+router.post('/submissions/submit',         authenticate, validate(submitTestSchema), subCtrl.submitTest);
 router.post('/submissions/run-code',       authenticate, codeLimiter, subCtrl.runCode);
 router.get ('/submissions/my',             authenticate, subCtrl.getMySubmissions);
 router.get ('/submissions/test/:testId',   authenticate, requireAdmin, subCtrl.getTestSubmissions);
@@ -43,7 +44,7 @@ router.get ('/submissions/:id',            authenticate, subCtrl.getSubmission);
 router.get   ('/users',                authenticate, requireAdmin, userCtrl.listUsers);
 router.get   ('/users/stats',          authenticate, requireAdmin, userCtrl.getStats);
 router.post  ('/users/admin',          authenticate, requireSuperAdmin, userCtrl.createAdmin);
-router.post  ('/users/bulk-import',    authenticate, requireAdmin, userCtrl.bulkImport);
+router.post  ('/users/bulk-import',    authenticate, requireAdmin, bulkImportLimiter, validate(bulkImportSchema), userCtrl.bulkImport);
 router.post  ('/users/notify-test',    authenticate, requireAdmin, userCtrl.notifyTestScheduled); // NEW
 router.patch ('/users/:id',            authenticate, requireAdmin, userCtrl.updateUser);
 router.delete('/users/:id',            authenticate, requireSuperAdmin, userCtrl.deleteUser);
@@ -77,7 +78,7 @@ router.post('/question-bank/import-csv',  authenticate, requireAdmin, bankCtrl.i
 
 // ── Email ─────────────────────────────────────────────────
 const emailCtrl = require('../controllers/email');
-router.post('/email/send', authenticate, requireAdmin, emailCtrl.sendBulkEmail);
+router.post('/email/send', authenticate, requireAdmin, emailLimiter, validate(sendEmailSchema), emailCtrl.sendBulkEmail);
 
 // ── Health check ──────────────────────────────────────────────
 router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

@@ -23,4 +23,18 @@ const codeLimiter = rateLimit({
   message: { error: 'Code submission rate limit exceeded. Please wait.' },
 });
 
-module.exports = { apiLimiter, authLimiter, codeLimiter };
+// Strict limit for bulk import (admin misuse prevention)
+const bulkImportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: { error: 'Bulk import rate limit exceeded. Maximum 10 imports per hour.' },
+});
+
+// Limit for email sending
+const emailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { error: 'Email rate limit exceeded. Maximum 5 sends per hour.' },
+});
+
+module.exports = { apiLimiter, authLimiter, codeLimiter, bulkImportLimiter, emailLimiter };

@@ -76,7 +76,7 @@ export default function Landing() {
         </p>
         <div className="flex items-center justify-center gap-3">
           <Link to="/login" className="btn-primary btn-lg">Get Started</Link>
-          <a href="#features" className="btn-ghost btn-lg">See Features</a>
+          <button onClick={() => { const el = document.getElementById('features'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }} className="btn-ghost btn-lg">See Features</button>
         </div>
 
         {/* Stats */}

@@ -114,6 +114,7 @@ export default function AdminUsers() {
             }
             className="btn-ghost-icon"
             title={u.is_active ? 'Deactivate' : 'Activate'}
+            aria-label={u.is_active ? 'Deactivate user' : 'Activate user'}
           >
             {u.is_active ? (
               <svg className="w-4 h-4 text-verify" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -128,6 +129,7 @@ export default function AdminUsers() {
           <button
             onClick={() => setDeleteId(u.id)}
             className="btn-ghost-icon text-annotation hover:text-alert"
+            aria-label="Delete user"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

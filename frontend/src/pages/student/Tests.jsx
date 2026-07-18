@@ -55,7 +55,7 @@ export default function StudentTests() {
   }
 
   const handleStartTest = (test) => {
-    navigate(`/student/tests/${test.id}`);
+    navigate(`/test/${test.id}`);
   };
 
   return (

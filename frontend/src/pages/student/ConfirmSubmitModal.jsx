@@ -1,0 +1,36 @@
+import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
+
+function ConfirmSubmitModal({ isOpen, onClose, answeredCount, totalQ, submitting, onSubmit }) {
+  const remaining = totalQ - answeredCount;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Submit Test?" width="max-w-sm">
+      <Alert type="warning" className="mb-4">
+        This will permanently submit your test. You cannot make changes after submission.
+      </Alert>
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="panel p-4 text-center">
+          <div className="text-2xs text-annotation mb-1 font-mono uppercase tracking-wider">Answered</div>
+          <div className="text-2xl font-display font-bold text-verify score-digit">{answeredCount}</div>
+        </div>
+        <div className="panel p-4 text-center">
+          <div className="text-2xs text-annotation mb-1 font-mono uppercase tracking-wider">Remaining</div>
+          <div className={`text-2xl font-display font-bold score-digit ${remaining > 0 ? 'text-accent' : 'text-annotation'}`}>{remaining}</div>
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <Btn variant="ghost" onClick={onClose} disabled={submitting}>
+          Continue Test
+        </Btn>
+        <Btn variant="success" onClick={onSubmit} disabled={submitting}>
+          {submitting ? (
+            <><Spinner size={14} className="text-deck" /> Submitting…</>
+          ) : (
+            <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg> Confirm Submit</>
+          )}
+        </Btn>
+      </div>
+    </Modal>
+  );
+}
+
+export default ConfirmSubmitModal;
