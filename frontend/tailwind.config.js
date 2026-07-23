@@ -15,7 +15,7 @@ export default {
         clarify:    { DEFAULT: '#565C86', light: '#7A80A8', dark: '#3F4566' },
       },
       fontFamily: {
-        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Outfit"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         sans:    ['Inter', 'system-ui', 'sans-serif'],
         mono:    ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
       },

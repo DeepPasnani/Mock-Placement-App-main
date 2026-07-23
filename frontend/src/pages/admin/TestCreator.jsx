@@ -98,6 +98,7 @@ export default function TestCreator() {
   const [form, setForm] = useState(DEFAULT_TEST);
   const [activeSection, setActiveSection] = useState(0);
   const [bankOpen, setBankOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const isEdit = !!id;
 
   // ── Keyboard shortcut: Ctrl+S → save draft ───────────────
