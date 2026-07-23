@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersAPI } from '../../services/api';
 import { Btn, Table, Badge, Modal, Input, Alert, ConfirmModal, Spinner } from '../../components/shared/UI';
 import { format } from 'date-fns';
@@ -16,20 +16,20 @@ export default function AdminUsers() {
   const [csvText, setCsvText] = useState('');
   const [deleteId, setDeleteId] = useState(null);
 
-  const { data, isLoading } = useQuery(['users', 'student', search], () =>
-    usersAPI.list({ role: 'student', search }),
-  );
-  const deleteMut = useMutation(usersAPI.delete, {
-    onSuccess: () => { toast.success('User removed'); qc.invalidateQueries('users'); },
+  const { data, isLoading } = useQuery({
+    queryKey: ['users', 'student', search],
+    queryFn: () => usersAPI.list({ role: 'student', search }),
   });
-  const toggleMut = useMutation(
-    ({ id, isActive }) => usersAPI.update(id, { isActive }),
-    {
-      onSuccess: () => { toast.success('Updated'); qc.invalidateQueries('users'); },
-    },
-  );
-  const importMut = useMutation(
-    () => {
+  const deleteMut = useMutation({
+    mutationFn: usersAPI.delete,
+    onSuccess: () => { toast.success('User removed'); qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+  const toggleMut = useMutation({
+    mutationFn: ({ id, isActive }) => usersAPI.update(id, { isActive }),
+    onSuccess: () => { toast.success('Updated'); qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+  const importMut = useMutation({
+    mutationFn: () => {
       const lines = csvText.trim().split('\n').slice(1);
       const students = lines
         .map(l => {
@@ -41,15 +41,13 @@ export default function AdminUsers() {
         .filter(s => s.email);
       return usersAPI.bulkImport({ students });
     },
-    {
-      onSuccess: (r) => {
-        toast.success(`Created ${r.created} students`);
-        qc.invalidateQueries('users');
-        setShowImport(false);
-        setCsvText('');
-      },
+    onSuccess: (r) => {
+      toast.success(`Created ${r.created} students`);
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setShowImport(false);
+      setCsvText('');
     },
-  );
+  });
 
   const users = data?.users || [];
 

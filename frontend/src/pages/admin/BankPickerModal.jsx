@@ -1,13 +1,13 @@
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Btn, Modal, Spinner, Badge } from '../../components/shared/UI';
 import { questionBankAPI } from '../../services/api';
 
 export default function BankPickerModal({ open, onClose, type, onPick }) {
-  const { data, isLoading } = useQuery(
-    ['question-bank', type],
-    () => questionBankAPI.list({ type }),
-    { enabled: open }
-  );
+  const { data, isLoading } = useQuery({
+    queryKey: ['question-bank', type],
+    queryFn: () => questionBankAPI.list({ type }),
+    enabled: open,
+  });
   const questions = data?.questions || [];
 
   return (

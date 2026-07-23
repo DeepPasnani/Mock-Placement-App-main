@@ -1,4 +1,4 @@
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { submissionsAPI } from '../../services/api';
 import { Badge, ProgressBar, Spinner } from '../../components/shared/UI';
@@ -9,7 +9,7 @@ import { format } from 'date-fns';
  * ═══════════════════════════════════════════════════════════ */
 
 export default function StudentResults() {
-  const { data, isLoading } = useQuery('my-submissions', submissionsAPI.getMy);
+  const { data, isLoading } = useQuery({ queryKey: 'my-submissions', queryFn: submissionsAPI.getMy });
   const subs = (data?.submissions || []).filter(
     s => s.status === 'submitted' || s.status === 'auto_submitted',
   );

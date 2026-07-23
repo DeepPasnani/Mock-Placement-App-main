@@ -1,3 +1,4 @@
+const logger = require('../services/logger');
 const { query, getClient } = require('../db');
 const { setActiveSession, getActiveSession, deleteActiveSession, trackActiveUser, getActiveUserCount } = require('../db/redis');
 const { judgeSubmission: judge0Judge } = require('../services/judge0');
@@ -165,7 +166,7 @@ async function submitTest(req, res) {
           totalScore += earned;
           detailedResults[p.id] = { earned, passed, total, results: results.filter(r => !r.hidden) };
         } catch (e) {
-          console.error('Runner error:', e.message);
+          logger.error({ err: e }, 'Runner error');
           // Fallback to Judge0 if Docker failed
           try {
             const results = await judge0Judge({
@@ -180,7 +181,7 @@ async function submitTest(req, res) {
             totalScore += earned;
             detailedResults[p.id] = { earned, passed, total, results: results.filter(r => !r.hidden) };
           } catch (e2) {
-            console.error('Judge0 fallback also failed:', e2.message);
+            logger.error({ err: e2 }, 'Judge0 fallback also failed');
             const earned = Math.round(p.marks * 0.1);
             totalScore += earned;
             detailedResults[p.id] = { earned, error: 'Execution service unavailable' };

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { testsAPI, batchesAPI } from '../../services/api';
 import { Btn, Badge, Table, ConfirmModal, Spinner, Modal, Input, Select } from '../../components/shared/UI';
 import { format } from 'date-fns';
@@ -16,13 +16,15 @@ export default function AdminTests() {
   const [deleteId, setDeleteId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [batchModalTest, setBatchModalTest] = useState(null);
-  const { data, isLoading } = useQuery('tests', testsAPI.list);
+  const { data, isLoading } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
 
-  const deleteMut = useMutation(testsAPI.delete, {
-    onSuccess: () => { toast.success('Test deleted'); qc.invalidateQueries('tests'); },
+  const deleteMut = useMutation({
+    mutationFn: testsAPI.delete,
+    onSuccess: () => { toast.success('Test deleted'); qc.invalidateQueries({ queryKey: 'tests' }); },
   });
-  const dupMut = useMutation(testsAPI.duplicate, {
-    onSuccess: () => { toast.success('Test duplicated'); qc.invalidateQueries('tests'); },
+  const dupMut = useMutation({
+    mutationFn: testsAPI.duplicate,
+    onSuccess: () => { toast.success('Test duplicated'); qc.invalidateQueries({ queryKey: 'tests' }); },
   });
 
   const tests = data?.tests || [];
@@ -44,16 +46,14 @@ export default function AdminTests() {
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   // ── Batch delete ─────────────────────────────────────────
-  const batchDeleteMut = useMutation(
-    (ids) => Promise.all(ids.map(id => testsAPI.delete(id))),
-    {
-      onSuccess: (_, ids) => {
-        toast.success(`${ids.length} test(s) deleted`);
-        setSelectedIds(new Set());
-        qc.invalidateQueries('tests');
-      },
+  const batchDeleteMut = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map(id => testsAPI.delete(id))),
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} test(s) deleted`);
+      setSelectedIds(new Set());
+      qc.invalidateQueries({ queryKey: 'tests' });
     },
-  );
+  });
 
   const columns = [
     {
@@ -284,12 +284,12 @@ function BatchMappingModal({ test, onClose }) {
   const [newBatchDept, setNewBatchDept] = useState('');
   const [selected, setSelected] = useState({}); // batchId -> { checked, set }
 
-  const { data: batchData } = useQuery('batches', batchesAPI.list, { enabled: !!test });
-  const { data: mappedData } = useQuery(
-    ['test-batches', test?.id],
-    () => batchesAPI.listForTest(test.id),
-    { enabled: !!test }
-  );
+  const { data: batchData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list, enabled: !!test });
+  const { data: mappedData } = useQuery({
+    queryKey: ['test-batches', test?.id],
+    queryFn: () => batchesAPI.listForTest(test.id),
+    enabled: !!test,
+  });
 
   const batches = batchData?.batches || [];
 
@@ -303,22 +303,21 @@ function BatchMappingModal({ test, onClose }) {
     }
   }, [test?.id, mappedData]);
 
-  const createBatchMut = useMutation(batchesAPI.create, {
-    onSuccess: () => { qc.invalidateQueries('batches'); setNewBatchName(''); setNewBatchDept(''); toast.success('Batch added'); },
+  const createBatchMut = useMutation({
+    mutationFn: batchesAPI.create,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: 'batches' }); setNewBatchName(''); setNewBatchDept(''); toast.success('Batch added'); },
   });
 
-  const saveMut = useMutation(
-    () => {
+  const saveMut = useMutation({
+    mutationFn: () => {
       const batchIds = Object.entries(selected).filter(([, v]) => v.checked).map(([id]) => id);
       const sectionMapping = {};
       batchIds.forEach(id => { sectionMapping[id] = { set: selected[id].set || 'A' }; });
       return batchesAPI.mapToTest(test.id, { batchIds, sectionMapping });
     },
-    {
-      onSuccess: () => { toast.success('Batch mapping saved'); qc.invalidateQueries(['test-batches', test.id]); onClose(); },
-      onError: (e) => toast.error(e.response?.data?.error || 'Failed to save mapping'),
-    }
-  );
+    onSuccess: () => { toast.success('Batch mapping saved'); qc.invalidateQueries({ queryKey: ['test-batches', test.id] }); onClose(); },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to save mapping'),
+  });
 
   const toggle = (id) => setSelected(p => ({ ...p, [id]: { checked: !p[id]?.checked, set: p[id]?.set || 'A' } }));
   const setSet = (id, set) => setSelected(p => ({ ...p, [id]: { ...p[id], set } }));

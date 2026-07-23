@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const logger = require('./logger');
 
 // ── Transporter ───────────────────────────────────────────────
 let transporter = null;
@@ -7,7 +8,7 @@ function getTransporter() {
   if (transporter) return transporter;
 
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn('⚠️  SMTP not configured — emails will be skipped.');
+    logger.warn('SMTP not configured — emails will be skipped.');
     return null;
   }
 
@@ -38,10 +39,9 @@ async function sendEmail({ to, subject, html, text }) {
       html,
       text: text || html.replace(/<[^>]+>/g, ''),
     });
-    console.log(`✅ Email sent to ${to} — "${subject}"`);
+    logger.info({ to, subject }, 'Email sent');
   } catch (err) {
-    // Never crash the app over a failed email
-    console.error(`❌ Email failed to ${to}:`, err.message);
+    logger.error({ err, to, subject }, 'Email failed');
   }
 }
 

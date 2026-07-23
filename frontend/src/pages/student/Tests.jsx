@@ -1,4 +1,4 @@
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { testsAPI, submissionsAPI } from '../../services/api';
 import { Btn, Badge, ProgressBar, Spinner } from '../../components/shared/UI';
@@ -12,8 +12,8 @@ import { format, formatDistanceToNow } from 'date-fns';
  * ═══════════════════════════════════════════════════════════ */
 
 export default function StudentTests() {
-  const { data, isLoading } = useQuery('tests', testsAPI.list);
-  const { data: subsData } = useQuery('my-submissions', submissionsAPI.getMy);
+  const { data, isLoading } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: subsData } = useQuery({ queryKey: 'my-submissions', queryFn: submissionsAPI.getMy });
   const navigate = useNavigate();
 
   if (isLoading) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { testsAPI } from '../../services/api';
 import { Btn, Input, Select, Textarea, Tabs, Spinner, HelpTip } from '../../components/shared/UI';
 import toast from 'react-hot-toast';
@@ -116,57 +116,55 @@ export default function TestCreator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.title]);
 
-  const { isLoading: loadingTest } = useQuery(
-    ['test', id],
-    () => testsAPI.get(id),
-    {
-      enabled: !!id,
-      onSuccess: (data) => {
-        setForm({
-          title: data.title,
-          description: data.description,
-          status: data.status,
-          startTime: data.start_time
-            ? new Date(
-                new Date(data.start_time).getTime() -
-                  new Date(data.start_time).getTimezoneOffset() * 60000,
-              )
-                .toISOString()
-                .slice(0, 16)
-            : '',
-          endTime: data.end_time
-            ? new Date(
-                new Date(data.end_time).getTime() -
-                  new Date(data.end_time).getTimezoneOffset() * 60000,
-              )
-                .toISOString()
-                .slice(0, 16)
-            : '',
-          durationMinutes: data.duration_minutes,
-          settings: data.settings || DEFAULT_TEST.settings,
-          sections: (data.sections || []).map(s => ({
-            ...s,
-            questions: (s.questions || []).map(q => ({
-              ...q,
-              _id: q.id || genId(),
-            })),
-          })),
-        });
-      },
-    },
-  );
+  const { data: editData, isLoading: loadingTest } = useQuery({
+    queryKey: ['test', id],
+    queryFn: () => testsAPI.get(id),
+    enabled: !!id,
+  });
 
-  const saveMut = useMutation(
-    (payload) => (isEdit ? testsAPI.update(id, payload) : testsAPI.create(payload)),
-    {
-      onSuccess: () => {
-        toast.success(isEdit ? 'Test updated!' : 'Test created!');
-        qc.invalidateQueries('tests');
-        navigate('/admin/tests');
-      },
-      onError: (e) => toast.error(e.response?.data?.error || 'Save failed'),
+  useEffect(() => {
+    if (!editData) return;
+    setForm({
+      title: editData.title,
+      description: editData.description,
+      status: editData.status,
+      startTime: editData.start_time
+        ? new Date(
+            new Date(editData.start_time).getTime() -
+              new Date(editData.start_time).getTimezoneOffset() * 60000,
+          )
+            .toISOString()
+            .slice(0, 16)
+        : '',
+      endTime: editData.end_time
+        ? new Date(
+            new Date(editData.end_time).getTime() -
+              new Date(editData.end_time).getTimezoneOffset() * 60000,
+          )
+            .toISOString()
+            .slice(0, 16)
+        : '',
+      durationMinutes: editData.duration_minutes,
+      settings: editData.settings || DEFAULT_TEST.settings,
+      sections: (editData.sections || []).map(s => ({
+        ...s,
+        questions: (s.questions || []).map(q => ({
+          ...q,
+          _id: q.id || genId(),
+        })),
+      })),
+    });
+  }, [editData]);
+
+  const saveMut = useMutation({
+    mutationFn: (payload) => (isEdit ? testsAPI.update(id, payload) : testsAPI.create(payload)),
+    onSuccess: () => {
+      toast.success(isEdit ? 'Test updated!' : 'Test created!');
+      qc.invalidateQueries({ queryKey: 'tests' });
+      navigate('/admin/tests');
     },
-  );
+    onError: (e) => toast.error(e.response?.data?.error || 'Save failed'),
+  });
 
   const upd = (f, v) => setForm(p => ({ ...p, [f]: v }));
   const updSettings = (f, v) =>

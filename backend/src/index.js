@@ -1,11 +1,16 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const morgan = require('morgan');
+const pinoHttp = require('pino-http');
 
 const routes = require('./routes');
+const { setupWebSocket } = require('./services/websocket');
+const logger = require('./services/logger');
+const { pool } = require('./db');
+const { getRedis } = require('./db/redis');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -13,7 +18,7 @@ const PORT = process.env.PORT || 5000;
 // ── Middleware ──────────────────────────────────────────────────
 app.use(helmet());
 app.use(compression());
-app.use(morgan('combined'));
+app.use(pinoHttp({ logger }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -25,8 +30,30 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api', routes);
 
 // ── Health check ───────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (_req, res) => {
+  const checks = { database: false, redis: false };
+
+  try {
+    await pool.query('SELECT 1');
+    checks.database = true;
+  } catch {
+    checks.database = false;
+  }
+
+  try {
+    const r = await getRedis();
+    await r.ping();
+    checks.redis = true;
+  } catch {
+    checks.redis = false;
+  }
+
+  const allOk = checks.database && checks.redis;
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? 'ok' : 'degraded',
+    checks,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ── 404 handler ────────────────────────────────────────────────
@@ -36,11 +63,15 @@ app.use((_req, res) => {
 
 // ── Error handler ──────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
-  console.error('Unhandled error:', err);
+  logger.error({ err }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// ── Create HTTP server with WebSocket support ──────────────────
+const server = http.createServer(app);
+setupWebSocket(server);
+
 // ── Start server ───────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  logger.info({ port: PORT }, 'Server started');
 });

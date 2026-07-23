@@ -5,7 +5,7 @@
  * Designed as a decision-making tool for T&P faculty.
  * ═══════════════════════════════════════════════════════════ */
 
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { usersAPI, testsAPI } from '../../services/api';
 import { Badge, Spinner } from '../../components/shared/UI';
@@ -25,12 +25,12 @@ const GENRE_ORDER = [
 ];
 
 export default function AdminDashboard() {
-  const { data: stats, isLoading } = useQuery(
-    'admin-stats',
-    usersAPI.stats,
-    { refetchInterval: 60000 },
-  );
-  const { data: testsData } = useQuery('tests', testsAPI.list);
+  const { data: stats, isLoading } = useQuery({
+    queryKey: 'admin-stats',
+    queryFn: usersAPI.stats,
+    refetchInterval: 60000,
+  });
+  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
 
   if (isLoading) {
     return (

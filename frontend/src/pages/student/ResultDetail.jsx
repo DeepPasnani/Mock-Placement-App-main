@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { submissionsAPI } from '../../services/api';
 import { Badge, ProgressBar, Spinner, Alert } from '../../components/shared/UI';
 import { format } from 'date-fns';
@@ -10,10 +10,10 @@ import { format } from 'date-fns';
 
 export default function ResultDetail() {
   const { submissionId } = useParams();
-  const { data, isLoading } = useQuery(
-    ['submission', submissionId],
-    () => submissionsAPI.get(submissionId),
-  );
+  const { data, isLoading } = useQuery({
+    queryKey: ['submission', submissionId],
+    queryFn: () => submissionsAPI.get(submissionId),
+  });
 
   if (isLoading) {
     return (

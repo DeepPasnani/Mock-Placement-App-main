@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { submissionsAPI, testsAPI, usersAPI } from '../../services/api';
 import { Badge, Spinner, Btn, Modal } from '../../components/shared/UI';
 import {
@@ -31,12 +31,12 @@ export default function AdminResults() {
   const [notifyModal, setNotifyModal] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const { data: testsData } = useQuery('tests', testsAPI.list);
-  const { data: subData, isLoading } = useQuery(
-    ['submissions', selectedTest],
-    () => submissionsAPI.getForTest(selectedTest),
-    { enabled: !!selectedTest },
-  );
+  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: subData, isLoading } = useQuery({
+    queryKey: ['submissions', selectedTest],
+    queryFn: () => submissionsAPI.getForTest(selectedTest),
+    enabled: !!selectedTest,
+  });
 
   const tests = testsData?.tests || [];
   const allSubs = subData?.submissions || [];
@@ -196,28 +196,27 @@ export default function AdminResults() {
     }
   };
 
-  const deleteMut = useMutation(submissionsAPI.delete, {
+  const deleteMut = useMutation({
+    mutationFn: submissionsAPI.delete,
     onSuccess: () => {
       toast.success('Submission deleted');
       setDeleteId(null);
-      qc.invalidateQueries(['submissions', selectedTest]);
+      qc.invalidateQueries({ queryKey: ['submissions', selectedTest] });
     },
     onError: () => toast.error('Failed to delete'),
   });
 
   // ── Resume test (admin) ───────────────────────────────
   const [resumingId, setResumingId] = useState(null);
-  const resumeMut = useMutation(
-    (id) => api.post(`/submissions/resume/${id}`).then(r => r.data),
-    {
-      onSuccess: (data) => {
-        toast.success(data.message || 'Test resumed successfully');
-        setResumingId(null);
-        qc.invalidateQueries(['submissions', selectedTest]);
-      },
-      onError: (e) => toast.error(e.response?.data?.error || 'Failed to resume test'),
-    }
-  );
+  const resumeMut = useMutation({
+    mutationFn: (id) => api.post(`/submissions/resume/${id}`).then(r => r.data),
+    onSuccess: (data) => {
+      toast.success(data.message || 'Test resumed successfully');
+      setResumingId(null);
+      qc.invalidateQueries({ queryKey: ['submissions', selectedTest] });
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to resume test'),
+  });
 
   // ── Ranked + sorted submissions ────────────────────────
   // Sort: submitted first (by score descending), then in-progress

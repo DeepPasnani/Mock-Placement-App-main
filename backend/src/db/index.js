@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const logger = require('../services/logger');
 
 const pool = new Pool(
   process.env.DATABASE_URL
@@ -22,7 +23,7 @@ const pool = new Pool(
 );
 
 pool.on('error', (err) => {
-  console.error('PostgreSQL pool error:', err);
+  logger.error({ err }, 'PostgreSQL pool error');
 });
 
 const query = (text, params) => pool.query(text, params);

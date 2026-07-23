@@ -8,19 +8,20 @@ async function listTests(req, res) {
   const userDepartment = req.user.department;
 
   let whereClause = '';
+  const params = [];
   
   if (userRole === 'super_admin') {
-    // Super admin sees all tests
     whereClause = '';
   } else if (userRole === 'admin') {
-    // Admin sees only their own tests
-    whereClause = `WHERE t.created_by = '${userId}'`;
+    whereClause = 'WHERE t.created_by = $1';
+    params.push(userId);
   } else if (userRole === 'student') {
-    // Student sees only published tests for their department
     if (userDepartment) {
-      whereClause = `WHERE t.status = 'published' AND t.department = '${userDepartment}'`;
+      whereClause = 'WHERE t.status = $1 AND (t.department = $2 OR t.department = \'all\')';
+      params.push('published', userDepartment);
     } else {
-      whereClause = `WHERE t.status = 'published' AND t.department = 'all'`; // fallback
+      whereClause = 'WHERE t.status = $1 AND t.department = $2';
+      params.push('published', 'all');
     }
   }
 
@@ -33,7 +34,7 @@ async function listTests(req, res) {
     LEFT JOIN users u ON t.created_by = u.id
     ${whereClause}
     ORDER BY t.created_at DESC
-  `);
+  `, params);
 
   res.json({ tests: rows });
 }

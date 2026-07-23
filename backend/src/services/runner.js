@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const logger = require('./logger');
 
 // Language → Docker image + compile/run commands
 const LANG_CONFIG = {
@@ -45,9 +46,9 @@ let dockerAvailable = false;
 try {
   execSync('docker info', { stdio: 'ignore', timeout: 5000 });
   dockerAvailable = true;
-  console.log('✅ Docker available — using local code runner');
+  logger.info('Docker available — using local code runner');
 } catch {
-  console.warn('⚠️  Docker not available — falling back to Judge0');
+  logger.warn('Docker not available — falling back to Judge0');
 }
 
 function isDockerAvailable() { return dockerAvailable; }

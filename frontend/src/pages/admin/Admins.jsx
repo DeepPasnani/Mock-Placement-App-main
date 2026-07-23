@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersAPI } from '../../services/api';
 import { useStore } from '../../store';
 import { Btn, Table, Badge, Modal, Input, Alert, ConfirmModal, Spinner } from '../../components/shared/UI';
@@ -18,18 +18,23 @@ export default function AdminAdmins() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [formErr, setFormErr] = useState('');
 
-  const { data, isLoading } = useQuery(['admins'], () => usersAPI.listAdmins());
-  const createMut = useMutation(usersAPI.createAdmin, {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admins'],
+    queryFn: () => usersAPI.listAdmins(),
+  });
+  const createMut = useMutation({
+    mutationFn: usersAPI.createAdmin,
     onSuccess: () => {
       toast.success('Admin account created');
-      qc.invalidateQueries(['admins']);
+      qc.invalidateQueries({ queryKey: ['admins'] });
       setShowAdd(false);
       setForm({ name: '', email: '', password: '' });
     },
     onError: (e) => setFormErr(e.response?.data?.error || 'Failed to create admin'),
   });
-  const deleteMut = useMutation(usersAPI.delete, {
-    onSuccess: () => { toast.success('Admin removed'); qc.invalidateQueries(['admins']); },
+  const deleteMut = useMutation({
+    mutationFn: usersAPI.delete,
+    onSuccess: () => { toast.success('Admin removed'); qc.invalidateQueries({ queryKey: ['admins'] }); },
   });
 
   const admins = data?.admins || [];

@@ -1,7 +1,10 @@
 const express = require('express');
 const router  = express.Router();
 const { authenticate, requireAdmin, requireSuperAdmin } = require('../middleware/auth');
-const { authLimiter, codeLimiter, bulkImportLimiter, emailLimiter } = require('../middleware/rateLimit');
+const { apiLimiter, authLimiter, codeLimiter, bulkImportLimiter, emailLimiter } = require('../middleware/rateLimit');
+
+// Apply blanket rate limiter to all /api routes
+router.use(apiLimiter);
 const { upload } = require('../services/cloudinary');
 const { validate, bulkImportSchema, createTestSchema, submitTestSchema, sendEmailSchema } = require('../middleware/validate');
 

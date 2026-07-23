@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { questionBankAPI } from '../../services/api';
 import { Btn, Input, Select, Textarea, Badge, Table, Modal, ConfirmModal, Tabs, Spinner, Alert } from '../../components/shared/UI';
 import toast from 'react-hot-toast';
@@ -68,13 +68,14 @@ function McqBankTab() {
   const [importOpen, setImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  const { data, isLoading } = useQuery(
-    ['question-bank', 'mcq', genre, search],
-    () => questionBankAPI.list({ type: 'mcq', genre: genre === 'all' ? undefined : genre, search: search || undefined })
-  );
+  const { data, isLoading } = useQuery({
+    queryKey: ['question-bank', 'mcq', genre, search],
+    queryFn: () => questionBankAPI.list({ type: 'mcq', genre: genre === 'all' ? undefined : genre, search: search || undefined }),
+  });
 
-  const deleteMut = useMutation(questionBankAPI.delete, {
-    onSuccess: () => { toast.success('Question removed'); qc.invalidateQueries(['question-bank', 'mcq']); },
+  const deleteMut = useMutation({
+    mutationFn: questionBankAPI.delete,
+    onSuccess: () => { toast.success('Question removed'); qc.invalidateQueries({ queryKey: ['question-bank', 'mcq'] }); },
   });
 
   const questions = data?.questions || [];
@@ -134,10 +135,11 @@ function McqCreateModal({ open, onClose }) {
 
   const reset = () => { setGenre('general'); setDifficulty('medium'); setText(''); setOptions(['', '', '', '']); setCorrect(0); setMarks(2); };
 
-  const createMut = useMutation(questionBankAPI.create, {
+  const createMut = useMutation({
+    mutationFn: questionBankAPI.create,
     onSuccess: () => {
       toast.success('Question added to bank');
-      qc.invalidateQueries(['question-bank', 'mcq']);
+      qc.invalidateQueries({ queryKey: ['question-bank', 'mcq'] });
       reset();
       onClose();
     },
@@ -196,21 +198,23 @@ function McqImportModal({ open, onClose }) {
   const [error, setError] = useState(null);
   const [importMode, setImportMode] = useState('json');
 
-  const jsonMut = useMutation(questionBankAPI.import, {
+  const jsonMut = useMutation({
+    mutationFn: questionBankAPI.import,
     onSuccess: (data) => {
       toast.success(data.message || 'Questions imported');
-      qc.invalidateQueries(['question-bank', 'mcq']);
+      qc.invalidateQueries({ queryKey: ['question-bank', 'mcq'] });
       setRaw(''); setError(null);
       onClose();
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Import failed'),
   });
 
-  const csvMut = useMutation(questionBankAPI.importCsv, {
+  const csvMut = useMutation({
+    mutationFn: questionBankAPI.importCsv,
     onSuccess: (data) => {
       toast.success(`${data.created || 0} question(s) imported`);
-      qc.invalidateQueries(['question-bank', 'mcq']);
-      qc.invalidateQueries(['question-bank', 'coding']);
+      qc.invalidateQueries({ queryKey: ['question-bank', 'mcq'] });
+      qc.invalidateQueries({ queryKey: ['question-bank', 'coding'] });
       setRaw(''); setError(null);
       onClose();
     },
@@ -311,9 +315,13 @@ function CodingBankTab() {
   const [importOpen, setImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  const { data, isLoading } = useQuery(['question-bank', 'coding'], () => questionBankAPI.list({ type: 'coding' }));
-  const deleteMut = useMutation(questionBankAPI.delete, {
-    onSuccess: () => { toast.success('Question removed'); qc.invalidateQueries(['question-bank', 'coding']); },
+  const { data, isLoading } = useQuery({
+    queryKey: ['question-bank', 'coding'],
+    queryFn: () => questionBankAPI.list({ type: 'coding' }),
+  });
+  const deleteMut = useMutation({
+    mutationFn: questionBankAPI.delete,
+    onSuccess: () => { toast.success('Question removed'); qc.invalidateQueries({ queryKey: ['question-bank', 'coding'] }); },
   });
 
   const questions = data?.questions || [];
@@ -373,10 +381,11 @@ function CodingCreateModal({ open, onClose }) {
 
   const reset = () => { setTitle(''); setDescription(''); setDifficulty('easy'); setMarks(4); setSampleInput(''); setSampleOutput(''); };
 
-  const createMut = useMutation(questionBankAPI.create, {
+  const createMut = useMutation({
+    mutationFn: questionBankAPI.create,
     onSuccess: () => {
       toast.success('Coding question added to bank');
-      qc.invalidateQueries(['question-bank', 'coding']);
+      qc.invalidateQueries({ queryKey: ['question-bank', 'coding'] });
       reset();
       onClose();
     },

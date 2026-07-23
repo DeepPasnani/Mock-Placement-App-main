@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from 'react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { testsAPI, submissionsAPI } from '../../services/api';
 import { useStore } from '../../store';
 import Timer from '../../components/shared/Timer';
@@ -66,13 +66,14 @@ export default function TestInterface() {
   const autoSaveRef = useRef(null);
 
   // ── Data ──────────────────────────────────────────────
-  const { data: testData, isLoading: loadingTest } = useQuery(
-    ['test-full', testId],
-    () => testsAPI.get(testId),
-  );
+  const { data: testData, isLoading: loadingTest } = useQuery({
+    queryKey: ['test-full', testId],
+    queryFn: () => testsAPI.get(testId),
+  });
 
   // ── Start test ────────────────────────────────────────
-  const startMut = useMutation(submissionsAPI.start, {
+  const startMut = useMutation({
+    mutationFn: submissionsAPI.start,
     onSuccess: (data) => {
       setRemainingSeconds(data.remainingSeconds);
       setTestStarted(true);
@@ -95,8 +96,9 @@ export default function TestInterface() {
     },
   });
 
-  const saveMut = useMutation(submissionsAPI.save);
-  const submitMut = useMutation(submissionsAPI.submit, {
+  const saveMut = useMutation({ mutationFn: submissionsAPI.save });
+  const submitMut = useMutation({
+    mutationFn: submissionsAPI.submit,
     onSuccess: () => {
       clearInterval(autoSaveRef.current);
       setSubmitting(false);

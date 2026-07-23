@@ -49,7 +49,32 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', r => { let d=''; r.on('data',c=>d+=c); r.on('end',()=>process.exit(JSON.parse(d).status==='ok'?0:1)) }).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
+
+  backend-init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pp_backend_init
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password_change_me@postgres:5432/placementpro
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      SKIP_MIGRATION: "0"
+    command: ["sh", "-c", "node src/db/migrate.js && node src/db/seed.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
 
   frontend:
     build:
@@ -63,6 +88,28 @@ services:
       - "2828:80"
     depends_on:
       - backend
+    restart: unless-stopped
+
+  db-backup:
+    image: postgres:16-alpine
+    container_name: pp_db_backup
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: placementpro
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password_change_me
+    volumes:
+      - ./scripts/backup-db.sh:/backup-db.sh:ro
+      - ./backups:/backups
+    command: >
+      sh -c "
+        apk add --no-cache bash &&
+        echo '0 3 * * * bash /backup-db.sh /backups' > /etc/crontabs/root &&
+        crond -f
+      "
+    depends_on:
+      - postgres
     restart: unless-stopped
 
 volumes:

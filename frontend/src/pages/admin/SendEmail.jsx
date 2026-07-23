@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from 'react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { emailAPI, usersAPI, batchesAPI } from '../../services/api';
 import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
 import toast from 'react-hot-toast';
@@ -25,15 +25,16 @@ export default function SendEmail() {
   const [template, setTemplate] = useState('blank');
   const [studentSearch, setStudentSearch] = useState('');
 
-  const { data: batchData } = useQuery('batches', batchesAPI.list);
+  const { data: batchData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list });
 
-  const { data: studentResults } = useQuery(
-    ['students-search', studentSearch],
-    () => usersAPI.list({ role: 'student', search: studentSearch, limit: 10 }),
-    { enabled: studentSearch.length >= 2 }
-  );
+  const { data: studentResults } = useQuery({
+    queryKey: ['students-search', studentSearch],
+    queryFn: () => usersAPI.list({ role: 'student', search: studentSearch, limit: 10 }),
+    enabled: studentSearch.length >= 2,
+  });
 
-  const sendMut = useMutation(emailAPI.send, {
+  const sendMut = useMutation({
+    mutationFn: emailAPI.send,
     onSuccess: (data) => {
       toast.success(`Email sent to ${data.sent} student(s)`);
       setShowConfirm(false);

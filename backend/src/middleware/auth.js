@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const logger = require('../services/logger');
 const { query } = require('../db');
 const { cacheGet, cacheSet } = require('../db/redis');
 
@@ -36,7 +37,7 @@ const authenticate = async (req, res, next) => {
     req.user = user;
     next();
   } catch (err) {
-    console.error('Auth middleware error:', err);
+    logger.error({ err }, 'Auth middleware error');
     res.status(500).json({ error: 'Authentication error' });
   }
 };
