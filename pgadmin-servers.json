@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "PlacementPro (Local)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "postgres",
+      "Password": "postgres_password_change_me",
+      "SSLMode": "prefer"
+    }
+  }
+}
