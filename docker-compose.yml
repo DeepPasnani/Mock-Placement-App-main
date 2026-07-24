@@ -47,6 +47,7 @@ services:
       JWT_EXPIRES_IN: 7d
       REFRESH_TOKEN_SECRET: local-dev-refresh-secret-please-change-in-production
       TZ: Asia/Kolkata
+      SKIP_MIGRATION: "1"
     ports:
       - "5000:5000"
     depends_on:
@@ -54,6 +55,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      backend-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', r => { let d=''; r.on('data',c=>d+=c); r.on('end',()=>process.exit(JSON.parse(d).status==='ok'?0:1)) }).on('error',()=>process.exit(1))"]
       interval: 30s
