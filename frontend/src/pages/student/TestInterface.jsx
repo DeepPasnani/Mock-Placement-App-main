@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { testsAPI, submissionsAPI } from '../../services/api';
+import { testsAPI, submissionsAPI, shuffleAPI, submissionsAPIExtended } from '../../services/api';
 import { useStore } from '../../store';
 import Timer from '../../components/shared/Timer';
 import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
@@ -13,18 +13,10 @@ import CodingQuestion from './CodingQuestion';
 import QuestionPalette from './QuestionPalette';
 import ConfirmSubmitModal from './ConfirmSubmitModal';
 import CodingProblemSelection from './CodingProblemSelection';
-
-/* ═══════════════════════════════════════════════════════════
- * Student Test Interface — Assessment Surface
- *
- * This is the most high-stakes screen in the product.
- * Design principles:
- *  • Timer is always visible (top bar centerpiece)
- *  • Question palette on the right for quick navigation
- *  • Clear answered/flagged/current states
- *  • Flat, clean panels — no visual noise
- *  • Monospace for all numeric/scores/timers
- * ═══════════════════════════════════════════════════════════ */
+import FullScreenEnforcer from '../../components/shared/FullScreenEnforcer';
+import { proctoringService } from '../../services/proctoring';
+import { lockdownService } from '../../services/lockdown';
+import { fingerprintService } from '../../services/fingerprint';
 
 const LANG_MAP = {
   python: 'python',
@@ -33,8 +25,9 @@ const LANG_MAP = {
   cpp: 'cpp',
 };
 
-const AUTO_SAVE_INTERVAL = 30000; // 30s
+const AUTO_SAVE_INTERVAL = 30000;
 const MAX_TAB_SWITCHES = 5;
+const FINGERPRINT_INTERVAL = 60000;
 
 export default function TestInterface() {
   const { testId } = useParams();
@@ -63,18 +56,37 @@ export default function TestInterface() {
   const [selectedProblems, setSelectedProblems] = useState([]);
   const [showProblemSelection, setShowProblemSelection] = useState(false);
   const [liveRemainingSeconds, setLiveRemainingSeconds] = useState(null);
-  const autoSaveRef = useRef(null);
+  const [submissionId, setSubmissionId] = useState(null);
 
-  // ── Data ──────────────────────────────────────────────
+  const [questionOrder, setQuestionOrder] = useState(null);
+  const [optionOrders, setOptionOrders] = useState(null);
+  const [timeBombs, setTimeBombs] = useState({});
+
+  const [proctoringActive, setProctoringActive] = useState(false);
+  const [proctoringWarning, setProctoringWarning] = useState(false);
+  const [proctoringVideo, setProctoringVideo] = useState(null);
+  const [cameraDenied, setCameraDenied] = useState(false);
+
+  const [fullscreenExitCount, setFullscreenExitCount] = useState(0);
+  const fingerprintRef = useRef(null);
+
+  const autoSaveRef = useRef(null);
+  const lockdownApplied = useRef(false);
+
   const { data: testData, isLoading: loadingTest } = useQuery({
     queryKey: ['test-full', testId],
     queryFn: () => testsAPI.get(testId),
   });
 
-  // ── Start test ────────────────────────────────────────
+  const { data: shuffleData } = useQuery({
+    queryKey: ['shuffle', testId],
+    queryFn: () => shuffleAPI.get(testId),
+    enabled: !!testStarted,
+  });
+
   const startMut = useMutation({
     mutationFn: submissionsAPI.start,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setRemainingSeconds(data.remainingSeconds);
       setTestStarted(true);
       if (data.submission?.answers) {
@@ -89,6 +101,40 @@ export default function TestInterface() {
           if (Array.isArray(sp) && sp.length > 0) setSelectedProblems(sp);
         } catch {/*noop*/}
       }
+      setSubmissionId(data.submission.id);
+
+      await shuffleAPI.assign(testId);
+      if (!shuffleData?.shuffled) {
+        try {
+          const sd = await shuffleAPI.get(testId);
+          if (sd.shuffled) {
+            setQuestionOrder(sd.questionOrder);
+            setOptionOrders(sd.optionOrders);
+          }
+        } catch {}
+      } else {
+        setQuestionOrder(shuffleData.questionOrder);
+        setOptionOrders(shuffleData.optionOrders);
+      }
+
+      try {
+        const bombData = await submissionsAPIExtended.getTimeBombStatus(testId);
+        if (bombData?.bombs) {
+          const bombMap = {};
+          bombData.bombs.forEach(b => { bombMap[b.questionId] = b; });
+          setTimeBombs(bombMap);
+        }
+      } catch {}
+
+      try {
+        const video = await proctoringService.start(data.submission.id, testId);
+        if (video && video.tagName === 'VIDEO') {
+          setProctoringVideo(video);
+          setProctoringActive(true);
+        } else if (video?.error === 'permission_denied') {
+          setCameraDenied(true);
+        }
+      } catch {}
     },
     onError: (e) => {
       toast.error(e.response?.data?.error || 'Failed to start test');
@@ -111,14 +157,25 @@ export default function TestInterface() {
     },
   });
 
-  // Auto-start when test loads
   useEffect(() => {
     if (testData && !testStarted) {
       startMut.mutate(testId);
     }
-  }, [testData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [testData]);
 
-  // Auto-save every 30s
+  useEffect(() => {
+    if (!testStarted || !submissionId) return;
+    fingerprintRef.current = setInterval(async () => {
+      try {
+        await fingerprintService.verify(submissionId);
+      } catch {}
+    }, FINGERPRINT_INTERVAL);
+    fingerprintService.send(submissionId);
+    return () => {
+      if (fingerprintRef.current) clearInterval(fingerprintRef.current);
+    };
+  }, [testStarted, submissionId]);
+
   useEffect(() => {
     if (!testStarted) return;
     autoSaveRef.current = setInterval(() => {
@@ -127,12 +184,30 @@ export default function TestInterface() {
         answers,
         codeSolutions,
         flaggedQuestions: Array.from(flagged),
+        tabSwitchCount,
+        selectedProblems,
       });
     }, AUTO_SAVE_INTERVAL);
     return () => clearInterval(autoSaveRef.current);
-  }, [testStarted, answers, codeSolutions, flagged]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [testStarted, answers, codeSolutions, flagged, tabSwitchCount, selectedProblems]);
 
-  // Prevent accidental page leave
+  useEffect(() => {
+    if (!testStarted || lockdownApplied.current) return;
+    lockdownService.enable((msg) => toast(msg, { icon: '⚠️', duration: 2000 }));
+    lockdownApplied.current = true;
+    return () => {
+      lockdownService.disable();
+      lockdownApplied.current = false;
+    };
+  }, [testStarted]);
+
+  useEffect(() => {
+    return () => {
+      proctoringService.stop();
+      lockdownService.disable();
+    };
+  }, []);
+
   useEffect(() => {
     const handler = (e) => {
       e.preventDefault();
@@ -142,7 +217,6 @@ export default function TestInterface() {
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  // Track tab switches
   useEffect(() => {
     if (!testStarted) return;
     const handleVisibilityChange = () => {
@@ -151,7 +225,7 @@ export default function TestInterface() {
         setTabSwitchCount(newCount);
         if (newCount > MAX_TAB_SWITCHES) {
           toast.error('Tab switch limit exceeded — submitting test.');
-          handleSubmit();
+          handleSubmit({ autoSubmitted: true });
         } else {
           setShowTabWarning(true);
           setTimeout(() => setShowTabWarning(false), 3000);
@@ -160,29 +234,8 @@ export default function TestInterface() {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [testStarted, tabSwitchCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [testStarted, tabSwitchCount]);
 
-  // Fullscreen
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  useEffect(() => {
-    const handleChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handleChange);
-    return () => document.removeEventListener('fullscreenchange', handleChange);
-  }, []);
-
-  // ── Independent MCQ / Coding round timers ──────────────
-  // Once the MCQ sub-clock runs out, move the student off any aptitude
-  // section and into the coding round. Placed before the loading-state
-  // early return so the hook always runs (Rules of Hooks).
   useEffect(() => {
     if (!testData || liveRemainingSeconds === null) return;
     const splitTimers = !!testData.settings?.splitTimers;
@@ -199,28 +252,72 @@ export default function TestInterface() {
         setCurrentQ(0);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveRemainingSeconds, testData, currentSection]);
 
-  // ── Submit handler ────────────────────────────────────
-  const handleSubmit = useCallback(async () => {
+  useEffect(() => {
+    if (!testStarted || !submissionId) return;
+    const interval = setInterval(async () => {
+      try {
+        const bombs = await submissionsAPIExtended.getTimeBombStatus(testId);
+        if (bombs?.bombs) {
+          const bombMap = {};
+          bombs.bombs.forEach(b => { bombMap[b.questionId] = b; });
+          setTimeBombs(bombMap);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [testStarted, submissionId, testId]);
+
+  useEffect(() => {
+    if (!proctoringVideo) return;
+    const interval = setInterval(() => {
+      try {
+        const state = proctoringService.getDetectedState(proctoringVideo);
+        if (!state.faceDetected || !state.gazeOk) {
+          setProctoringWarning(true);
+          setTimeout(() => setProctoringWarning(false), 3000);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [proctoringVideo]);
+
+  const handleSubmit = useCallback(async (opts = {}) => {
     setSubmitting(true);
     setConfirmSubmit(false);
+    proctoringService.stop();
     submitMut.mutate({
       testId,
       answers,
       codeSolutions,
       flaggedQuestions: Array.from(flagged),
+      tabSwitchCount,
+      selectedProblems,
+      autoSubmitted: opts.autoSubmitted || false,
     });
-  }, [testId, answers, codeSolutions, flagged]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [testId, answers, codeSolutions, flagged, tabSwitchCount, selectedProblems]);
 
-  // ── Time expired ──────────────────────────────────────
   const handleTimeExpired = useCallback(() => {
     setTimeExpired(true);
-    handleSubmit();
+    handleSubmit({ autoSubmitted: true });
   }, [handleSubmit]);
 
-  // ── Run code ──────────────────────────────────────────
+  const handleFullscreenViolation = useCallback(async (count) => {
+    setFullscreenExitCount(count);
+    setTabSwitchCount(prev => prev + 1);
+    if (submissionId) {
+      try {
+        await submissionsAPIExtended.fullscreenViolation({ submissionId, exitCount: count, testId });
+      } catch {}
+    }
+  }, [submissionId, testId]);
+
+  const handleFullscreenThresholdExceeded = useCallback(() => {
+    toast.error('Fullscreen exit limit exceeded — submitting test.');
+    handleSubmit({ autoSubmitted: true });
+  }, [handleSubmit]);
+
   const handleRunAllTests = async () => {
     const q = section?.questions[currentQ];
     if (!q || q.type !== 'coding') return;
@@ -263,7 +360,6 @@ export default function TestInterface() {
     setRunLoading(false);
   };
 
-  // ── Loading state ─────────────────────────────────────
   if (loadingTest || !testStarted || remainingSeconds === null) {
     return (
       <div className="min-h-screen bg-deck flex flex-col items-center justify-center gap-4">
@@ -278,7 +374,7 @@ export default function TestInterface() {
   const test = testData;
   const section = test?.sections?.[currentSection];
   const isAptitude = section?.type === 'aptitude';
-  const totalQ = test?.sections?.reduce((n, s) => n + s.questions.length, 0) || 0;
+  const totalQ = test?.sections?.reduce((n, s) => n + (s.type === 'aptitude' ? s.questions.length : 0), 0) || 0;
   const answeredCount =
     Object.keys(answers).length +
     Object.keys(codeSolutions).filter(k =>
@@ -292,7 +388,6 @@ export default function TestInterface() {
   const elapsedSeconds = liveRemainingSeconds !== null ? totalDurationSeconds - liveRemainingSeconds : 0;
   const mcqLocked = splitTimers && mcqDurationSeconds > 0 && elapsedSeconds >= mcqDurationSeconds;
 
-  // ── Check if coding section needs problem selection ──
   const codingSection = section?.type === 'coding' && section?.questions?.length > 3
     ? section
     : null;
@@ -300,14 +395,17 @@ export default function TestInterface() {
     ? selectedProblems.some(id => codingSection.questions.some(q => q.id === id))
     : true;
 
-  // Filter questions: only show selected ones for coding sections with selection
   const displayQuestions = codingSection && hasSelectedCodingProblems
     ? section.questions.filter(q => selectedProblems.includes(q.id))
     : section?.questions || [];
 
-  const displayQ = displayQuestions[currentQ] || displayQuestions[0];
+  const sectionQuestionOrder = questionOrder?.[section?.id] || [];
+  const sortedDisplayQuestions = section?.type === 'aptitude' && sectionQuestionOrder.length > 0
+    ? [...displayQuestions].sort((a, b) => sectionQuestionOrder.indexOf(a.id) - sectionQuestionOrder.indexOf(b.id))
+    : displayQuestions;
 
-  // ── Navigation helpers ────────────────────────────────
+  const displayQ = sortedDisplayQuestions[currentQ] || sortedDisplayQuestions[0];
+
   const navigateQ = (si, qi) => {
     if (mcqLocked && test.sections[si]?.type === 'aptitude') {
       toast.error('MCQ round has ended for this test.');
@@ -319,7 +417,7 @@ export default function TestInterface() {
   };
 
   const goNext = () => {
-    if (currentQ < section.questions.length - 1) {
+    if (currentQ < sortedDisplayQuestions.length - 1) {
       navigateQ(currentSection, currentQ + 1);
     } else if (currentSection < test.sections.length - 1) {
       navigateQ(currentSection + 1, 0);
@@ -331,12 +429,15 @@ export default function TestInterface() {
       navigateQ(currentSection, currentQ - 1);
     } else if (currentSection > 0) {
       const prevSec = test.sections[currentSection - 1];
-      navigateQ(currentSection - 1, prevSec.questions.length - 1);
+      const prevQuestions = prevSec?.type === 'aptitude' && questionOrder?.[prevSec.id]
+        ? [...(prevSec.questions || [])].sort((a, b) => (questionOrder[prevSec.id].indexOf(a.id) - questionOrder[prevSec.id].indexOf(b.id)))
+        : prevSec?.questions || [];
+      navigateQ(currentSection - 1, prevQuestions.length - 1);
     }
   };
 
   const isLastQuestion =
-    currentQ === section.questions.length - 1 &&
+    currentQ === sortedDisplayQuestions.length - 1 &&
     currentSection === test.sections.length - 1;
 
   const setAnswer = (qId, val) => setAnswers(a => ({ ...a, [qId]: val }));
@@ -359,7 +460,6 @@ export default function TestInterface() {
 
   if (!displayQ && !codingSection) return null;
 
-  // If coding section needs problem selection, show the picker
   if (codingSection && !hasSelectedCodingProblems) {
     return <CodingProblemSelection
       section={codingSection}
@@ -367,14 +467,12 @@ export default function TestInterface() {
       setSelectedProblems={setSelectedProblems}
       codeSolutions={codeSolutions}
       onConfirm={() => {
-        // Save selection
         saveMut.mutate({ testId, answers, codeSolutions, flaggedQuestions: Array.from(flagged), selectedProblems });
         setCurrentQ(0);
       }}
     />;
   }
 
-  // ── Time expired overlay ──────────────────────────────
   if (timeExpired) {
     return (
       <div className="min-h-screen bg-deck flex flex-col items-center justify-center gap-4">
@@ -394,24 +492,35 @@ export default function TestInterface() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════
-  // MAIN RENDER
-  // ═══════════════════════════════════════════════════════
+  const bombInfo = displayQ ? timeBombs[displayQ.id] : null;
+
   return (
     <div className="h-screen flex flex-col bg-deck text-ink overflow-hidden exam-mode">
-      {/* ── Top Bar ──────────────────────────────────────── */}
+      <FullScreenEnforcer
+        enabled={testStarted}
+        onViolation={handleFullscreenViolation}
+        onThresholdExceeded={handleFullscreenThresholdExceeded}
+      />
+
       <header className="h-14 bg-panel border-b border-rim flex items-center justify-between px-3 sm:px-4 shrink-0 z-50">
-        {/* Left: test title */}
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-display font-bold text-sm text-ink truncate max-w-40 sm:max-w-56">
             {test.title}
           </span>
+          {proctoringActive && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-verify/15 text-verify text-2xs font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-verify animate-pulse" />
+              Cam
+            </span>
+          )}
           <span className="text-xs text-annotation/60 hidden sm:block font-mono">
             {answeredCount}/{totalQ}
           </span>
+          {cameraDenied && (
+            <span className="text-2xs text-alert font-mono">No Camera</span>
+          )}
         </div>
 
-        {/* Center: Timer (signature element) */}
         <div className="flex items-center gap-2">
           {splitTimers && (
             <span className={`hidden md:inline-flex items-center px-2 py-1 rounded-md text-2xs font-mono font-bold ${mcqLocked ? 'bg-accent/15 text-accent' : 'bg-panel text-annotation border border-rim'}`}>
@@ -436,9 +545,7 @@ export default function TestInterface() {
           />
         </div>
 
-        {/* Right: actions */}
         <div className="flex items-center gap-1.5">
-          {/* Tab switch count */}
           {tabSwitchCount > 0 && (
             <div
               className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-mono font-bold ${
@@ -454,23 +561,6 @@ export default function TestInterface() {
             </div>
           )}
 
-          {/* Fullscreen */}
-          <button
-            onClick={toggleFullscreen}
-            className="btn-ghost-icon hidden sm:flex"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              {isFullscreen ? (
-                <path strokeLinecap="round" d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" />
-              ) : (
-                <path strokeLinecap="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              )}
-            </svg>
-          </button>
-
-          {/* Toggle palette */}
           <button
             onClick={() => setShowPalette(v => !v)}
             className="btn-ghost-icon hidden md:flex"
@@ -486,7 +576,6 @@ export default function TestInterface() {
             </svg>
           </button>
 
-          {/* Submit button */}
           <Btn variant="success" size="sm" onClick={() => setConfirmSubmit(true)}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" d="M5 13l4 4L19 7" />
@@ -496,11 +585,14 @@ export default function TestInterface() {
         </div>
       </header>
 
-      {/* ── Main Content ─────────────────────────────────── */}
+      {proctoringWarning && (
+        <div className="bg-alert/10 border-b border-alert/20 px-4 py-1.5 text-xs text-alert font-medium text-center animate-fade-in">
+          Face not detected — ensure you are visible to the camera
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Left Panel: Sections + Question ────────────── */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Section tabs */}
           <div className="flex gap-1 px-3 pt-2.5 pb-1.5 bg-panel border-b border-rim shrink-0 overflow-x-auto">
             {test.sections.map((sec, si) => {
               const tabLocked = mcqLocked && sec.type === 'aptitude';
@@ -534,7 +626,6 @@ export default function TestInterface() {
             })}
           </div>
 
-          {/* Question Area */}
           <div className="flex-1 overflow-y-auto">
             {isAptitude ? (
               <AptitudeQuestion
@@ -549,35 +640,54 @@ export default function TestInterface() {
                 onNext={goNext}
                 isLast={isLastQuestion}
                 onConfirmSubmit={() => setConfirmSubmit(true)}
+                timeBomb={bombInfo}
               />
             ) : displayQ ? (
-              <CodingQuestion
-                q={displayQ}
-                qi={currentQ}
-                section={section}
-                codeSolutions={codeSolutions}
-                setCode={setCode}
-                activeLang={activeLang}
-                setActiveLang={setActiveLang}
-                allowedLangs={allowedLangs}
-                flagged={flagged}
-                toggleFlag={toggleFlag}
-                runResult={runResult}
-                runLoading={runLoading}
-                onRunCode={handleRunCode}
-                testResults={testResults}
-                testLoading={testLoading}
-                onRunAllTests={handleRunAllTests}
-                onPrev={goPrev}
-                onNext={goNext}
-                isLast={isLastQuestion}
-                onConfirmSubmit={() => setConfirmSubmit(true)}
-              />
+              <div>
+                {bombInfo?.enabled && bombInfo.expired && (
+                  <div className="max-w-3xl mx-auto p-4 sm:p-5">
+                    <div className="panel p-6 text-center">
+                      <div className="w-12 h-12 rounded-full bg-alert/15 flex items-center justify-center mx-auto mb-3">
+                        <svg className="w-6 h-6 text-alert" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-base font-display font-bold text-ink mb-1">Question Expired</h3>
+                      <p className="text-sm text-annotation">This time-limited question is no longer available.</p>
+                    </div>
+                  </div>
+                )}
+                {(!bombInfo?.enabled || !bombInfo.expired) && (
+                  <CodingQuestion
+                    q={displayQ}
+                    qi={currentQ}
+                    section={section}
+                    codeSolutions={codeSolutions}
+                    setCode={setCode}
+                    activeLang={activeLang}
+                    setActiveLang={setActiveLang}
+                    allowedLangs={allowedLangs}
+                    flagged={flagged}
+                    toggleFlag={toggleFlag}
+                    runResult={runResult}
+                    runLoading={runLoading}
+                    onRunCode={handleRunCode}
+                    testResults={testResults}
+                    testLoading={testLoading}
+                    onRunAllTests={handleRunAllTests}
+                    onPrev={goPrev}
+                    onNext={goNext}
+                    isLast={isLastQuestion}
+                    onConfirmSubmit={() => setConfirmSubmit(true)}
+                    timeBomb={bombInfo}
+                    submissionId={submissionId}
+                  />
+                )}
+              </div>
             ) : null}
           </div>
         </div>
 
-        {/* ── Right Panel: Question Palette ──────────────── */}
         {showPalette && (
           <QuestionPalette
             sections={test.sections}
@@ -587,17 +697,13 @@ export default function TestInterface() {
             isAnswered={isAnswered}
             onNavigate={navigateQ}
             selectedProblems={selectedProblems}
+            questionOrder={questionOrder}
+            optionOrders={optionOrders}
           />
         )}
       </div>
 
-      {/* ── Confirm Submit Modal ─────────────────────────── */}
-      {/* Screen-reader accessible live region for tab-switch warnings */}
-      <div
-        role="alert"
-        aria-live="assertive"
-        className="sr-only"
-      >
+      <div role="alert" aria-live="assertive" className="sr-only">
         {tabSwitchCount > 0 && `Tab switch ${tabSwitchCount} of ${MAX_TAB_SWITCHES}`}
       </div>
 
@@ -609,6 +715,19 @@ export default function TestInterface() {
         submitting={submitting}
         onSubmit={handleSubmit}
       />
+
+      {proctoringVideo && (
+        <div className="fixed bottom-4 right-4 z-50 w-32 h-24 rounded-lg overflow-hidden border-2 border-verify/40 shadow-lg bg-black">
+          <video
+            ref={el => { if (el) el.srcObject = proctoringVideo.srcObject; }}
+            autoPlay
+            muted
+            playsInline
+            className="w-full h-full object-cover scale-x-[-1]"
+          />
+          <div className="absolute top-1 left-1 w-2 h-2 rounded-full bg-verify animate-pulse" />
+        </div>
+      )}
     </div>
   );
 }

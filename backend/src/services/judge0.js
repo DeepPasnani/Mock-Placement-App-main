@@ -1,12 +1,15 @@
 const axios = require('axios');
 
-// Judge0 language IDs
 const LANGUAGE_IDS = {
-  python:     71,  // Python 3.8
-  javascript: 63,  // Node.js 12
-  java:       62,  // Java 13
-  cpp:        54,  // C++ 17 (GCC 9.2)
-  c:          50,  // C (GCC 9.2)
+  python:     71,
+  javascript: 63,
+  java:       62,
+  cpp:        54,
+  c:          50,
+  go:         60,
+  rust:       73,
+  ruby:       72,
+  kotlin:     78,
 };
 
 const judge0Client = axios.create({

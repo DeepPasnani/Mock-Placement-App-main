@@ -199,7 +199,7 @@ function McqImportModal({ open, onClose }) {
   const [importMode, setImportMode] = useState('json');
 
   const jsonMut = useMutation({
-    mutationFn: questionBankAPI.import,
+    mutationFn: questionBankAPI.importJson,
     onSuccess: (data) => {
       toast.success(data.message || 'Questions imported');
       qc.invalidateQueries({ queryKey: ['question-bank', 'mcq'] });
@@ -236,7 +236,7 @@ function McqImportModal({ open, onClose }) {
           throw new Error(`Item ${i + 1}: requires "text", "options" array, and numeric "correctAnswer"`);
         }
       });
-      jsonMut.mutate({ type: 'mcq', items });
+      jsonMut.mutate({ items });
     } catch (e) {
       setError(e.message);
     }

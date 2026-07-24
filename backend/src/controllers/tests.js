@@ -246,4 +246,17 @@ async function buildTestData(testId) {
   return { sections };
 }
 
-module.exports = { listTests, getTest, createTest, updateTest, deleteTest, duplicateTest };
+async function schedulePublish(req, res) {
+  const { scheduled_publish_at } = req.body;
+  if (!scheduled_publish_at) return res.status(400).json({ error: 'scheduled_publish_at required' });
+
+  const { rows } = await query(
+    'UPDATE tests SET scheduled_publish_at=$1 WHERE id=$2 AND created_by=$3 RETURNING *',
+    [scheduled_publish_at, req.params.id, req.user.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Test not found' });
+
+  res.json({ test: rows[0] });
+}
+
+module.exports = { listTests, getTest, createTest, updateTest, deleteTest, duplicateTest, schedulePublish };

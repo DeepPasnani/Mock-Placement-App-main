@@ -10,6 +10,11 @@ export default function AptQEditor({ q, onChange, onRemove }) {
     update('options', o);
   };
 
+  const insertCodeBlock = () => {
+    const newText = (q.text || '') + '\n```\n// code here\n```\n';
+    update('text', newText);
+  };
+
   return (
     <div className="panel p-4 mb-3">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -74,10 +79,16 @@ export default function AptQEditor({ q, onChange, onRemove }) {
         </Btn>
       </div>
 
+      <div className="flex items-center gap-1 mb-1.5">
+        <Btn variant="ghost" size="sm" onClick={insertCodeBlock} title="Insert code block" className="text-xs">
+          {'</>'} Code
+        </Btn>
+        <span className="text-2xs text-annotation/50">Wrap code in ``` blocks for syntax-highlighted rendering</span>
+      </div>
       <Textarea
         value={q.text}
         onChange={e => update('text', e.target.value)}
-        placeholder="Enter question text..."
+        placeholder="Enter question text... Use ```language&#10;code&#10;``` for code blocks"
         rows={3}
         className="mb-3 text-sm"
       />

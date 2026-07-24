@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
+const { query } = require('../db');
 
 // ── Transporter ───────────────────────────────────────────────
 let transporter = null;
@@ -207,7 +208,84 @@ async function sendAdminCreatedEmail({ to, name, tempPassword }) {
   });
 }
 
-// ── 6. Bulk import — student credentials ─────────────────────
+// ── 6. Test reminder (1h before) ──────────────────────────────
+async function sendTestReminderEmail({ to, name, test }) {
+  const start = new Date(test.start_time).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata', dateStyle: 'full', timeStyle: 'short'
+  });
+
+  await sendEmail({
+    to,
+    subject: `⏰ Reminder: ${test.title} starts soon!`,
+    html: wrap(`Test Reminder: ${test.title}`, `
+      <p>Hi <strong>${name}</strong>,</p>
+      <p>This is a reminder that the following test is scheduled to start <strong>soon</strong>.</p>
+      <div class="info-box">
+        <div class="info-row"><span class="info-label">Test</span><span class="info-value">${test.title}</span></div>
+        <div class="info-row"><span class="info-label">Date &amp; Time</span><span class="info-value">${start}</span></div>
+        <div class="info-row"><span class="info-label">Duration</span><span class="info-value">${test.duration_minutes} minutes</span></div>
+        ${test.department ? `<div class="info-row"><span class="info-label">Department</span><span class="info-value">${test.department}</span></div>` : ''}
+      </div>
+      ${test.description ? `<p>${test.description}</p>` : ''}
+      <p>Make sure you have a stable internet connection and a quiet environment. Good luck! 🚀</p>
+    `),
+  });
+}
+
+// ── 7. Weekly digest ─────────────────────────────────────────
+async function sendWeeklyDigestEmail({ to, name, submissions, upcomingTests, unreadCount, achievements }) {
+  let submissionsHtml = '';
+  if (submissions && submissions.length > 0) {
+    submissionsHtml = submissions.map(s => {
+      const pct = s.max_score > 0 ? Math.round((s.score / s.max_score) * 100) : 0;
+      return `<div class="info-row"><span class="info-label">${s.test_title}</span><span class="info-value">${s.score}/${s.max_score} (${pct}%)</span></div>`;
+    }).join('');
+  }
+
+  let upcomingHtml = '';
+  if (upcomingTests && upcomingTests.length > 0) {
+    upcomingHtml = upcomingTests.map(t => {
+      const date = new Date(t.start_time).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata', dateStyle: 'full', timeStyle: 'short'
+      });
+      return `<div class="info-row"><span class="info-label">${t.title}</span><span class="info-value">${date}</span></div>`;
+    }).join('');
+  }
+
+  let achievementsHtml = '';
+  if (achievements && achievements.length > 0) {
+    achievementsHtml = achievements.map(a => `<span class="badge badge-green">${a.name}</span>`).join(' ');
+  }
+
+  await sendEmail({
+    to,
+    subject: '📬 Your Weekly Digest — PlacementPro',
+    html: wrap('Weekly Performance Digest', `
+      <p>Hi <strong>${name}</strong>,</p>
+      <p>Here's your weekly summary from PlacementPro.</p>
+
+      ${submissionsHtml ? `
+      <h3 style="font-size:15px;margin:20px 0 10px;">📊 Tests Completed This Week</h3>
+      <div class="info-box">${submissionsHtml}</div>` : '<p>You didn\'t complete any tests this week. Keep practising! 📚</p>'}
+
+      ${upcomingHtml ? `
+      <h3 style="font-size:15px;margin:20px 0 10px;">📋 Upcoming Tests</h3>
+      <div class="info-box">${upcomingHtml}</div>` : ''}
+
+      <div class="info-box">
+        <div class="info-row"><span class="info-label">Unread Notifications</span><span class="info-value">${unreadCount}</span></div>
+      </div>
+
+      ${achievementsHtml ? `<h3 style="font-size:15px;margin:20px 0 10px;">🏆 Achievements Earned</h3><p>${achievementsHtml}</p>` : ''}
+
+      <p style="margin-top:24px;font-size:12px;color:#94a3b8;">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/student/notifications/preferences" style="color:#1a6cf5;">Unsubscribe from weekly digests</a>
+      </p>
+    `),
+  });
+}
+
+// ── 8. Bulk import — student credentials ─────────────────────
 async function sendBulkImportEmail({ to, name, tempPassword }) {
   await sendEmail({
     to,
@@ -261,6 +339,8 @@ module.exports = {
   sendPasswordResetEmail,
   sendAdminCreatedEmail,
   sendBulkImportEmail,
+  sendTestReminderEmail,
+  sendWeeklyDigestEmail,
   sendEmail,
   wrap,
   TEMPLATES,

@@ -56,6 +56,8 @@ const submitTestSchema = Joi.object({
   codeSolutions: Joi.object().pattern(Joi.string(), Joi.object()),
   flaggedQuestions: Joi.array().items(Joi.string()),
   selectedProblems: Joi.array().items(Joi.string()),
+  tabSwitchCount: Joi.number().integer().min(0),
+  autoSubmitted: Joi.boolean(),
 });
 
 const sendEmailSchema = Joi.object({

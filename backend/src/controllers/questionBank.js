@@ -197,4 +197,49 @@ async function importCsv(req, res) {
   });
 }
 
-module.exports = { listBank, createBank, bulkImportBank, importCsv, deleteBank };
+// ── POST /api/question-bank/import-json ──────────────────────
+// Dedicated JSON import for MCQ questions with format validation.
+// Intended to be used for bulk-importing MCQ questions directly
+// without needing to specify type per-item.
+async function importJson(req, res) {
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items must be a non-empty array' });
+  }
+
+  const inserted = [];
+  const errors = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    try {
+      if (!item.text || !Array.isArray(item.options) || item.options.length < 2 || item.correctAnswer === undefined) {
+        errors.push({ row: i + 1, message: 'Each item requires "text", "options" (array, min 2), and "correctAnswer"' });
+        continue;
+      }
+      const data = {
+        text: item.text,
+        options: item.options,
+        correctAnswer: item.correctAnswer,
+      };
+      const { rows: [question] } = await query(
+        `INSERT INTO bank_questions (type, data, genre, difficulty, marks, tags, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        ['mcq', JSON.stringify(data), item.genre || 'general', item.difficulty || 'medium',
+         item.marks || 2, item.tags || null, req.user.id]
+      );
+      inserted.push(question);
+    } catch (err) {
+      errors.push({ row: i + 1, message: err.message });
+    }
+  }
+
+  res.status(201).json({
+    message: `Imported ${inserted.length} MCQ question(s)`,
+    created: inserted.length,
+    errors: errors.length ? errors : undefined,
+    questions: inserted,
+  });
+}
+
+module.exports = { listBank, createBank, bulkImportBank, importCsv, importJson, deleteBank };

@@ -12,14 +12,44 @@ const AdminResults = lazy(() => import('./pages/admin/Results'));
 const AdminUsers = lazy(() => import('./pages/admin/Users'));
 const AdminAdmins = lazy(() => import('./pages/admin/Admins'));
 const AdminQuestionBank = lazy(() => import('./pages/admin/QuestionBank'));
+const AdminDrives = lazy(() => import('./pages/admin/Drives'));
+const StudentAnalytics = lazy(() => import('./pages/admin/StudentAnalytics'));
+const QuestionAnalytics = lazy(() => import('./pages/admin/QuestionAnalytics'));
+const PlagiarismCheck = lazy(() => import('./pages/admin/PlagiarismCheck'));
 const SendEmail = lazy(() => import('./pages/admin/SendEmail'));
+const SecurityAlerts = lazy(() => import('./pages/admin/SecurityAlerts'));
+const AiQuestionGenerator = lazy(() => import('./pages/admin/AiQuestionGenerator'));
+const AiPlacementPredictions = lazy(() => import('./pages/admin/AiPlacementPredictions'));
+const AiNlQuery = lazy(() => import('./pages/admin/AiNlQuery'));
 const Landing = lazy(() => import('./pages/Landing'));
+const CohortAnalytics = lazy(() => import('./pages/admin/analytics/CohortAnalytics'));
+const StudentGrowth = lazy(() => import('./pages/admin/analytics/StudentGrowth'));
+const QuestionMetrics = lazy(() => import('./pages/admin/analytics/QuestionMetrics'));
+const TimeSinkAnalysis = lazy(() => import('./pages/admin/analytics/TimeSinkAnalysis'));
+const PlacementPredictionsPage = lazy(() => import('./pages/admin/analytics/PlacementPredictions'));
+const ReportBuilder = lazy(() => import('./pages/admin/analytics/ReportBuilder'));
+const ScheduledReports = lazy(() => import('./pages/admin/analytics/ScheduledReports'));
 
 const StudentLayout = lazy(() => import('./pages/student/Layout'));
 const StudentTests = lazy(() => import('./pages/student/Tests'));
 const StudentResults = lazy(() => import('./pages/student/Results'));
 const TestInterface = lazy(() => import('./pages/student/TestInterface'));
 const ResultDetail = lazy(() => import('./pages/student/ResultDetail'));
+const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
+const StudentPricing = lazy(() => import('./pages/student/Pricing'));
+const StudentPayments = lazy(() => import('./pages/student/Payments'));
+const AdminLMS = lazy(() => import('./pages/admin/LMS'));
+const AdminATS = lazy(() => import('./pages/admin/ATS'));
+const AdminWebhooks = lazy(() => import('./pages/admin/Webhooks'));
+const AdminSMS = lazy(() => import('./pages/admin/SMS'));
+const AdminPayments = lazy(() => import('./pages/admin/Payments'));
+const Gamification = lazy(() => import('./pages/student/Gamification'));
+const Leaderboard = lazy(() => import('./pages/student/Leaderboard'));
+const Achievements = lazy(() => import('./pages/student/Achievements'));
+const Progress = lazy(() => import('./pages/student/Progress'));
+const DailyChallenge = lazy(() => import('./pages/student/DailyChallenge'));
+const MockInterview = lazy(() => import('./pages/student/MockInterview'));
+const Resources = lazy(() => import('./pages/student/Resources'));
 
 function SuspenseFallback() {
   return (
@@ -69,17 +99,49 @@ export default function App() {
         <Route path="tests/:id/edit" element={<ErrorBoundary><TestCreator /></ErrorBoundary>} />
         <Route path="results" element={<ErrorBoundary><AdminResults /></ErrorBoundary>} />
         <Route path="results/:testId" element={<ErrorBoundary><AdminResults /></ErrorBoundary>} />
+        <Route path="analytics/students/:studentId" element={<ErrorBoundary><StudentAnalytics /></ErrorBoundary>} />
+        <Route path="analytics/questions" element={<ErrorBoundary><QuestionAnalytics /></ErrorBoundary>} />
+        <Route path="analytics/plagiarism" element={<ErrorBoundary><PlagiarismCheck /></ErrorBoundary>} />
+        <Route path="security/alerts" element={<ErrorBoundary><SecurityAlerts /></ErrorBoundary>} />
         <Route path="users" element={<ErrorBoundary><AdminUsers /></ErrorBoundary>} />
         <Route path="admins" element={<ErrorBoundary><AdminAdmins /></ErrorBoundary>} />
         <Route path="question-bank" element={<ErrorBoundary><AdminQuestionBank /></ErrorBoundary>} />
+        <Route path="drives" element={<ErrorBoundary><AdminDrives /></ErrorBoundary>} />
         <Route path="email" element={<ErrorBoundary><SendEmail /></ErrorBoundary>} />
+        <Route path="analytics/cohort" element={<ErrorBoundary><CohortAnalytics /></ErrorBoundary>} />
+        <Route path="analytics/growth/:studentId" element={<ErrorBoundary><StudentGrowth /></ErrorBoundary>} />
+        <Route path="analytics/question-metrics" element={<ErrorBoundary><QuestionMetrics /></ErrorBoundary>} />
+        <Route path="analytics/question-metrics/:testId" element={<ErrorBoundary><QuestionMetrics /></ErrorBoundary>} />
+        <Route path="analytics/time-sink" element={<ErrorBoundary><TimeSinkAnalysis /></ErrorBoundary>} />
+        <Route path="analytics/time-sink/:testId" element={<ErrorBoundary><TimeSinkAnalysis /></ErrorBoundary>} />
+        <Route path="analytics/placement-predictions" element={<ErrorBoundary><PlacementPredictionsPage /></ErrorBoundary>} />
+        <Route path="analytics/report-builder" element={<ErrorBoundary><ReportBuilder /></ErrorBoundary>} />
+        <Route path="analytics/scheduled-reports" element={<ErrorBoundary><ScheduledReports /></ErrorBoundary>} />
+        <Route path="ai/question-generator" element={<ErrorBoundary><AiQuestionGenerator /></ErrorBoundary>} />
+        <Route path="ai/placement-predictions" element={<ErrorBoundary><AiPlacementPredictions /></ErrorBoundary>} />
+        <Route path="ai/nl-query" element={<ErrorBoundary><AiNlQuery /></ErrorBoundary>} />
+        <Route path="lms" element={<ErrorBoundary><AdminLMS /></ErrorBoundary>} />
+        <Route path="ats" element={<ErrorBoundary><AdminATS /></ErrorBoundary>} />
+        <Route path="webhooks" element={<ErrorBoundary><AdminWebhooks /></ErrorBoundary>} />
+        <Route path="sms" element={<ErrorBoundary><AdminSMS /></ErrorBoundary>} />
+        <Route path="payments" element={<ErrorBoundary><AdminPayments /></ErrorBoundary>} />
       </Route>
 
       {/* Student routes */}
       <Route path="/student" element={<RequireAuth role="student"><StudentLayout /></RequireAuth>}>
-        <Route index element={<ErrorBoundary><StudentTests /></ErrorBoundary>} />
+        <Route index element={<ErrorBoundary><StudentDashboard /></ErrorBoundary>} />
+        <Route path="tests" element={<ErrorBoundary><StudentTests /></ErrorBoundary>} />
         <Route path="results" element={<ErrorBoundary><StudentResults /></ErrorBoundary>} />
         <Route path="results/:submissionId" element={<ErrorBoundary><ResultDetail /></ErrorBoundary>} />
+        <Route path="gamification" element={<ErrorBoundary><Gamification /></ErrorBoundary>} />
+        <Route path="leaderboard" element={<ErrorBoundary><Leaderboard /></ErrorBoundary>} />
+        <Route path="achievements" element={<ErrorBoundary><Achievements /></ErrorBoundary>} />
+        <Route path="progress" element={<ErrorBoundary><Progress /></ErrorBoundary>} />
+        <Route path="daily-challenge" element={<ErrorBoundary><DailyChallenge /></ErrorBoundary>} />
+        <Route path="mock-interview" element={<ErrorBoundary><MockInterview /></ErrorBoundary>} />
+        <Route path="resources" element={<ErrorBoundary><Resources /></ErrorBoundary>} />
+        <Route path="pricing" element={<ErrorBoundary><StudentPricing /></ErrorBoundary>} />
+        <Route path="payments" element={<ErrorBoundary><StudentPayments /></ErrorBoundary>} />
       </Route>
 
       {/* Test taking - full screen, no layout */}

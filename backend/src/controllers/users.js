@@ -286,6 +286,139 @@ async function sendResults(req, res) {
   res.json({ message: `Results queued for ${sent} student${sent !== 1 ? 's' : ''}.`, sent });
 }
 
+// ── POST /api/users/bulk-update-batch ────────────────────────
+// Bulk update student batch and year_of_study via CSV data.
+// For semester-start re-shuffling. Accepts array of { email, batch, year_of_study }.
+async function bulkUpdateBatch(req, res) {
+  const { students } = req.body;
+  if (!Array.isArray(students) || !students.length) {
+    return res.status(400).json({ error: 'Student list required' });
+  }
+
+  const results = { updated: 0, skipped: 0, errors: [] };
+
+  for (const s of students) {
+    if (!s.email) { results.errors.push('Missing email for entry'); continue; }
+    try {
+      const fields = [];
+      const params = [];
+      if (s.batch !== undefined) { params.push(s.batch); fields.push(`batch=$${params.length}`); }
+      if (s.year_of_study !== undefined) { params.push(parseInt(s.year_of_study)); fields.push(`year_of_study=$${params.length}`); }
+      if (!fields.length) { results.errors.push(`${s.email}: No fields to update`); continue; }
+
+      params.push(s.email.toLowerCase());
+      const { rowCount } = await query(
+        `UPDATE users SET ${fields.join(', ')}, updated_at=NOW() WHERE email=$${params.length} AND role='student'`,
+        params
+      );
+
+      if (rowCount > 0) results.updated++;
+      else results.skipped++;
+    } catch (err) {
+      results.errors.push(`${s.email}: ${err.message}`);
+    }
+  }
+
+  res.json(results);
+}
+
+// ── GET /api/users/:id/analytics ────────────────────────────
+// Individual student drill-down analytics
+async function getStudentAnalytics(req, res) {
+  const { id } = req.params;
+  const { rows: [student] } = await query('SELECT id, name, email, branch, roll_number, batch, year_of_study FROM users WHERE id=$1 AND role=\'student\'', [id]);
+  if (!student) return res.status(404).json({ error: 'Student not found' });
+
+  // Overall stats
+  const { rows: [overall] } = await query(`
+    SELECT
+      COUNT(*) as total_tests,
+      COUNT(*) FILTER (WHERE status = 'submitted') as submitted_count,
+      COUNT(*) FILTER (WHERE status = 'auto_submitted') as auto_submitted_count,
+      AVG(CASE WHEN max_score > 0 THEN (score / max_score) * 100 END) as avg_percentage,
+      SUM(CASE WHEN max_score > 0 AND (score / max_score) * 100 >= 40 THEN 1 ELSE 0 END) as passed_count,
+      SUM(score) as total_score,
+      SUM(max_score) as total_max_score
+    FROM submissions WHERE user_id=$1`, [id]);
+
+  // Per-test breakdown
+  const { rows: testBreakdown } = await query(`
+    SELECT s.id as submission_id, s.score, s.max_score, s.status, s.submitted_at,
+           s.time_taken_seconds, s.tab_switch_count,
+           t.id as test_id, t.title as test_title, t.department
+    FROM submissions s JOIN tests t ON s.test_id = t.id
+    WHERE s.user_id=$1 ORDER BY s.submitted_at DESC NULLS LAST`, [id]);
+
+  // Genre-wise accuracy for this student
+  const { rows: genreAccuracy } = await query(`
+    SELECT q.genre,
+      COUNT(q.id) as total_questions,
+      SUM(CASE WHEN (s.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1 ELSE 0 END) as correct_count,
+      COUNT(q.id) as attempted_count
+    FROM submissions sub
+    JOIN tests t ON sub.test_id = t.id
+    JOIN sections sec ON sec.test_id = t.id
+    JOIN questions q ON q.section_id = sec.id
+    WHERE sub.user_id=$1 AND sub.status='submitted'
+    GROUP BY q.genre ORDER BY q.genre`, [id]);
+
+  // Coding performance
+  const { rows: codingBreakdown } = await query(`
+    SELECT cp.id as problem_id, cp.title, cp.difficulty, cp.marks,
+           (sub.code_results->>cp.id::text)::jsonb as result
+    FROM submissions sub
+    JOIN tests t ON sub.test_id = t.id
+    JOIN sections sec ON sec.test_id = t.id
+    JOIN coding_problems cp ON cp.section_id = sec.id
+    WHERE sub.user_id=$1 AND sub.status='submitted'
+    ORDER BY cp.difficulty`, [id]);
+
+  res.json({
+    student,
+    overall: {
+      total_tests: parseInt(overall.total_tests) || 0,
+      submitted: parseInt(overall.submitted_count) || 0,
+      auto_submitted: parseInt(overall.auto_submitted_count) || 0,
+      avg_percentage: Math.round(parseFloat(overall.avg_percentage) || 0),
+      passed: parseInt(overall.passed_count) || 0,
+      total_score: parseFloat(overall.total_score) || 0,
+      total_max_score: parseFloat(overall.total_max_score) || 0,
+    },
+    tests: testBreakdown.map(t => ({
+      ...t,
+      percentage: t.max_score > 0 ? Math.round((t.score / t.max_score) * 100) : 0,
+      passed: t.max_score > 0 && (t.score / t.max_score) * 100 >= 40,
+    })),
+    genre_accuracy: genreAccuracy.map(g => ({
+      genre: g.genre,
+      total: parseInt(g.total_questions) || 0,
+      correct: parseInt(g.correct_count) || 0,
+      attempted: parseInt(g.attempted_count) || 0,
+      accuracy: g.attempted_count > 0 ? Math.round((parseInt(g.correct_count) / parseInt(g.attempted_count)) * 100) : 0,
+    })),
+    coding_results: codingBreakdown.map(c => ({
+      problem_id: c.problem_id,
+      title: c.title,
+      difficulty: c.difficulty,
+      marks: c.marks,
+      earned: c.result ? parseInt(c.result.earned) || 0 : 0,
+      total: c.result ? parseInt(c.result.total) || 0 : 0,
+      passed: c.result ? (c.result.earned || 0) > 0 : false,
+    })),
+  });
+}
+
+async function updateLanguage(req, res) {
+  const { language } = req.body;
+  if (!language) return res.status(400).json({ error: 'Language required' });
+
+  await query('UPDATE users SET settings = COALESCE(settings, $1) || $2 WHERE id=$3',
+    [JSON.stringify({}), JSON.stringify({ language }), req.user.id]
+  );
+
+  res.json({ message: 'Language updated', language });
+}
+
 module.exports = {
   listUsers,
   getStats,
@@ -296,4 +429,7 @@ module.exports = {
   listAdmins,
   notifyTestScheduled,
   sendResults,
+  bulkUpdateBatch,
+  getStudentAnalytics,
+  updateLanguage,
 };

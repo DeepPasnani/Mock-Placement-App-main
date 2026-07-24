@@ -1,0 +1,35 @@
+services:
+  frontend:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/ssl:/etc/ssl:ro
+    environment:
+      VITE_API_URL: /api
+      VITE_WS_URL: wss://your-domain.com/ws
+      VITE_GOOGLE_CLIENT_ID: your_google_client_id
+      VITE_APP_NAME: CampusTrack
+      VITE_COLLEGE_NAME: Your College Name
+
+  backend:
+    environment:
+      FRONTEND_URL: https://your-domain.com
+      GOOGLE_CLIENT_ID: your_google_client_id
+      GOOGLE_CLIENT_SECRET: your_google_client_secret
+      SMTP_HOST: your-smtp-host
+      SMTP_PORT: "587"
+      SMTP_USER: your-smtp-user
+      SMTP_PASS: your-smtp-password
+      EMAIL_FROM: noreply@your-domain.com
+      JUDGE0_API_URL: https://judge0-ce.p.rapidapi.com
+      JUDGE0_API_KEY: your-judge0-key
+      JUDGE0_API_HOST: judge0-ce.p.rapidapi.com
+      CLOUDINARY_CLOUD_NAME: your-cloud-name
+      CLOUDINARY_API_KEY: your-cloudinary-key
+      CLOUDINARY_API_SECRET: your-cloudinary-secret
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: change_this_to_strong_password

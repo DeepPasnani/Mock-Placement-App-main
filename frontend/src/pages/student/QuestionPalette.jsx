@@ -1,4 +1,4 @@
-function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswered, onNavigate, selectedProblems = [] }) {
+function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswered, onNavigate, selectedProblems = [], questionOrder, optionOrders, timeBombs = {} }) {
   return (
     <div className="w-48 bg-panel border-l border-rim overflow-y-auto shrink-0 hidden md:block">
       <div className="p-3">
@@ -7,9 +7,16 @@ function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswer
         </div>
         {sections.map((sec, si) => {
           const isCodingWithSelection = sec.type === 'coding' && selectedProblems.length > 0;
-          const displayQuestions = isCodingWithSelection
+          let displayQuestions = isCodingWithSelection
             ? sec.questions.filter(qq => selectedProblems.includes(qq.id))
             : sec.questions;
+
+          const sectionQOrder = questionOrder?.[sec.id] || [];
+          if (sec.type === 'aptitude' && sectionQOrder.length > 0) {
+            displayQuestions = [...displayQuestions].sort(
+              (a, b) => sectionQOrder.indexOf(a.id) - sectionQOrder.indexOf(b.id)
+            );
+          }
 
           return (
             <div key={sec.id} className="mb-4">
@@ -19,18 +26,24 @@ function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswer
                   const ans = isAnswered(sec, qq);
                   const cur = si === currentSection && qi === currentQ;
                   const flg = flagged.has(qq.id);
+                  const bomb = timeBombs[qq.id];
+                  const expired = bomb?.enabled && bomb?.expired;
                   const cls = cur
                     ? 'q-grid-btn--current'
                     : ans
                     ? 'q-grid-btn--answered'
                     : flg
                     ? 'q-grid-btn--flagged'
+                    : expired
+                    ? 'q-grid-btn--default opacity-40'
                     : 'q-grid-btn--default';
                   return (
                     <button
                       key={qq.id}
-                      onClick={() => onNavigate(si, qi)}
+                      onClick={() => !expired && onNavigate(si, qi)}
+                      disabled={expired}
                       className={`q-grid-btn ${cls}`}
+                      title={expired ? 'Time expired' : ''}
                     >
                       {qi + 1}
                     </button>
@@ -41,7 +54,6 @@ function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswer
           );
         })}
 
-        {/* Legend */}
         <div className="mt-4 space-y-1.5 pt-3 border-t border-rim">
           {[
             ['q-grid-btn--current', 'Current'],

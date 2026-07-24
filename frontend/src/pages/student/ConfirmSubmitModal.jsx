@@ -1,13 +1,13 @@
 import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
 
-function ConfirmSubmitModal({ isOpen, onClose, answeredCount, totalQ, submitting, onSubmit }) {
+function ConfirmSubmitModal({ isOpen, onClose, answeredCount, totalQ, submitting, onSubmit, tabSwitchCount, fullscreenExitCount }) {
   const remaining = totalQ - answeredCount;
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Submit Test?" width="max-w-sm">
       <Alert type="warning" className="mb-4">
         This will permanently submit your test. You cannot make changes after submission.
       </Alert>
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="panel p-4 text-center">
           <div className="text-2xs text-annotation mb-1 font-mono uppercase tracking-wider">Answered</div>
           <div className="text-2xl font-display font-bold text-verify score-digit">{answeredCount}</div>
@@ -17,6 +17,14 @@ function ConfirmSubmitModal({ isOpen, onClose, answeredCount, totalQ, submitting
           <div className={`text-2xl font-display font-bold score-digit ${remaining > 0 ? 'text-accent' : 'text-annotation'}`}>{remaining}</div>
         </div>
       </div>
+      {tabSwitchCount > 0 && (
+        <div className="flex items-center gap-2 mb-3 text-2xs text-annotation/70">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {tabSwitchCount} tab switches{fullscreenExitCount > 0 ? ` · ${fullscreenExitCount} fullscreen exits` : ''}
+        </div>
+      )}
       <div className="flex gap-2 justify-end">
         <Btn variant="ghost" onClick={onClose} disabled={submitting}>
           Continue Test

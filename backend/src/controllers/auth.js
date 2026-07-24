@@ -9,7 +9,8 @@ const {
   sendPasswordResetEmail,
 } = require('../services/email');
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 
 function signToken(userId, role) {
   return jwt.sign({ userId, role }, process.env.JWT_SECRET, {
@@ -80,12 +81,13 @@ async function register(req, res) {
 async function googleLogin(req, res) {
   const { credential } = req.body;
   if (!credential) return res.status(400).json({ error: 'Google credential required' });
+  if (!googleClient) return res.status(400).json({ error: 'Google OAuth is not configured' });
 
   let payload;
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken:  credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: googleClientId,
     });
     payload = ticket.getPayload();
   } catch {

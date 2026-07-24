@@ -16,6 +16,13 @@ const NAV_ICONS = {
   Admins: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z',
   'Question Bank': 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s4.332.477 5.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
   'Send Email': 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  Drives: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+  'Question Analytics': 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  Plagiarism: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z',
+  Security: 'M12 15v2m-6 4h14a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z',
+  'AI Question Generator': 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
+  'AI Placement Predictions': 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+  'AI NL Query': 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z',
 };
 
 export default function AdminLayout() {
@@ -27,9 +34,18 @@ export default function AdminLayout() {
   const NAV = useMemo(() => {
     const items = [
       { to: '/admin', label: 'Dashboard', end: true },
+      { to: '/admin/drives', label: 'Drives' },
       { to: '/admin/tests', label: 'Tests' },
       { to: '/admin/question-bank', label: 'Question Bank' },
       { to: '/admin/results', label: 'Results' },
+      { to: '/admin/analytics/questions', label: 'Question Analytics' },
+      { to: '/admin/analytics/plagiarism', label: 'Plagiarism' },
+      { to: '/admin/analytics/cohort', label: 'Cohort Analytics' },
+      { to: '/admin/analytics/question-metrics', label: 'Question Metrics' },
+      { to: '/admin/analytics/time-sink', label: 'Time-Sink Analysis' },
+      { to: '/admin/analytics/placement-predictions', label: 'Placement Predictions' },
+      { to: '/admin/analytics/report-builder', label: 'Report Builder' },
+      { to: '/admin/analytics/scheduled-reports', label: 'Scheduled Reports' },
       { to: '/admin/email', label: 'Send Email' },
       { to: '/admin/users', label: 'Students' },
     ];

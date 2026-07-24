@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { submissionsAPI } from '../../services/api';
-import { Badge, ProgressBar, Spinner, Alert } from '../../components/shared/UI';
+import { Badge, ProgressBar, Spinner, Alert, Btn } from '../../components/shared/UI';
+import CodePlayback from '../../components/shared/CodePlayback';
+import CodeQualityCard from '../../components/shared/CodeQualityCard';
 import { format } from 'date-fns';
 
 /* ═══════════════════════════════════════════════════════════
@@ -47,10 +50,8 @@ export default function ResultDetail() {
     : null;
   const passingScore = sub.test_settings?.passingScore || 40;
 
-  // ── Section breakdown (approximate, based on test structure) ──
-  // If the API returns section-level scores, we'd use those.
-  // Currently the API returns aggregate score. We show what we can.
-  // Future: section_breakdown from API would go here.
+  const [showPlayback, setShowPlayback] = useState(false);
+  const [showQuality, setShowQuality] = useState(false);
 
   return (
     <div className="animate-fade-up">

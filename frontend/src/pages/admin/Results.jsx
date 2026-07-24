@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { submissionsAPI, testsAPI, usersAPI } from '../../services/api';
 import { Badge, Spinner, Btn, Modal } from '../../components/shared/UI';
@@ -30,6 +30,9 @@ export default function AdminResults() {
   const [emailModal, setEmailModal] = useState(false);
   const [notifyModal, setNotifyModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('desc');
 
   const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
   const { data: subData, isLoading } = useQuery({
@@ -90,60 +93,23 @@ export default function AdminResults() {
   // ── Export CSV ─────────────────────────────────────────
   const [exporting, setExporting] = useState(false);
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
     setExporting(true);
-    const rows = [
-      [
-        'Rank',
-        'Name',
-        'Email',
-        'Roll No',
-        'Branch',
-        'Batch',
-        'Score',
-        'Max',
-        'Percentage',
-        'Result',
-        'Time Taken',
-        'Submitted At',
-        'Status',
-      ],
-    ];
-    const ranked = [...subs].sort(
-      (a, b) =>
-        (b.status === 'submitted' ? 1 : 0) -
-        (a.status === 'submitted' ? 1 : 0) ||
-        (b.max_score > 0 ? b.score / b.max_score : 0) -
-          (a.max_score > 0 ? a.score / a.max_score : 0),
-    );
-    ranked.forEach((s, i) => {
-      const pct = s.max_score > 0 ? Math.round((s.score / s.max_score) * 100) : 0;
-      rows.push([
-        String(i + 1),
-        s.user_name,
-        s.user_email,
-        s.roll_number || '',
-        s.branch || '',
-        s.batch_display || '',
-        String(s.score ?? '—'),
-        String(s.max_score ?? '—'),
-        `${pct}%`,
-        pct >= 40 ? 'Pass' : s.status === 'submitted' ? 'Fail' : '—',
-        s.time_taken_seconds
-          ? `${Math.floor(s.time_taken_seconds / 60)}m ${s.time_taken_seconds % 60}s`
-          : '—',
-        s.submitted_at ? format(new Date(s.submitted_at), 'dd/MM/yyyy HH:mm') : '—',
-        s.status,
-      ]);
-    });
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `campus-track_results_${selectedTest}.csv`;
-    a.click();
-    setExporting(false);
+    try {
+      const blob = await submissionsAPI.exportCsv(selectedTest, {
+        batch: batchFilter !== 'all' ? batchFilter : undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `campus-track_results_${selectedTest}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error('Failed to export CSV.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   // ── Export PDF ─────────────────────────────────────────
@@ -218,14 +184,65 @@ export default function AdminResults() {
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to resume test'),
   });
 
+  // ── Search filter ──────────────────────────────────────
+  const searchedSubs = useMemo(() => {
+    if (!searchQuery.trim()) return subs;
+    const q = searchQuery.toLowerCase();
+    return subs.filter(s =>
+      (s.user_name || '').toLowerCase().includes(q) ||
+      (s.user_email || '').toLowerCase().includes(q) ||
+      (s.roll_number || '').toLowerCase().includes(q)
+    );
+  }, [subs, searchQuery]);
+
   // ── Ranked + sorted submissions ────────────────────────
   // Sort: submitted first (by score descending), then in-progress
-  const rankedSubs = [...subs].sort(
-    (a, b) =>
-      (b.status === 'submitted' ? 1 : 0) - (a.status === 'submitted' ? 1 : 0) ||
-      (b.max_score > 0 ? b.score / b.max_score : 0) -
-        (a.max_score > 0 ? a.score / a.max_score : 0),
-  );
+  // Or apply custom column sort if specified
+  const rankedSubs = useMemo(() => {
+    const list = [...searchedSubs];
+    if (sortField) {
+      list.sort((a, b) => {
+        let aVal, bVal;
+        switch (sortField) {
+          case 'name': aVal = (a.user_name || '').toLowerCase(); bVal = (b.user_name || '').toLowerCase(); break;
+          case 'email': aVal = (a.user_email || '').toLowerCase(); bVal = (b.user_email || '').toLowerCase(); break;
+          case 'roll': aVal = (a.roll_number || '').toLowerCase(); bVal = (b.roll_number || '').toLowerCase(); break;
+          case 'score':
+            aVal = a.max_score > 0 ? (a.score || 0) / a.max_score : -1;
+            bVal = b.max_score > 0 ? (b.score || 0) / b.max_score : -1;
+            break;
+          case 'time': aVal = a.time_taken_seconds || 0; bVal = b.time_taken_seconds || 0; break;
+          case 'percentage': aVal = a.max_score > 0 ? (a.score || 0) / a.max_score * 100 : 0; bVal = b.max_score > 0 ? (b.score || 0) / b.max_score * 100 : 0; break;
+          default: aVal = a[sortField]; bVal = b[sortField];
+        }
+        if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    } else {
+      list.sort(
+        (a, b) =>
+          (b.status === 'submitted' ? 1 : 0) - (a.status === 'submitted' ? 1 : 0) ||
+          (b.max_score > 0 ? b.score / b.max_score : 0) -
+            (a.max_score > 0 ? a.score / a.max_score : 0),
+      );
+    }
+    return list;
+  }, [searchedSubs, sortField, sortDir]);
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir(field === 'name' || field === 'email' || field === 'roll' ? 'asc' : 'desc');
+    }
+  };
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return <span className="opacity-20 ml-1">↕</span>;
+    return <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
 
   return (
     <div className="animate-fade-up">
@@ -298,14 +315,14 @@ export default function AdminResults() {
       </div>
 
       {/* Test selector */}
-      <div className="panel p-3 mb-5 flex flex-wrap gap-4">
+      <div className="panel p-3 mb-5 flex flex-wrap items-end gap-4">
         <div>
           <label className="text-2xs text-annotation/60 mb-1.5">
             Select Test
           </label>
           <select
             value={selectedTest}
-            onChange={e => { setSelectedTest(e.target.value); setBatchFilter('all'); }}
+            onChange={e => { setSelectedTest(e.target.value); setBatchFilter('all'); setSearchQuery(''); }}
             className="select-field max-w-sm"
           >
             <option value="">— Select a test —</option>
@@ -331,6 +348,19 @@ export default function AdminResults() {
                 <option key={b} value={b}>{b}</option>
               ))}
             </select>
+          </div>
+        )}
+        {selectedTest && (
+          <div className="ml-auto">
+            <label className="text-2xs text-annotation/60 mb-1.5">
+              Search student
+            </label>
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Name, email, or roll…"
+              className="input-field max-w-56"
+            />
           </div>
         )}
       </div>
@@ -464,12 +494,22 @@ export default function AdminResults() {
                 <thead>
                   <tr>
                     <th className="w-10">#</th>
-                    <th>Student</th>
-                    <th className="hidden sm:table-cell">Roll / Branch</th>
-                    <th>Score</th>
-                    <th>%</th>
+                    <th className="cursor-pointer hover:text-accent select-none" onClick={() => handleSort('name')}>
+                      Student <SortIcon field="name" />
+                    </th>
+                    <th className="hidden sm:table-cell cursor-pointer hover:text-accent select-none" onClick={() => handleSort('roll')}>
+                      Roll / Branch <SortIcon field="roll" />
+                    </th>
+                    <th className="cursor-pointer hover:text-accent select-none" onClick={() => handleSort('score')}>
+                      Score <SortIcon field="score" />
+                    </th>
+                    <th className="cursor-pointer hover:text-accent select-none" onClick={() => handleSort('percentage')}>
+                      % <SortIcon field="percentage" />
+                    </th>
                     <th>Status</th>
-                    <th className="hidden md:table-cell">Time</th>
+                    <th className="hidden md:table-cell cursor-pointer hover:text-accent select-none" onClick={() => handleSort('time')}>
+                      Time <SortIcon field="time" />
+                    </th>
                     <th className="hidden lg:table-cell">Submitted</th>
                     <th className="w-10" />
                   </tr>
@@ -506,9 +546,10 @@ export default function AdminResults() {
                             </span>
                           </td>
                           <td>
-                            <div className="font-medium text-sm text-ink">
+                            <Link to={`/admin/analytics/students/${s.user_id}`}
+                              className="font-medium text-sm text-ink hover:text-accent transition-colors">
                               {s.user_name}
-                            </div>
+                            </Link>
                             <div className="text-xs text-annotation/60">
                               {s.user_email}
                             </div>

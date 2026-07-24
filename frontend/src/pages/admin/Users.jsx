@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { usersAPI } from '../../services/api';
 import { Btn, Table, Badge, Modal, Input, Alert, ConfirmModal, Spinner } from '../../components/shared/UI';
 import { format } from 'date-fns';
@@ -14,6 +15,8 @@ export default function AdminUsers() {
   const [search, setSearch] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState('');
+  const [showBatchUpdate, setShowBatchUpdate] = useState(false);
+  const [batchCsvText, setBatchCsvText] = useState('');
   const [deleteId, setDeleteId] = useState(null);
 
   const { data, isLoading } = useQuery({
@@ -47,6 +50,28 @@ export default function AdminUsers() {
       setShowImport(false);
       setCsvText('');
     },
+  });
+
+  const batchUpdateMut = useMutation({
+    mutationFn: () => {
+      const lines = batchCsvText.trim().split('\n').slice(1);
+      const students = lines
+        .map(l => {
+          const [email, batch, yearOfStudy] = l
+            .split(',')
+            .map(s => s.trim().replace(/"/g, ''));
+          return { email, batch, year_of_study: yearOfStudy ? parseInt(yearOfStudy) : undefined };
+        })
+        .filter(s => s.email);
+      return usersAPI.bulkUpdateBatch({ students });
+    },
+    onSuccess: (r) => {
+      toast.success(`Updated ${r.updated} students`);
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setShowBatchUpdate(false);
+      setBatchCsvText('');
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Batch update failed'),
   });
 
   const users = data?.users || [];
@@ -106,6 +131,13 @@ export default function AdminUsers() {
       label: '',
       render: (u) => (
         <div className="flex gap-1 justify-end">
+          <Link to={`/admin/analytics/students/${u.id}`}
+            className="btn-ghost-icon text-clarify hover:text-accent"
+            title="View analytics" aria-label="View student analytics">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </Link>
           <button
             onClick={() =>
               toggleMut.mutate({ id: u.id, isActive: !u.is_active })
@@ -145,6 +177,12 @@ export default function AdminUsers() {
           <h1 className="section-title">Students</h1>
           <p className="section-subtitle">{data?.total || 0} registered</p>
         </div>
+        <Btn variant="ghost" size="sm" onClick={() => setShowBatchUpdate(true)}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Update Batch
+        </Btn>
         <Btn variant="primary" onClick={() => setShowImport(true)}>
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -217,6 +255,44 @@ export default function AdminUsers() {
           <Alert type="success" className="mt-3">
             Created: {importMut.data.created} · Skipped:{' '}
             {importMut.data.skipped}
+          </Alert>
+        )}
+      </Modal>
+
+      {/* Bulk Update Batch Modal */}
+      <Modal
+        isOpen={showBatchUpdate}
+        onClose={() => setShowBatchUpdate(false)}
+        title="Bulk Update Batch / Year"
+        footer={
+          <>
+            <Btn variant="ghost" onClick={() => setShowBatchUpdate(false)}>Cancel</Btn>
+            <Btn variant="primary" onClick={() => batchUpdateMut.mutate()} disabled={!batchCsvText.trim() || batchUpdateMut.isLoading}>
+              {batchUpdateMut.isLoading ? 'Updating…' : 'Update Batches'}
+            </Btn>
+          </>
+        }
+      >
+        <Alert type="info" className="mb-4">
+          Update student batch assignments and year of study for semester re-shuffling.
+        </Alert>
+        <p className="text-xs text-annotation/70 mb-3 font-mono bg-deck p-2 rounded border border-rim">
+          email,batch,year_of_study
+          <br />
+          alice@college.edu,CS-A,3
+          <br />
+          bob@college.edu,IT-B,2
+        </p>
+        <textarea
+          value={batchCsvText}
+          onChange={e => setBatchCsvText(e.target.value)}
+          rows={10}
+          placeholder="Paste CSV data here (email,batch,year_of_study)..."
+          className="textarea-field"
+        />
+        {batchUpdateMut.data && (
+          <Alert type="success" className="mt-3">
+            Updated: {batchUpdateMut.data.updated} · Skipped: {batchUpdateMut.data.skipped}
           </Alert>
         )}
       </Modal>

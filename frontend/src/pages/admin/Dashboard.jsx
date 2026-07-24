@@ -5,13 +5,14 @@
  * Designed as a decision-making tool for T&P faculty.
  * ═══════════════════════════════════════════════════════════ */
 
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { usersAPI, testsAPI } from '../../services/api';
+import { usersAPI, testsAPI, submissionsAPI } from '../../services/api';
 import { Badge, Spinner } from '../../components/shared/UI';
 import { formatDistanceToNow } from 'date-fns';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 
 const GENRE_ORDER = [
@@ -25,12 +26,20 @@ const GENRE_ORDER = [
 ];
 
 export default function AdminDashboard() {
+  const [selectedTest, setSelectedTest] = useState('all');
+  const [dateRange, setDateRange] = useState('30');
+
   const { data: stats, isLoading } = useQuery({
-    queryKey: 'admin-stats',
-    queryFn: usersAPI.stats,
+    queryKey: ['admin-stats', dateRange],
+    queryFn: () => usersAPI.stats(),
     refetchInterval: 60000,
   });
   const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: testSubsData } = useQuery({
+    queryKey: ['dashboard-submissions', selectedTest],
+    queryFn: () => submissionsAPI.getForTest(selectedTest),
+    enabled: selectedTest !== 'all' && !!selectedTest,
+  });
 
   if (isLoading) {
     return (
@@ -41,7 +50,40 @@ export default function AdminDashboard() {
   }
 
   const s = stats || {};
-  const recentTests = testsData?.tests?.slice(0, 5) || [];
+  const tests = testsData?.tests || [];
+  const recentTests = tests.slice(0, 5) || [];
+
+  // ── Compute score distribution ──────────────────────────
+  const allSubs = testSubsData?.submissions || s.recentSubmissions || [];
+  const scoredSubs = (selectedTest !== 'all' ? allSubs : (s.recentSubmissions || [])).filter(
+    sb => sb.status === 'submitted' && sb.max_score > 0
+  );
+  const distBuckets = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+  const distData = distBuckets.slice(0, -1).map((b, i) => ({
+    range: `${b}-${distBuckets[i + 1]}`,
+    count: scoredSubs.filter(sb => {
+      const p = sb.max_score > 0 ? (sb.score / sb.max_score) * 100 : 0;
+      return p >= b && p < distBuckets[i + 1];
+    }).length,
+    passing: b >= 40,
+  }));
+
+  // ── Batch breakdown ────────────────────────────────────
+  const batchMap = {};
+  scoredSubs.forEach(sb => {
+    const batch = sb.batch_display || 'Unknown';
+    if (!batchMap[batch]) batchMap[batch] = { count: 0, totalPct: 0, passCount: 0 };
+    batchMap[batch].count++;
+    const pct = sb.max_score > 0 ? (sb.score / sb.max_score) * 100 : 0;
+    batchMap[batch].totalPct += pct;
+    if (pct >= 40) batchMap[batch].passCount++;
+  });
+  const batchData = Object.entries(batchMap).map(([batch, d]) => ({
+    batch,
+    count: d.count,
+    avg: Math.round(d.totalPct / d.count),
+    passRate: Math.round((d.passCount / d.count) * 100),
+  }));
 
   const genreData = (s.genreStats || []).map(g => ({
     name: g.genre.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -64,8 +106,8 @@ export default function AdminDashboard() {
   }));
 
   const testsBreakdown = {
-    total: s.tests ? Object.values(s.tests).reduce((a, b) => a + b, 0) : 0,
-    published: s.tests?.published || 0,
+    total: tests.length,
+    published: tests.filter(t => t.status === 'published').length,
   };
 
   return (
@@ -84,12 +126,34 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
+      {/* Filters */}
+      <div className="panel p-3 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="text-2xs text-annotation/60 mb-1.5">Test</label>
+          <select value={selectedTest} onChange={e => setSelectedTest(e.target.value)} className="select-field max-w-xs">
+            <option value="all">All tests (aggregate)</option>
+            {tests.map(t => (
+              <option key={t.id} value={t.id}>{t.title}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-2xs text-annotation/60 mb-1.5">Period</label>
+          <select value={dateRange} onChange={e => setDateRange(e.target.value)} className="select-field max-w-xxs">
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="365">All time</option>
+          </select>
+        </div>
+      </div>
+
       {/* Stat cards (neutral, one accent max) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatBox label="Tests" value={testsBreakdown.total} sub={`${testsBreakdown.published} published`} highlight />
         <StatBox label="Students" value={s.students || 0} sub="registered" />
         <StatBox label="Active (7d)" value={s.active_this_week || 0} sub="recent logins" />
-        <StatBox label="Avg Score" value={`${s.recentSubmissions?.length ? Math.round(s.recentSubmissions.reduce((a, s) => a + (s.max_score > 0 ? (s.score/s.max_score)*100 : 0), 0) / s.recentSubmissions.length) : 0}%`} sub="recent tests" />
+        <StatBox label="Avg Score" value={`${scoredSubs.length ? Math.round(scoredSubs.reduce((a, sb) => a + (sb.max_score > 0 ? (sb.score/sb.max_score)*100 : 0), 0) / scoredSubs.length) : 0}%`} sub="selected test(s)" />
       </div>
 
       {/* Charts row */}
@@ -166,6 +230,58 @@ export default function AdminDashboard() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Score Distribution */}
+      {scoredSubs.length > 0 && (
+        <div className="panel p-4">
+          <h3 className="text-label text-annotation mb-3">Score Distribution {selectedTest !== 'all' ? '(selected test)' : '(recent)'}</h3>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={distData} margin={{ top: 0, right: 0, bottom: 0, left: -16 }}>
+              <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#8A8066' }} />
+              <YAxis tick={{ fontSize: 10, fill: '#8A8066' }} allowDecimals={false} />
+              <Tooltip formatter={v => [`${v} students`]} contentStyle={{ background: '#FBF9F2', border: '1px solid #DFD4B8', borderRadius: '8px', color: '#2A2419', fontSize: '12px' }} />
+              <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+                {distData.map((d, i) => (
+                  <Cell key={i} fill={d.passing ? '#4B7B3F' : '#AE4331'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex gap-4 justify-center mt-2 text-2xs text-annotation/60">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-verify rounded-sm inline-block" /> Pass (≥40%)</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-alert rounded-sm inline-block" /> Fail (&lt;40%)</span>
+          </div>
+        </div>
+      )}
+
+      {/* Class-wise Breakdown */}
+      {batchData.length > 1 && (
+        <div className="panel p-4">
+          <h3 className="text-label text-annotation mb-3">Class-wise Breakdown</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-rim">
+                  <th className="text-left py-2 font-medium text-annotation">Batch</th>
+                  <th className="text-right py-2 font-medium text-annotation">Submitted</th>
+                  <th className="text-right py-2 font-medium text-annotation">Average</th>
+                  <th className="text-right py-2 font-medium text-annotation">Pass Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchData.map(b => (
+                  <tr key={b.batch} className="border-b border-rim/30">
+                    <td className="py-1.5 font-medium text-ink">{b.batch}</td>
+                    <td className="text-right py-1.5 font-mono">{b.count}</td>
+                    <td className="text-right py-1.5 font-mono">{b.avg}%</td>
+                    <td className="text-right py-1.5 font-mono">{b.passRate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

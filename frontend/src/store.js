@@ -70,10 +70,48 @@ export const useStore = create(
 
       sidebarOpen: true,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+
+      // Gamification state
+      streak: null,
+      xpStats: null,
+      setStreak: (streak) => set({ streak }),
+      setXpStats: (xpStats) => set({ xpStats }),
+      checkedInToday: false,
+      setCheckedInToday: (v) => set({ checkedInToday: v }),
+
+      // Accessibility & preferences
+      preferences: {
+        dyslexiaMode: false,
+        fontSize: 'md',
+        onboardingCompleted: false,
+        dashboardWidgets: ['UpcomingTests', 'RecentScores', 'WeakTopics', 'XPProgress'],
+        widgetOrder: ['UpcomingTests', 'RecentScores', 'WeakTopics', 'LeaderboardRank', 'XPProgress', 'StreakCounter'],
+      },
+      updatePreference: (key, value) => set((s) => ({
+        preferences: { ...s.preferences, [key]: value },
+      })),
+      setDyslexiaMode: (v) => set((s) => ({
+        preferences: { ...s.preferences, dyslexiaMode: v },
+      })),
+      setFontSize: (v) => set((s) => ({
+        preferences: { ...s.preferences, fontSize: v },
+      })),
+      completeOnboarding: () => set((s) => ({
+        preferences: { ...s.preferences, onboardingCompleted: true },
+      })),
+      setDashboardWidgets: (widgets) => set((s) => ({
+        preferences: { ...s.preferences, dashboardWidgets: widgets },
+      })),
+      setWidgetOrder: (order) => set((s) => ({
+        preferences: { ...s.preferences, widgetOrder: order },
+      })),
     }),
     {
       name: 'pp-store',
-      partialize: (s) => ({ user: s.user, token: s.token }),
+      partialize: (s) => ({
+        user: s.user, token: s.token, streak: s.streak, xpStats: s.xpStats,
+        checkedInToday: s.checkedInToday, preferences: s.preferences,
+      }),
     }
   )
 );
