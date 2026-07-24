@@ -1,4 +1,5 @@
-import { useState, useQuery, useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { lmsAPI } from '../../services/api';
 import { Btn, Select, Alert, Spinner, Modal, Table } from '../../components/shared/UI';
 import toast from 'react-hot-toast';
