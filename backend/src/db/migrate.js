@@ -866,7 +866,6 @@ async function migrate() {
       ALTER TABLE questions ADD COLUMN IF NOT EXISTS template JSONB;
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
-  `);
 
   // ═══════════════════════════════════════════════════════════
   // ADVANCED ANALYTICS & REPORTING TABLES
@@ -1089,6 +1088,7 @@ async function migrate() {
   );
   CREATE INDEX IF NOT EXISTS idx_question_feedback_question_id ON question_feedback(question_id);
   CREATE INDEX IF NOT EXISTS idx_question_feedback_status ON question_feedback(status);
+  `);
 
   console.log('✅ Migrations complete.');
   process.exit(0);
