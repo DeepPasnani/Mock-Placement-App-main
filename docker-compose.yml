@@ -1,4 +1,4 @@
-services:
+  services:
   postgres:
     image: postgres:16-alpine
     container_name: pp_postgres
@@ -47,7 +47,6 @@ services:
       JWT_EXPIRES_IN: 7d
       REFRESH_TOKEN_SECRET: local-dev-refresh-secret-please-change-in-production
       TZ: Asia/Kolkata
-      SKIP_MIGRATION: "1"
     ports:
       - "5000:5000"
     depends_on:
@@ -74,8 +73,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:postgres_password_change_me@postgres:5432/placementpro
       REDIS_URL: redis://redis:6379
-      SKIP_MIGRATION: "0"
-    command: ["sh", "-c", "node src/db/migrate.js && node src/db/seed.js"]
+    entrypoint: ["sh", "-c", "node src/db/migrate.js && node src/db/seed.js"]
     depends_on:
       postgres:
         condition: service_healthy

@@ -9,7 +9,6 @@ RUN npm install --omit=dev
 COPY . .
 
 ENV TZ=Asia/Kolkata
-ENV SKIP_MIGRATION=1
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

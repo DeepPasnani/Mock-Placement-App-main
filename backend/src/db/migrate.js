@@ -867,9 +867,9 @@ async function migrate() {
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
-  // ═══════════════════════════════════════════════════════════
-  // ADVANCED ANALYTICS & REPORTING TABLES
-  // ═══════════════════════════════════════════════════════════
+  -- ═══════════════════════════════════════════════════════════
+  -- ADVANCED ANALYTICS & REPORTING TABLES
+  -- ═══════════════════════════════════════════════════════════
 
   CREATE TABLE IF NOT EXISTS scheduled_reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -907,9 +907,9 @@ async function migrate() {
     created_at TIMESTAMPTZ DEFAULT NOW()
   );
 
-  // ═══════════════════════════════════════════════════════════
-  // THIRD-PARTY INTEGRATIONS & NEW FEATURES
-  // ═══════════════════════════════════════════════════════════
+  -- ═══════════════════════════════════════════════════════════
+  -- THIRD-PARTY INTEGRATIONS & NEW FEATURES
+  -- ═══════════════════════════════════════════════════════════
 
   -- Add phone column to users (for SMS)
   DO $$ BEGIN
@@ -1018,9 +1018,9 @@ async function migrate() {
   EXCEPTION WHEN duplicate_column THEN NULL;
   END $$;
 
-  // ═══════════════════════════════════════════════════════════
-  // STUDENT EXPERIENCE & SELF-SERVICE FEATURES
-  // ═══════════════════════════════════════════════════════════
+  -- ═══════════════════════════════════════════════════════════
+  -- STUDENT EXPERIENCE & SELF-SERVICE FEATURES
+  -- ═══════════════════════════════════════════════════════════
 
   DO $$ BEGIN
     ALTER TABLE users ADD COLUMN IF NOT EXISTS skills JSONB DEFAULT '[]';
