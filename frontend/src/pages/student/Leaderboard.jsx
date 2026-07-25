@@ -22,7 +22,7 @@ export default function Leaderboard() {
   });
 
   const { data: batchesData } = useQuery({
-    queryKey: 'batches',
+    queryKey: ['batches'],
     queryFn: batchesAPI.list,
   });
 

@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { Btn, Input, Select, Textarea, ImageUpload } from '../../components/shared/UI';
 import { uploadAPI } from '../../services/api';
-import toast from 'react-hot-toast';
 
 export default function AptQEditor({ q, onChange, onRemove }) {
+  const [uploading, setUploading] = useState(false);
   const update = (f, v) => onChange({ ...q, [f]: v });
   const updateOption = (i, v) => {
     const o = [...q.options];
@@ -95,9 +96,11 @@ export default function AptQEditor({ q, onChange, onRemove }) {
 
       <ImageUpload
         value={q.imageUrl}
+        uploading={uploading}
         onChange={async (file) => {
           if (typeof file === 'string') { update('imageUrl', file); return; }
-          try { const r = await uploadAPI.image(file); update('imageUrl', r.url); } catch { toast.error('Image upload failed'); }
+          setUploading(true);
+          try { const r = await uploadAPI.image(file); update('imageUrl', r.url); } catch {} finally { setUploading(false); }
         }}
         label="Attach Image"
       />
@@ -108,40 +111,58 @@ export default function AptQEditor({ q, onChange, onRemove }) {
             Options — {q.type === 'msq' ? 'check all correct' : 'select correct'}
           </p>
           {q.options.map((opt, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                type={q.type === 'msq' ? 'checkbox' : 'radio'}
-                name={`correct_${q._id}`}
-                checked={
-                  q.type === 'msq'
-                    ? Array.isArray(q.correctAnswer) && q.correctAnswer.includes(i)
-                    : q.correctAnswer === i
-                }
-                onChange={() => {
-                  if (q.type === 'msq') {
-                    const ca = Array.isArray(q.correctAnswer) ? [...q.correctAnswer] : [];
-                    const idx = ca.indexOf(i);
-                    idx > -1 ? ca.splice(idx, 1) : ca.push(i);
-                    update('correctAnswer', ca);
-                  } else update('correctAnswer', i);
-                }}
-                className="accent-accent w-4 h-4 shrink-0 cursor-pointer"
-              />
-              <span className="text-xs font-mono text-annotation w-5 shrink-0">
-                {String.fromCharCode(65 + i)}.
-              </span>
-              <input
-                value={opt}
-                onChange={e => updateOption(i, e.target.value)}
-                placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                className="input-field text-sm py-1.5"
-              />
+            <div key={i} className="panel p-2.5">
+              <div className="flex items-center gap-2">
+                <input
+                  type={q.type === 'msq' ? 'checkbox' : 'radio'}
+                  name={`correct_${q._id}`}
+                  checked={
+                    q.type === 'msq'
+                      ? Array.isArray(q.correctAnswer) && q.correctAnswer.includes(i)
+                      : q.correctAnswer === i
+                  }
+                  onChange={() => {
+                    if (q.type === 'msq') {
+                      const ca = Array.isArray(q.correctAnswer) ? [...q.correctAnswer] : [];
+                      const idx = ca.indexOf(i);
+                      idx > -1 ? ca.splice(idx, 1) : ca.push(i);
+                      update('correctAnswer', ca);
+                    } else update('correctAnswer', i);
+                  }}
+                  className="accent-accent w-4 h-4 shrink-0 cursor-pointer"
+                />
+                <span className="text-xs font-mono text-annotation w-5 shrink-0">
+                  {String.fromCharCode(65 + i)}.
+                </span>
+                <input
+                  value={opt}
+                  onChange={e => updateOption(i, e.target.value)}
+                  placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                  className="input-field text-sm py-1.5 flex-1"
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-2 ml-9">
+                <ImageUpload
+                  value={(q.optionImages || [])[i]}
+                  uploading={uploading}
+                  onChange={async (file) => {
+                    const imgs = [...(q.optionImages || Array(q.options.length).fill(''))];
+                    if (typeof file === 'string') { imgs[i] = ''; update('optionImages', imgs); return; }
+                    setUploading(true);
+                    try { const r = await uploadAPI.image(file); imgs[i] = r.url; update('optionImages', imgs); } catch {} finally { setUploading(false); }
+                  }}
+                  label={q.optionImages?.[i] ? 'Change' : 'Image'}
+                />
+                {q.optionImages?.[i] && (
+                  <span className="text-[10px] text-annotation/50 truncate max-w-[120px]">Uploaded</span>
+                )}
+              </div>
             </div>
           ))}
           <Btn
             variant="ghost"
             size="sm"
-            onClick={() => onChange({ ...q, options: [...q.options, ''] })}
+            onClick={() => onChange({ ...q, options: [...q.options, ''], optionImages: [...(q.optionImages || Array(q.options.length).fill('')), ''] })}
           >
             + Add Option
           </Btn>

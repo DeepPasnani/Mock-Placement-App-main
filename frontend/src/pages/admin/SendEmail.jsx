@@ -25,7 +25,7 @@ export default function SendEmail() {
   const [template, setTemplate] = useState('blank');
   const [studentSearch, setStudentSearch] = useState('');
 
-  const { data: batchData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list });
+  const { data: batchData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
 
   const { data: studentResults } = useQuery({
     queryKey: ['students-search', studentSearch],

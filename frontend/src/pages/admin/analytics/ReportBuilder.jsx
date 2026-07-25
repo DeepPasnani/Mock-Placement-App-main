@@ -29,8 +29,8 @@ export default function ReportBuilder() {
   const [dateEnd, setDateEnd] = useState('');
   const [drillDown, setDrillDown] = useState(null);
 
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
-  const { data: batchesData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
+  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
 
   const reportPayload = {
     metrics: selectedMetrics,

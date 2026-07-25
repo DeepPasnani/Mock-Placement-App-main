@@ -128,22 +128,8 @@ export default function TestCreator() {
       title: editData.title,
       description: editData.description,
       status: editData.status,
-      startTime: editData.start_time
-        ? new Date(
-            new Date(editData.start_time).getTime() -
-              new Date(editData.start_time).getTimezoneOffset() * 60000,
-          )
-            .toISOString()
-            .slice(0, 16)
-        : '',
-      endTime: editData.end_time
-        ? new Date(
-            new Date(editData.end_time).getTime() -
-              new Date(editData.end_time).getTimezoneOffset() * 60000,
-          )
-            .toISOString()
-            .slice(0, 16)
-        : '',
+      startTime: toLocalDatetimeString(editData.start_time),
+      endTime: toLocalDatetimeString(editData.end_time),
       durationMinutes: editData.duration_minutes,
       settings: editData.settings || DEFAULT_TEST.settings,
       sections: (editData.sections || []).map(s => ({
@@ -160,11 +146,27 @@ export default function TestCreator() {
     mutationFn: (payload) => (isEdit ? testsAPI.update(id, payload) : testsAPI.create(payload)),
     onSuccess: () => {
       toast.success(isEdit ? 'Test updated!' : 'Test created!');
-      qc.invalidateQueries({ queryKey: 'tests' });
+      qc.invalidateQueries({ queryKey: ['tests'] });
       navigate('/admin/tests');
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Save failed'),
   });
+
+  const convertToUTC = (localDateTime) => {
+    if (!localDateTime) return null;
+    return new Date(localDateTime).toISOString();
+  };
+
+  const toLocalDatetimeString = (utcStr) => {
+    if (!utcStr) return '';
+    const d = new Date(utcStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day}T${h}:${min}`;
+  };
 
   const upd = (f, v) => setForm(p => ({ ...p, [f]: v }));
   const updSettings = (f, v) =>
@@ -263,12 +265,6 @@ export default function TestCreator() {
       return;
     }
 
-    const convertToUTC = (localDateTime) => {
-      if (!localDateTime) return null;
-      const date = new Date(localDateTime);
-      return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString();
-    };
-
     const payload = {
       title: form.title,
       description: form.description,
@@ -282,7 +278,7 @@ export default function TestCreator() {
         id: s.id,
         name: s.name,
         type: s.type,
-        questions: s.questions.map(q => ({ ...q, imageUrl: q.imageUrl || q.image_url })),
+        questions: s.questions.map(q => ({ ...q, imageUrl: q.imageUrl || q.image_url, optionImages: q.optionImages || q.option_images || [] })),
       })),
     };
     saveMut.mutate(payload);

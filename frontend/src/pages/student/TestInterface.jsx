@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { testsAPI, submissionsAPI, shuffleAPI, submissionsAPIExtended } from '../../services/api';
 import { useStore } from '../../store';
 import Timer from '../../components/shared/Timer';
-import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
+import { Btn, Modal, Spinner } from '../../components/shared/UI';
 import Editor from '@monaco-editor/react';
 import toast from 'react-hot-toast';
 
@@ -14,7 +14,6 @@ import QuestionPalette from './QuestionPalette';
 import ConfirmSubmitModal from './ConfirmSubmitModal';
 import CodingProblemSelection from './CodingProblemSelection';
 import FullScreenEnforcer from '../../components/shared/FullScreenEnforcer';
-import { proctoringService } from '../../services/proctoring';
 import { lockdownService } from '../../services/lockdown';
 import { fingerprintService } from '../../services/fingerprint';
 
@@ -62,10 +61,7 @@ export default function TestInterface() {
   const [optionOrders, setOptionOrders] = useState(null);
   const [timeBombs, setTimeBombs] = useState({});
 
-  const [proctoringActive, setProctoringActive] = useState(false);
-  const [proctoringWarning, setProctoringWarning] = useState(false);
-  const [proctoringVideo, setProctoringVideo] = useState(null);
-  const [cameraDenied, setCameraDenied] = useState(false);
+
 
   const [fullscreenExitCount, setFullscreenExitCount] = useState(0);
   const fingerprintRef = useRef(null);
@@ -123,16 +119,6 @@ export default function TestInterface() {
           const bombMap = {};
           bombData.bombs.forEach(b => { bombMap[b.questionId] = b; });
           setTimeBombs(bombMap);
-        }
-      } catch {}
-
-      try {
-        const video = await proctoringService.start(data.submission.id, testId);
-        if (video && video.tagName === 'VIDEO') {
-          setProctoringVideo(video);
-          setProctoringActive(true);
-        } else if (video?.error === 'permission_denied') {
-          setCameraDenied(true);
         }
       } catch {}
     },
@@ -203,7 +189,6 @@ export default function TestInterface() {
 
   useEffect(() => {
     return () => {
-      proctoringService.stop();
       lockdownService.disable();
     };
   }, []);
@@ -269,24 +254,9 @@ export default function TestInterface() {
     return () => clearInterval(interval);
   }, [testStarted, submissionId, testId]);
 
-  useEffect(() => {
-    if (!proctoringVideo) return;
-    const interval = setInterval(() => {
-      try {
-        const state = proctoringService.getDetectedState(proctoringVideo);
-        if (!state.faceDetected || !state.gazeOk) {
-          setProctoringWarning(true);
-          setTimeout(() => setProctoringWarning(false), 3000);
-        }
-      } catch {}
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [proctoringVideo]);
-
   const handleSubmit = useCallback(async (opts = {}) => {
     setSubmitting(true);
     setConfirmSubmit(false);
-    proctoringService.stop();
     submitMut.mutate({
       testId,
       answers,
@@ -507,18 +477,9 @@ export default function TestInterface() {
           <span className="font-display font-bold text-sm text-ink truncate max-w-40 sm:max-w-56">
             {test.title}
           </span>
-          {proctoringActive && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-verify/15 text-verify text-2xs font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-verify animate-pulse" />
-              Cam
-            </span>
-          )}
           <span className="text-xs text-annotation/60 hidden sm:block font-mono">
             {answeredCount}/{totalQ}
           </span>
-          {cameraDenied && (
-            <span className="text-2xs text-alert font-mono">No Camera</span>
-          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -584,12 +545,6 @@ export default function TestInterface() {
           </Btn>
         </div>
       </header>
-
-      {proctoringWarning && (
-        <div className="bg-alert/10 border-b border-alert/20 px-4 py-1.5 text-xs text-alert font-medium text-center animate-fade-in">
-          Face not detected — ensure you are visible to the camera
-        </div>
-      )}
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -716,18 +671,6 @@ export default function TestInterface() {
         onSubmit={handleSubmit}
       />
 
-      {proctoringVideo && (
-        <div className="fixed bottom-4 right-4 z-50 w-32 h-24 rounded-lg overflow-hidden border-2 border-verify/40 shadow-lg bg-black">
-          <video
-            ref={el => { if (el) el.srcObject = proctoringVideo.srcObject; }}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-full object-cover scale-x-[-1]"
-          />
-          <div className="absolute top-1 left-1 w-2 h-2 rounded-full bg-verify animate-pulse" />
-        </div>
-      )}
     </div>
   );
 }

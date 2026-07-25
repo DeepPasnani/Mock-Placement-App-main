@@ -1,5 +1,6 @@
 require('dotenv').config();
 const http = require('http');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -7,6 +8,7 @@ const compression = require('compression');
 const pinoHttp = require('pino-http');
 const promClient = require('prom-client');
 
+const multer = require('multer');
 const routes = require('./routes');
 const { setupWebSocket } = require('./services/websocket');
 const { startScheduler } = require('./services/scheduler');
@@ -69,6 +71,9 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+// ── Serve uploaded files ────────────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ── Routes ──────────────────────────────────────────────────────
 app.use('/api', routes);
@@ -136,7 +141,27 @@ app.use((_req, res) => {
 // ── Error handler ──────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error({ err }, 'Unhandled error');
-  res.status(500).json({ error: 'Internal server error' });
+
+  // Multer-specific errors
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File too large. Maximum size is 5 MB.' });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ error: 'Unexpected file field' });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+
+  let message = err?.message;
+  if (!message) message = err?.error?.message;
+  if (!message && typeof err?.error === 'string') message = err.error;
+  if (!message && typeof err === 'string') message = err;
+  if (!message && typeof err?.error === 'object') message = JSON.stringify(err.error);
+  if (!message) message = typeof err === 'object' ? JSON.stringify(err) : String(err);
+
+  logger.error({ err, extractedMessage: message }, 'Request error');
+  return res.status(500).json({ error: message });
 });
 
 // ── Global error handlers (prevent crash on unhandled promise rejections) ──

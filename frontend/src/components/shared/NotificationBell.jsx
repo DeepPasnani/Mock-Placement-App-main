@@ -26,16 +26,16 @@ export default function NotificationBell() {
   const markReadMut = useMutation({
     mutationFn: notificationsAPI.markRead,
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications-unread']);
-      queryClient.invalidateQueries(['notifications-recent']);
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-recent'] });
     },
   });
 
   const markAllMut = useMutation({
     mutationFn: notificationsAPI.markAllRead,
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications-unread']);
-      queryClient.invalidateQueries(['notifications-recent']);
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-recent'] });
     },
   });
 
@@ -64,9 +64,9 @@ export default function NotificationBell() {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'NOTIFICATION') {
-            queryClient.invalidateQueries(['notifications-unread']);
-            queryClient.invalidateQueries(['notifications-recent']);
-            queryClient.invalidateQueries(['notifications']);
+            queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+            queryClient.invalidateQueries({ queryKey: ['notifications-recent'] });
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
           }
         } catch {}
       };

@@ -1,29 +1,27 @@
-const cloudinary = require('cloudinary').v2;
+const fs = require('fs');
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const path = require('path');
+const crypto = require('crypto');
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'images');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'campustrack',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
-    transformation: [{ width: 1200, height: 900, crop: 'limit', quality: 'auto' }],
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const uniqueName = crypto.randomUUID() + ext;
+    cb(null, uniqueName);
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max
-  fileFilter: (req, file, cb) => {
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Only image files are allowed'));
   },
 });
 
-module.exports = { cloudinary, upload };
+module.exports = { upload };

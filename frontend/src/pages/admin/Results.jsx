@@ -34,7 +34,7 @@ export default function AdminResults() {
   const [sortField, setSortField] = useState('');
   const [sortDir, setSortDir] = useState('desc');
 
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
   const { data: subData, isLoading } = useQuery({
     queryKey: ['submissions', selectedTest],
     queryFn: () => submissionsAPI.getForTest(selectedTest),

@@ -25,16 +25,16 @@ export default function StudentNotifications() {
   const markReadMut = useMutation({
     mutationFn: notificationsAPI.markRead,
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications']);
-      queryClient.invalidateQueries(['notifications-unread']);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
     },
   });
 
   const markAllMut = useMutation({
     mutationFn: notificationsAPI.markAllRead,
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications']);
-      queryClient.invalidateQueries(['notifications-unread']);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
       toast.success('All marked as read');
     },
   });

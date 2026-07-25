@@ -34,7 +34,7 @@ const iconColors = {
 
 export default function Achievements() {
   const { data, isLoading } = useQuery({
-    queryKey: 'achievements',
+    queryKey: ['achievements'],
     queryFn: gamificationAPI.getAchievements,
   });
   const cardsRef = useRef([]);

@@ -9,7 +9,7 @@ import { format } from 'date-fns';
  * ═══════════════════════════════════════════════════════════ */
 
 export default function StudentResults() {
-  const { data, isLoading } = useQuery({ queryKey: 'my-submissions', queryFn: submissionsAPI.getMy });
+  const { data, isLoading } = useQuery({ queryKey: ['my-submissions'], queryFn: submissionsAPI.getMy });
   const subs = (data?.submissions || []).filter(
     s => s.status === 'submitted' || s.status === 'auto_submitted',
   );

@@ -16,15 +16,15 @@ export default function AdminTests() {
   const [deleteId, setDeleteId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [batchModalTest, setBatchModalTest] = useState(null);
-  const { data, isLoading } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data, isLoading } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
 
   const deleteMut = useMutation({
     mutationFn: testsAPI.delete,
-    onSuccess: () => { toast.success('Test deleted'); qc.invalidateQueries({ queryKey: 'tests' }); },
+    onSuccess: () => { toast.success('Test deleted'); qc.invalidateQueries({ queryKey: ['tests'] }); },
   });
   const dupMut = useMutation({
     mutationFn: testsAPI.duplicate,
-    onSuccess: () => { toast.success('Test duplicated'); qc.invalidateQueries({ queryKey: 'tests' }); },
+    onSuccess: () => { toast.success('Test duplicated'); qc.invalidateQueries({ queryKey: ['tests'] }); },
   });
 
   const tests = data?.tests || [];
@@ -51,7 +51,7 @@ export default function AdminTests() {
     onSuccess: (_data, ids) => {
       toast.success(`${ids.length} test(s) deleted`);
       setSelectedIds(new Set());
-      qc.invalidateQueries({ queryKey: 'tests' });
+      qc.invalidateQueries({ queryKey: ['tests'] });
     },
   });
 
@@ -284,7 +284,7 @@ function BatchMappingModal({ test, onClose }) {
   const [newBatchDept, setNewBatchDept] = useState('');
   const [selected, setSelected] = useState({}); // batchId -> { checked, set }
 
-  const { data: batchData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list, enabled: !!test });
+  const { data: batchData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list, enabled: !!test });
   const { data: mappedData } = useQuery({
     queryKey: ['test-batches', test?.id],
     queryFn: () => batchesAPI.listForTest(test.id),
@@ -305,7 +305,7 @@ function BatchMappingModal({ test, onClose }) {
 
   const createBatchMut = useMutation({
     mutationFn: batchesAPI.create,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: 'batches' }); setNewBatchName(''); setNewBatchDept(''); toast.success('Batch added'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['batches'] }); setNewBatchName(''); setNewBatchDept(''); toast.success('Batch added'); },
   });
 
   const saveMut = useMutation({

@@ -159,8 +159,8 @@ async function createTest(req, res) {
               await client.query(
                 `INSERT INTO questions (section_id, type, text, image_url, options, option_images, correct_answer, explanation, marks, difficulty, genre, question_set, order_index)
                  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-                [section.id, q.type || 'mcq', q.text, q.imageUrl || null,
-                 JSON.stringify(q.options || []), JSON.stringify(q.optionImages || []),
+                [section.id, q.type || 'mcq', q.text, q.imageUrl || q.image_url || null,
+                 JSON.stringify(q.options || []), JSON.stringify(q.optionImages || q.option_images || []),
                  JSON.stringify(q.correctAnswer), q.explanation, q.marks || 2, q.difficulty || 'medium', q.genre || 'general', q.questionSet || 'A', qi]
               );
             } else {
@@ -169,7 +169,7 @@ async function createTest(req, res) {
                  constraints, sample_input, sample_output, explanation, test_cases, starter_code,
                  time_limit_seconds, memory_limit_mb, marks, difficulty, tags, order_index)
                  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-                [section.id, q.title, q.description, q.imageUrl || null, q.inputFormat, q.outputFormat,
+                [section.id, q.title, q.description, q.imageUrl || q.image_url || null, q.inputFormat, q.outputFormat,
                  q.constraints, q.sampleInput, q.sampleOutput, q.explanation,
                  JSON.stringify(q.testCases || []), JSON.stringify(q.starterCode || {}),
                  q.timeLimit || 2, q.memoryLimit || 256, q.marks || 10, q.difficulty || 'medium', q.tags, qi]
@@ -193,19 +193,74 @@ async function createTest(req, res) {
 // ── PUT /api/tests/:id
 async function updateTest(req, res) {
   const { id } = req.params;
-  const { title, description, status, startTime, endTime, durationMinutes, settings } = req.body;
+  const { title, description, status, startTime, endTime, durationMinutes, settings, sections } = req.body;
 
-  const { rows } = await query(
-    `UPDATE tests SET title=$1, description=$2, status=$3, start_time=$4, end_time=$5,
-     duration_minutes=$6, settings=$7, updated_at=NOW() WHERE id=$8 RETURNING *`,
-    [title, description, status, startTime || null, endTime || null,
-     durationMinutes, JSON.stringify(settings || {}), id]
-  );
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
 
-  if (!rows.length) return res.status(404).json({ error: 'Test not found' });
+    const { rows } = await client.query(
+      `UPDATE tests SET title=$1, description=$2, status=$3, start_time=$4, end_time=$5,
+       duration_minutes=$6, settings=$7, updated_at=NOW() WHERE id=$8 RETURNING *`,
+      [title, description, status, startTime || null, endTime || null,
+       durationMinutes, JSON.stringify(settings || {}), id]
+    );
 
-  await cacheDelPattern(`test:${id}:full:`);
-  res.json({ test: rows[0] });
+    if (!rows.length) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json({ error: 'Test not found' });
+    }
+
+    // Delete existing sections (questions cascade-deleted) and re-insert
+    if (sections?.length) {
+      await client.query('DELETE FROM sections WHERE test_id = $1', [id]);
+
+      for (let si = 0; si < sections.length; si++) {
+        const sec = sections[si];
+        const { rows: [section] } = await client.query(
+          'INSERT INTO sections (test_id, name, type, order_index) VALUES ($1,$2,$3,$4) RETURNING *',
+          [id, sec.name, sec.type, si]
+        );
+
+        if (sec.questions?.length) {
+          for (let qi = 0; qi < sec.questions.length; qi++) {
+            const q = sec.questions[qi];
+            if (sec.type === 'aptitude') {
+              await client.query(
+                `INSERT INTO questions (section_id, type, text, image_url, options, option_images, correct_answer, explanation, marks, difficulty, genre, question_set, order_index)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+                [section.id, q.type || 'mcq', q.text, q.imageUrl || q.image_url || null,
+                 JSON.stringify(q.options || []), JSON.stringify(q.optionImages || q.option_images || []),
+                 JSON.stringify(q.correctAnswer), q.explanation, q.marks || 2, q.difficulty || 'medium', q.genre || 'general', q.questionSet || 'A', qi]
+              );
+            } else {
+              await client.query(
+                `INSERT INTO coding_problems (section_id, title, description, image_url, input_format, output_format,
+                 constraints, sample_input, sample_output, explanation, test_cases, starter_code,
+                 time_limit_seconds, memory_limit_mb, marks, difficulty, tags, order_index)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+                [section.id, q.title, q.description, q.imageUrl || q.image_url || null, q.inputFormat, q.outputFormat,
+                 q.constraints, q.sampleInput, q.sampleOutput, q.explanation,
+                 JSON.stringify(q.testCases || []), JSON.stringify(q.starterCode || {}),
+                 q.timeLimit || 2, q.memoryLimit || 256, q.marks || 10, q.difficulty || 'medium', q.tags, qi]
+              );
+            }
+          }
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+    client.release();
+
+    await cacheDelPattern(`test:${id}:full:`);
+    res.json({ test: rows[0], message: 'Test updated successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    client.release();
+    throw err;
+  }
 }
 
 // ── DELETE /api/tests/:id

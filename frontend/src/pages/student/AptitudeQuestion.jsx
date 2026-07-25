@@ -1,4 +1,11 @@
+import { useState } from 'react';
 import { Btn } from '../../components/shared/UI';
+
+function ImgWithFallback({ src, alt, className }) {
+  const [error, setError] = useState(false);
+  if (!src || error) return null;
+  return <img src={src} alt={alt} loading="lazy" className={className} onError={() => setError(true)} />;
+}
 
 function DifficultyBadge({ level }) {
   const map = {
@@ -77,14 +84,11 @@ function AptitudeQuestion({
         <div className="text-sm leading-relaxed whitespace-pre-wrap text-ink">
           <CodeBlock text={q.text} />
         </div>
-        {q.image_url && (
-          <img
-            src={q.image_url}
-            alt="Question reference"
-            loading="lazy"
-            className="mt-3 max-w-full max-h-56 rounded-lg object-contain border border-rim"
-          />
-        )}
+        <ImgWithFallback
+          src={q.image_url}
+          alt="Question reference"
+          className="mt-3 max-w-full max-h-56 rounded-lg object-contain border border-rim"
+        />
       </div>
 
       {timeBomb?.expired && (q.type === 'mcq' || q.type === 'msq') && (
@@ -132,9 +136,11 @@ function AptitudeQuestion({
                     <span className="font-mono text-annotation mr-1.5">{String.fromCharCode(65 + i)}.</span>
                     {opt}
                   </span>
-                  {q.option_images?.[originalIdx] && (
-                    <img src={q.option_images[originalIdx]} alt="" loading="lazy" className="mt-2 max-h-20 rounded-lg object-contain" />
-                  )}
+                  <ImgWithFallback
+                    src={q.option_images?.[originalIdx]}
+                    alt=""
+                    className="mt-2 max-h-20 rounded-lg object-contain"
+                  />
                 </div>
               </label>
             );

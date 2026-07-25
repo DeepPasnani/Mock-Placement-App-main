@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { Btn, Input, Select, Textarea, Alert, ImageUpload } from '../../components/shared/UI';
 import { uploadAPI } from '../../services/api';
 import Editor from '@monaco-editor/react';
-import toast from 'react-hot-toast';
 
 export default function CodeQEditor({ q, onChange, onRemove }) {
   const [tab, setTab] = useState('desc');
   const [codeLang, setCodeLang] = useState('python');
+  const [uploading, setUploading] = useState(false);
   const update = (f, v) => onChange({ ...q, [f]: v });
   const TABS = [
     { id: 'desc', label: 'Description' },
@@ -80,9 +80,11 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
           />
           <ImageUpload
             value={q.imageUrl}
+            uploading={uploading}
             onChange={async (file) => {
               if (typeof file === 'string') { update('imageUrl', file); return; }
-              try { const r = await uploadAPI.image(file); update('imageUrl', r.url); } catch { toast.error('Upload failed'); }
+              setUploading(true);
+              try { const r = await uploadAPI.image(file); update('imageUrl', r.url); } catch {} finally { setUploading(false); }
             }}
             label="Attach Diagram"
           />

@@ -5,6 +5,17 @@ import { Btn, Spinner, Modal, Badge } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
+const toLocalDatetimeString = (utcStr) => {
+  if (!utcStr) return '';
+  const d = new Date(utcStr);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day}T${h}:${min}`;
+};
+
 export default function AdminDrives() {
   const qc = useQueryClient();
   const [selectedDrive, setSelectedDrive] = useState(null);
@@ -12,9 +23,9 @@ export default function AdminDrives() {
   const [showDetail, setShowDetail] = useState(null);
   const [editing, setEditing] = useState(null);
 
-  const { data: drivesData, isLoading } = useQuery({ queryKey: 'drives', queryFn: drivesAPI.list });
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
-  const { data: batchesData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list });
+  const { data: drivesData, isLoading } = useQuery({ queryKey: ['drives'], queryFn: drivesAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
+  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
 
   const drives = drivesData?.drives || [];
   const tests = testsData?.tests || [];
@@ -22,37 +33,37 @@ export default function AdminDrives() {
 
   const deleteMut = useMutation({
     mutationFn: drivesAPI.delete,
-    onSuccess: () => { toast.success('Drive deleted'); qc.invalidateQueries({ queryKey: 'drives' }); },
+    onSuccess: () => { toast.success('Drive deleted'); qc.invalidateQueries({ queryKey: ['drives'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Delete failed'),
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => drivesAPI.update(id, data),
-    onSuccess: () => { toast.success('Drive updated'); qc.invalidateQueries({ queryKey: 'drives' }); setEditing(null); },
+    onSuccess: () => { toast.success('Drive updated'); qc.invalidateQueries({ queryKey: ['drives'] }); setEditing(null); },
     onError: (e) => toast.error(e.response?.data?.error || 'Update failed'),
   });
 
   const addTestMut = useMutation({
     mutationFn: ({ id, data }) => drivesAPI.addTest(id, data),
-    onSuccess: () => { toast.success('Test added to drive'); qc.invalidateQueries({ queryKey: 'drives' }); },
+    onSuccess: () => { toast.success('Test added to drive'); qc.invalidateQueries({ queryKey: ['drives'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),
   });
 
   const removeTestMut = useMutation({
     mutationFn: ({ id, testId }) => drivesAPI.removeTest(id, testId),
-    onSuccess: () => { toast.success('Test removed'); qc.invalidateQueries({ queryKey: 'drives' }); },
+    onSuccess: () => { toast.success('Test removed'); qc.invalidateQueries({ queryKey: ['drives'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),
   });
 
   const addBatchMut = useMutation({
     mutationFn: ({ id, data }) => drivesAPI.addBatch(id, data),
-    onSuccess: () => { toast.success('Batch added to drive'); qc.invalidateQueries({ queryKey: 'drives' }); },
+    onSuccess: () => { toast.success('Batch added to drive'); qc.invalidateQueries({ queryKey: ['drives'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),
   });
 
   const removeBatchMut = useMutation({
     mutationFn: ({ id, batchId }) => drivesAPI.removeBatch(id, batchId),
-    onSuccess: () => { toast.success('Batch removed'); qc.invalidateQueries({ queryKey: 'drives' }); },
+    onSuccess: () => { toast.success('Batch removed'); qc.invalidateQueries({ queryKey: ['drives'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),
   });
 
@@ -123,7 +134,7 @@ export default function AdminDrives() {
         onSave={async (data) => {
           await drivesAPI.create(data);
           toast.success('Drive created');
-          qc.invalidateQueries({ queryKey: 'drives' });
+          qc.invalidateQueries({ queryKey: ['drives'] });
           setShowCreate(false);
         }} />
 
@@ -133,7 +144,7 @@ export default function AdminDrives() {
         onSave={async (data) => {
           await drivesAPI.update(editing.id, data);
           toast.success('Drive updated');
-          qc.invalidateQueries({ queryKey: 'drives' });
+          qc.invalidateQueries({ queryKey: ['drives'] });
           setEditing(null);
         }} />
 
@@ -196,11 +207,11 @@ function DriveFormModal({ isOpen, onClose, initial, onSave }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="input-label">Start Time</label>
-            <input className="input-field" type="datetime-local" value={form.start_time ? form.start_time.slice(0, 16) : ''} onChange={e => setForm({ ...form, start_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
+            <input className="input-field" type="datetime-local" value={form.start_time ? toLocalDatetimeString(form.start_time) : ''} onChange={e => setForm({ ...form, start_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
           </div>
           <div>
             <label className="input-label">End Time</label>
-            <input className="input-field" type="datetime-local" value={form.end_time ? form.end_time.slice(0, 16) : ''} onChange={e => setForm({ ...form, end_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
+            <input className="input-field" type="datetime-local" value={form.end_time ? toLocalDatetimeString(form.end_time) : ''} onChange={e => setForm({ ...form, end_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
           </div>
         </div>
       </div>

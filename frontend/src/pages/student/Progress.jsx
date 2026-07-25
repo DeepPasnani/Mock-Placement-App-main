@@ -6,15 +6,15 @@ import { Clock, TrendingUp, BookOpen, CheckCircle, Target } from 'lucide-react';
 
 export default function Progress() {
   const { data: stats } = useQuery({
-    queryKey: 'gamification-stats',
+    queryKey: ['gamification-stats'],
     queryFn: gamificationAPI.getMyStats,
   });
   const { data: subsData, isLoading } = useQuery({
-    queryKey: 'my-submissions',
+    queryKey: ['my-submissions'],
     queryFn: submissionsAPI.getMy,
   });
   const { data: achievements } = useQuery({
-    queryKey: 'achievements',
+    queryKey: ['achievements'],
     queryFn: gamificationAPI.getAchievements,
   });
 

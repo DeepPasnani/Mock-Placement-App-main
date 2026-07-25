@@ -81,8 +81,8 @@ export default function StudentDashboard() {
         return (
           <div className="panel p-4">
             <h3 className="text-title mb-2">XP Progress</h3>
-            <p className="text-2xl font-bold font-mono text-accent">{xpData?.xp || 0} XP</p>
-            <p className="text-xs text-annotation">Level {xpData?.level || 1}</p>
+            <p className="text-2xl font-bold font-mono text-accent">{xpData?.xp?.current ?? 0} XP</p>
+            <p className="text-xs text-annotation">Level {xpData?.xp?.level ?? 1}</p>
           </div>
         );
       case 'StreakCounter':

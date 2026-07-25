@@ -34,7 +34,7 @@ export default function AdminDashboard() {
     queryFn: () => usersAPI.stats(),
     refetchInterval: 60000,
   });
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
   const { data: testSubsData } = useQuery({
     queryKey: ['dashboard-submissions', selectedTest],
     queryFn: () => submissionsAPI.getForTest(selectedTest),

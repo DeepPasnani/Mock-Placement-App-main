@@ -10,7 +10,7 @@ export default function PlagiarismCheck() {
   const [showCode, setShowCode] = useState(null);
   const [viewMode, setViewMode] = useState('list');
 
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['plagiarism', selectedTest, threshold],
     queryFn: () => api.get(`/submissions/plagiarism-check/${selectedTest}`, {

@@ -26,41 +26,41 @@ export default function ScheduledReports() {
   });
 
   const { data: reportsData, isLoading } = useQuery({
-    queryKey: 'scheduled-reports',
+    queryKey: ['scheduled-reports'],
     queryFn: analyticsAPI.scheduledReports.list,
   });
 
   const { data: alertsData } = useQuery({
-    queryKey: 'threshold-alerts',
+    queryKey: ['threshold-alerts'],
     queryFn: analyticsAPI.thresholdAlerts.list,
   });
 
   const createMut = useMutation({
     mutationFn: (data) => analyticsAPI.scheduledReports.create(data),
-    onSuccess: () => { toast.success('Report created'); setShowCreate(false); qc.invalidateQueries('scheduled-reports'); resetForm(); },
+    onSuccess: () => { toast.success('Report created'); setShowCreate(false);       qc.invalidateQueries({ queryKey: ['scheduled-reports'] }); resetForm(); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to create report'),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id) => analyticsAPI.scheduledReports.delete(id),
-    onSuccess: () => { toast.success('Report deleted'); qc.invalidateQueries('scheduled-reports'); },
+    onSuccess: () => { toast.success('Report deleted');       qc.invalidateQueries({ queryKey: ['scheduled-reports'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to delete'),
   });
 
   const toggleMut = useMutation({
     mutationFn: ({ id, enabled }) => analyticsAPI.scheduledReports.update(id, { enabled }),
-    onSuccess: () => { qc.invalidateQueries('scheduled-reports'); },
+    onSuccess: () => {       qc.invalidateQueries({ queryKey: ['scheduled-reports'] }); },
   });
 
   const createAlertMut = useMutation({
     mutationFn: (data) => analyticsAPI.thresholdAlerts.create(data),
-    onSuccess: () => { toast.success('Alert created'); setShowAlert(false); qc.invalidateQueries('threshold-alerts'); setAlertForm({ name: '', student_id: '', threshold_pct: 20, email_recipients: '', enabled: true }); },
+    onSuccess: () => { toast.success('Alert created'); setShowAlert(false);       qc.invalidateQueries({ queryKey: ['threshold-alerts'] }); setAlertForm({ name: '', student_id: '', threshold_pct: 20, email_recipients: '', enabled: true }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to create alert'),
   });
 
   const deleteAlertMut = useMutation({
     mutationFn: (id) => analyticsAPI.thresholdAlerts.delete(id),
-    onSuccess: () => { toast.success('Alert deleted'); qc.invalidateQueries('threshold-alerts'); },
+    onSuccess: () => { toast.success('Alert deleted');       qc.invalidateQueries({ queryKey: ['threshold-alerts'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to delete'),
   });
 

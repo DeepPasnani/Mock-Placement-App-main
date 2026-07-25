@@ -20,7 +20,7 @@ export default function Resources() {
     queryFn: () => gamificationAPI.listResources({ type: typeFilter || undefined, genre: genreFilter || undefined }),
   });
   const { data: statsData } = useQuery({
-    queryKey: 'resource-stats',
+    queryKey: ['resource-stats'],
     queryFn: gamificationAPI.getResourceStats,
   });
 

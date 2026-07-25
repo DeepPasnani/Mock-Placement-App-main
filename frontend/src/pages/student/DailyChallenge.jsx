@@ -12,7 +12,7 @@ export default function DailyChallenge() {
   const [timeLeft, setTimeLeft] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: 'daily-challenge',
+    queryKey: ['daily-challenge'],
     queryFn: gamificationAPI.getDailyChallenge,
     refetchInterval: 60000,
   });

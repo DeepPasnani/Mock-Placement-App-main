@@ -11,12 +11,12 @@ import { format } from 'date-fns';
 export default function Gamification() {
   const { user } = useStore();
   const { data: stats, isLoading } = useQuery({
-    queryKey: 'gamification-stats',
+    queryKey: ['gamification-stats'],
     queryFn: gamificationAPI.getMyStats,
     refetchInterval: 30000,
   });
   const { data: levelsData } = useQuery({
-    queryKey: 'gamification-levels',
+    queryKey: ['gamification-levels'],
     queryFn: gamificationAPI.getLevels,
   });
 

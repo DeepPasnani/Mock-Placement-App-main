@@ -14,7 +14,7 @@ export default function TimeSinkAnalysis() {
   const [thresholdTime, setThresholdTime] = useState(60);
   const [thresholdAcc, setThresholdAcc] = useState(40);
 
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
   const { data, isLoading } = useQuery({
     queryKey: ['time-sink', testId],
     queryFn: () => analyticsAPI.timeSink(testId),

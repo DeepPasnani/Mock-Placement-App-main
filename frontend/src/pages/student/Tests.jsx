@@ -12,8 +12,8 @@ import { format, formatDistanceToNow } from 'date-fns';
  * ═══════════════════════════════════════════════════════════ */
 
 export default function StudentTests() {
-  const { data, isLoading } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
-  const { data: subsData } = useQuery({ queryKey: 'my-submissions', queryFn: submissionsAPI.getMy });
+  const { data, isLoading } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
+  const { data: subsData } = useQuery({ queryKey: ['my-submissions'], queryFn: submissionsAPI.getMy });
   const navigate = useNavigate();
 
   if (isLoading) {

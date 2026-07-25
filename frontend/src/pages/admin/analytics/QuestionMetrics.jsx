@@ -9,7 +9,7 @@ export default function QuestionMetrics() {
   const [selectedQ, setSelectedQ] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
   const { data, isLoading } = useQuery({
     queryKey: ['question-metrics', testId],
     queryFn: () => analyticsAPI.questionMetrics(testId),

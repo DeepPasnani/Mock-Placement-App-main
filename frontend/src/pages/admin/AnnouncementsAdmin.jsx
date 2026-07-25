@@ -20,7 +20,7 @@ export default function AdminAnnouncements() {
   const createMut = useMutation({
     mutationFn: announcementsAPI.create,
     onSuccess: () => {
-      queryClient.invalidateQueries(['announcements']);
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
       setShowCreate(false);
       resetForm();
       toast.success('Announcement created');
@@ -31,7 +31,7 @@ export default function AdminAnnouncements() {
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => announcementsAPI.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(['announcements']);
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
       setEditing(null);
       resetForm();
       toast.success('Announcement updated');
@@ -42,7 +42,7 @@ export default function AdminAnnouncements() {
   const deleteMut = useMutation({
     mutationFn: announcementsAPI.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries(['announcements']);
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
       toast.success('Deleted');
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),

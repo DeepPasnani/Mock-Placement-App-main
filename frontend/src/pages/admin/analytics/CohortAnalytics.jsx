@@ -14,8 +14,8 @@ export default function CohortAnalytics() {
   const [department, setDepartment] = useState('');
   const [testId, setTestId] = useState('');
 
-  const { data: testsData } = useQuery({ queryKey: 'tests', queryFn: testsAPI.list });
-  const { data: batchesData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list });
+  const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
+  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
 
   const params = {};
   if (batchId) params.batch_id = batchId;

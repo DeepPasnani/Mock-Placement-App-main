@@ -23,7 +23,7 @@ export default function ForumPage() {
   const createMut = useMutation({
     mutationFn: forumAPI.createThread,
     onSuccess: () => {
-      queryClient.invalidateQueries(['forum-threads', problemId]);
+      queryClient.invalidateQueries({ queryKey: ['forum-threads', problemId] });
       setShowNewThread(false);
       setThreadTitle('');
       setThreadBody('');
@@ -104,8 +104,8 @@ function ThreadCard({ thread, problemId, currentUser }) {
   const replyMut = useMutation({
     mutationFn: (data) => forumAPI.replyToThread(thread.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(['forum-thread', thread.id]);
-      queryClient.invalidateQueries(['forum-threads', problemId]);
+      queryClient.invalidateQueries({ queryKey: ['forum-thread', thread.id] });
+      queryClient.invalidateQueries({ queryKey: ['forum-threads', problemId] });
       setReplyText('');
       toast.success('Reply posted');
     },
@@ -115,14 +115,14 @@ function ThreadCard({ thread, problemId, currentUser }) {
   const upvoteMut = useMutation({
     mutationFn: forumAPI.upvoteReply,
     onSuccess: () => {
-      queryClient.invalidateQueries(['forum-thread', thread.id]);
+      queryClient.invalidateQueries({ queryKey: ['forum-thread', thread.id] });
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: forumAPI.deleteReply,
     onSuccess: () => {
-      queryClient.invalidateQueries(['forum-thread', thread.id]);
+      queryClient.invalidateQueries({ queryKey: ['forum-thread', thread.id] });
       toast.success('Reply deleted');
     },
   });

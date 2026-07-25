@@ -16,7 +16,7 @@ export default function StudentLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useQuery({
-    queryKey: 'streak-data',
+    queryKey: ['streak-data'],
     queryFn: async () => {
       const data = await gamificationAPI.getStreak();
       setStreak(data.streak);

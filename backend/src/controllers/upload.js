@@ -1,41 +1,27 @@
-const { cloudinary } = require('../services/cloudinary');
+const fs = require('fs');
+const path = require('path');
 
-const generatePlaceholderUrl = (filename) => {
-  const placeholderImages = [
-    'https://placehold.co/600x400/1a1a1a/ffffff?text=Test+Image',
-    'https://placehold.co/600x400/262626/ffffff?text=Placement+Test',
-    'https://placehold.co/600x400/333333/ffffff?text=Question+Image',
-  ];
-  return placeholderImages[Math.floor(Math.random() * placeholderImages.length)];
-};
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'images');
 
-// POST /api/upload/image
 async function uploadImage(req, res) {
   if (!req.file) return res.status(400).json({ error: 'No image file provided' });
-  
-  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
-    res.json({
-      url: req.file.path,
-      publicId: req.file.filename,
-      width: req.file.width,
-      height: req.file.height,
-    });
-  } else {
-    res.json({
-      url: generatePlaceholderUrl(req.file.originalname),
-      publicId: 'placeholder_' + Date.now(),
-    });
-  }
+
+  res.json({
+    url: '/uploads/images/' + req.file.filename,
+    filename: req.file.filename,
+  });
 }
 
-// DELETE /api/upload/image/:publicId
 async function deleteImage(req, res) {
   const { publicId } = req.params;
-  
-  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
-    await cloudinary.uploader.destroy(publicId);
+  const filePath = path.join(UPLOADS_DIR, path.basename(publicId));
+
+  try {
+    await fs.promises.unlink(filePath);
+  } catch {
+    // file might not exist, that's okay
   }
-  
+
   res.json({ message: 'Image deleted' });
 }
 

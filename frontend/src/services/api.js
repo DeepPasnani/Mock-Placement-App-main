@@ -126,11 +126,9 @@ export const uploadAPI = {
   image: (file) => {
     const fd = new FormData();
     fd.append('image', file);
-    return api.post('/upload/image', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }).then(r => r.data);
+    return api.post('/upload/image', fd).then(r => r.data);
   },
-  deleteImage: (publicId) => api.delete(`/upload/image/${encodeURIComponent(publicId)}`).then(r => r.data),
+  deleteImage: (filename) => api.delete(`/upload/image/${encodeURIComponent(filename)}`).then(r => r.data),
 };
 
 // ── Email ────────────────────────────────────────────────────

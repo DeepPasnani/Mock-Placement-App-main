@@ -10,7 +10,7 @@ export default function PlacementPredictions() {
   const [minProb, setMinProb] = useState(0);
   const [department, setDepartment] = useState('');
 
-  const { data: batchesData } = useQuery({ queryKey: 'batches', queryFn: batchesAPI.list });
+  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
 
   const params = {};
   if (batchFilter) params.batch_id = batchFilter;

@@ -27,7 +27,7 @@ export default function TestMonitor() {
 
   const resolveMut = useMutation({
     mutationFn: testMessagesAPI.resolve,
-    onSuccess: () => queryClient.invalidateQueries(['test-messages', testId]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['test-messages', testId] }),
   });
 
   // WebSocket for live messaging
@@ -40,7 +40,7 @@ export default function TestMonitor() {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'TEST_MESSAGE' && msg.testId === testId) {
-          queryClient.invalidateQueries(['test-messages', testId]);
+          queryClient.invalidateQueries({ queryKey: ['test-messages', testId] });
         }
       } catch {}
     };
