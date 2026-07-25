@@ -34,7 +34,7 @@ async function sendEmail({ to, subject, html, text }) {
 
   try {
     await t.sendMail({
-      from: process.env.EMAIL_FROM || `PlacementPro <${process.env.SMTP_USER}>`,
+      from: process.env.EMAIL_FROM || `CampusTrack <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
@@ -78,7 +78,7 @@ function wrap(title, body) {
 <body>
   <div class="wrapper">
     <div class="header">
-      <h1>🎓 PlacementPro</h1>
+      <h1>🎓 CampusTrack</h1>
       <p>Campus Placement Assessment Platform — SVIT Vasad</p>
     </div>
     <div class="body">
@@ -86,7 +86,7 @@ function wrap(title, body) {
       ${body}
     </div>
     <div class="footer">
-      <p>© 2025 PlacementPro · SVIT Vasad · GTU</p>
+      <p>© 2025 CampusTrack · SVIT Vasad · GTU</p>
       <p>This is an automated message. Please do not reply to this email.</p>
     </div>
   </div>
@@ -98,14 +98,14 @@ function wrap(title, body) {
 async function sendWelcomeEmail({ to, name }) {
   await sendEmail({
     to,
-    subject: '🎓 Welcome to PlacementPro!',
+    subject: '🎓 Welcome to CampusTrack!',
     html: wrap('Welcome aboard!', `
       <p>Hi <strong>${name}</strong>,</p>
-      <p>Your account has been successfully created on <strong>PlacementPro</strong> — your campus placement assessment platform.</p>
+      <p>Your account has been successfully created on <strong>CampusTrack</strong> — your campus placement assessment platform.</p>
       <div class="info-box">
         <div class="info-row"><span class="info-label">Email</span><span class="info-value">${to}</span></div>
         <div class="info-row"><span class="info-label">Role</span><span class="info-value">Student</span></div>
-        <div class="info-row"><span class="info-label">Platform</span><span class="info-value">PlacementPro · SVIT Vasad</span></div>
+        <div class="info-row"><span class="info-label">Platform</span><span class="info-value">CampusTrack · SVIT Vasad</span></div>
       </div>
       <p>You can now log in and access aptitude tests, coding challenges, and placement preparation resources.</p>
       <p>Best of luck with your placement journey! 🚀</p>
@@ -162,7 +162,7 @@ async function sendTestResultEmail({ to, name, result }) {
         <div class="info-row"><span class="info-label">Submitted At</span><span class="info-value">${new Date(result.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></div>
       </div>
       <p>${remark}</p>
-      <p>Log in to PlacementPro to view your detailed answer breakdown and explanations.</p>
+      <p>Log in to CampusTrack to view your detailed answer breakdown and explanations.</p>
     `),
   });
 }
@@ -171,10 +171,10 @@ async function sendTestResultEmail({ to, name, result }) {
 async function sendPasswordResetEmail({ to, name, otp }) {
   await sendEmail({
     to,
-    subject: '🔐 Password Reset OTP — PlacementPro',
+    subject: '🔐 Password Reset OTP — CampusTrack',
     html: wrap('Reset Your Password', `
       <p>Hi <strong>${name}</strong>,</p>
-      <p>We received a request to reset your PlacementPro password. Use the OTP below:</p>
+      <p>We received a request to reset your CampusTrack password. Use the OTP below:</p>
       <div style="text-align:center;margin:24px 0;">
         <div style="display:inline-block;background:#f1f5f9;border:2px dashed #1a6cf5;border-radius:12px;padding:20px 40px;">
           <p style="margin:0 0 4px;font-size:12px;color:#64748b;letter-spacing:0.1em;text-transform:uppercase;">Your OTP</p>
@@ -194,10 +194,10 @@ async function sendPasswordResetEmail({ to, name, otp }) {
 async function sendAdminCreatedEmail({ to, name, tempPassword }) {
   await sendEmail({
     to,
-    subject: '🔑 Your Admin Account — PlacementPro',
+    subject: '🔑 Your Admin Account — CampusTrack',
     html: wrap('Admin Account Created', `
       <p>Hi <strong>${name}</strong>,</p>
-      <p>An admin account has been created for you on PlacementPro. Please log in and change your password immediately.</p>
+      <p>An admin account has been created for you on CampusTrack. Please log in and change your password immediately.</p>
       <div class="info-box">
         <div class="info-row"><span class="info-label">Email</span><span class="info-value">${to}</span></div>
         <div class="info-row"><span class="info-label">Temporary Password</span><span class="info-value" style="font-family:monospace;">${tempPassword}</span></div>
@@ -259,10 +259,10 @@ async function sendWeeklyDigestEmail({ to, name, submissions, upcomingTests, unr
 
   await sendEmail({
     to,
-    subject: '📬 Your Weekly Digest — PlacementPro',
+    subject: '📬 Your Weekly Digest — CampusTrack',
     html: wrap('Weekly Performance Digest', `
       <p>Hi <strong>${name}</strong>,</p>
-      <p>Here's your weekly summary from PlacementPro.</p>
+      <p>Here's your weekly summary from CampusTrack.</p>
 
       ${submissionsHtml ? `
       <h3 style="font-size:15px;margin:20px 0 10px;">📊 Tests Completed This Week</h3>
@@ -289,10 +289,10 @@ async function sendWeeklyDigestEmail({ to, name, submissions, upcomingTests, unr
 async function sendBulkImportEmail({ to, name, tempPassword }) {
   await sendEmail({
     to,
-    subject: '🎓 Your PlacementPro Account Details',
+    subject: '🎓 Your CampusTrack Account Details',
     html: wrap('Your Account is Ready', `
       <p>Hi <strong>${name}</strong>,</p>
-      <p>Your student account on PlacementPro has been created by your T&P Cell. Use the credentials below to log in.</p>
+      <p>Your student account on CampusTrack has been created by your T&P Cell. Use the credentials below to log in.</p>
       <div class="info-box">
         <div class="info-row"><span class="info-label">Email</span><span class="info-value">${to}</span></div>
         <div class="info-row"><span class="info-label">Temporary Password</span><span class="info-value" style="font-family:monospace;">${tempPassword}</span></div>
@@ -312,23 +312,23 @@ const TEMPLATES = {
   },
   welcome: {
     label: 'Welcome',
-    subject: '🎓 Welcome to PlacementPro!',
-    body: '<p>Hi {name},</p><p>Your account has been successfully created on <strong>PlacementPro</strong> — your campus placement assessment platform.</p><p>You can now log in and access aptitude tests, coding challenges, and placement preparation resources.</p><p>Best of luck with your placement journey! 🚀</p>',
+    subject: '🎓 Welcome to CampusTrack!',
+    body: '<p>Hi {name},</p><p>Your account has been successfully created on <strong>CampusTrack</strong> — your campus placement assessment platform.</p><p>You can now log in and access aptitude tests, coding challenges, and placement preparation resources.</p><p>Best of luck with your placement journey! 🚀</p>',
   },
   testScheduled: {
     label: 'Test Scheduled',
     subject: '📋 New Test Scheduled: {test_title}',
-    body: '<p>Hi {name},</p><p>A new placement test has been scheduled for your department. Please make sure you\'re prepared and available at the scheduled time.</p><p>Log in to PlacementPro to view the details.</p>',
+    body: '<p>Hi {name},</p><p>A new placement test has been scheduled for your department. Please make sure you\'re prepared and available at the scheduled time.</p><p>Log in to CampusTrack to view the details.</p>',
   },
   testResults: {
     label: 'Test Results Available',
     subject: '📊 Your Results: {test_title}',
-    body: '<p>Hi {name},</p><p>Your results for <strong>{test_title}</strong> are now available. Log in to PlacementPro to view your detailed score breakdown.</p>',
+    body: '<p>Hi {name},</p><p>Your results for <strong>{test_title}</strong> are now available. Log in to CampusTrack to view your detailed score breakdown.</p>',
   },
   passwordReset: {
     label: 'Password Reset',
-    subject: '🔐 Password Reset OTP — PlacementPro',
-    body: '<p>Hi {name},</p><p>We received a request to reset your PlacementPro password. Use the OTP shown on screen to complete the process.</p><p>If you did not request a password reset, ignore this email.</p>',
+    subject: '🔐 Password Reset OTP — CampusTrack',
+    body: '<p>Hi {name},</p><p>We received a request to reset your CampusTrack password. Use the OTP shown on screen to complete the process.</p><p>If you did not request a password reset, ignore this email.</p>',
   },
 };
 

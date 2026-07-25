@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 const TEMPLATES = {
   blank: { label: 'Blank', subject: '', body: '' },
-  welcome: { label: 'Welcome', subject: '🎓 Welcome to PlacementPro!', body: '<p>Hi {name},</p><p>Your account has been successfully created on <strong>PlacementPro</strong>.</p><p>Best of luck with your placement journey! 🚀</p>' },
+  welcome: { label: 'Welcome', subject: '🎓 Welcome to CampusTrack!', body: '<p>Hi {name},</p><p>Your account has been successfully created on <strong>CampusTrack</strong>.</p><p>Best of luck with your placement journey! 🚀</p>' },
   testScheduled: { label: 'Test Scheduled', subject: '📋 New Test Scheduled', body: '<p>Hi {name},</p><p>A new placement test has been scheduled. Log in for details.</p>' },
   testResults: { label: 'Test Results', subject: '📊 Your Results', body: '<p>Hi {name},</p><p>Your results are now available. Log in to view.</p>' },
   passwordReset: { label: 'Password Reset', subject: '🔐 Password Reset OTP', body: '<p>Hi {name},</p><p>Use the OTP provided to reset your password.</p>' },

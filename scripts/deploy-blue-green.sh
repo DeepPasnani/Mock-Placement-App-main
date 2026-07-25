@@ -19,10 +19,10 @@ set -euo pipefail
 # ============================================================
 
 # ── Configuration ─────────────────────────────────────────
-PROJECT_DIR="/opt/placementpro"
+PROJECT_DIR="/opt/campustrack"
 COMPOSE_FILE="docker-compose.blue-green.yml"
 NGINX_CONF_SOURCE="infra/blue-green-nginx.conf"
-NGINX_CONF_TARGET="/etc/nginx/sites-enabled/placementpro"
+NGINX_CONF_TARGET="/etc/nginx/sites-enabled/campustrack"
 STATE_FILE="${PROJECT_DIR}/.deploy-state"
 
 # Determine which environment is active

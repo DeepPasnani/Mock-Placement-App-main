@@ -1,4 +1,4 @@
-# Horizontal Scaling for PlacementPro
+# Horizontal Scaling for CampusTrack
 
 ## Overview
 
@@ -59,12 +59,12 @@ services:
 ```bash
 # Docker Swarm
 docker service create \
-  --name placementpro-backend \
+  --name campustrack-backend \
   --replicas 5 \
-  --network placementpro \
+  --network campustrack \
   --env DATABASE_URL=... \
   --env REDIS_URL=... \
-  placementpro-backend:latest
+  campustrack-backend:latest
 ```
 
 ### Environment Variables for Scaling
@@ -84,12 +84,12 @@ docker service create \
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: placementpro-backend
+  name: campustrack-backend
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: placementpro-backend
+    name: campustrack-backend
   minReplicas: 2
   maxReplicas: 10
   metrics:

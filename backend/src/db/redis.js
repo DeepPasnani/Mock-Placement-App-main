@@ -43,12 +43,12 @@ async function cacheDel(key) {
 // MCQ set/batch).
 async function cacheDelPattern(prefix) {
   const r = await getRedis();
-  let cursor = '0';
+  let cursor = 0;
   do {
     const res = await r.scan(cursor, { MATCH: `${prefix}*`, COUNT: 100 });
     cursor = res.cursor;
     if (res.keys.length) await r.del(res.keys);
-  } while (cursor !== '0');
+  } while (cursor !== 0);
 }
 
 // Rate limiting helpers

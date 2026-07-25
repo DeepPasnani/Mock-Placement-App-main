@@ -19,7 +19,7 @@ FILENAME="campustrack_${TIMESTAMP}.sql.gz"
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5433}"
-DB_NAME="${DB_NAME:-placementpro}"
+DB_NAME="${DB_NAME:-campustrack}"
 DB_USER="${DB_USER:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-postgres_password_change_me}"
 

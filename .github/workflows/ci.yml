@@ -56,7 +56,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: placementpro_test
+          POSTGRES_DB: campustrack_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: test_password
         ports:
@@ -99,12 +99,12 @@ jobs:
       - name: Run database migrations
         run: |
           cd backend
-          DATABASE_URL="postgresql://postgres:test_password@localhost:5433/placementpro_test" \
+          DATABASE_URL="postgresql://postgres:test_password@localhost:5433/campustrack_test" \
           REDIS_URL="redis://localhost:6379" \
           JWT_SECRET="test-jwt-secret" \
           JWT_EXPIRES_IN="7d" \
           node src/db/migrate.js
-          DATABASE_URL="postgresql://postgres:test_password@localhost:5433/placementpro_test" \
+          DATABASE_URL="postgresql://postgres:test_password@localhost:5433/campustrack_test" \
           REDIS_URL="redis://localhost:6379" \
           JWT_SECRET="test-jwt-secret" \
           node src/db/seed.js
@@ -112,7 +112,7 @@ jobs:
       - name: Start backend
         run: |
           cd backend
-          DATABASE_URL="postgresql://postgres:test_password@localhost:5433/placementpro_test" \
+          DATABASE_URL="postgresql://postgres:test_password@localhost:5433/campustrack_test" \
           REDIS_URL="redis://localhost:6379" \
           JWT_SECRET="test-jwt-secret" \
           JWT_EXPIRES_IN="7d" \
@@ -186,7 +186,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            cd /opt/placementpro
+            cd /opt/campustrack
             docker compose pull
             docker compose up -d --remove-orphans
             docker system prune -f

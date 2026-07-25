@@ -2,12 +2,12 @@ const { query } = require('../db');
 
 async function listActiveSessions(req, res) {
   const { rows } = await query(
-    `SELECT s.id, s.user_id, s.ip_address, s.created_at as started_at,
+    `    SELECT s.id, s.user_id, s.ip_address, s.started_at,
             u.name as user_name, u.email as user_email, u.role as user_role
      FROM submissions s
      JOIN users u ON s.user_id = u.id
      WHERE s.status = 'in_progress'
-     ORDER BY s.created_at DESC`
+     ORDER BY s.started_at DESC`
   );
 
   const sessions = rows.map(s => ({

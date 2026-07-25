@@ -23,6 +23,7 @@ const NAV_ICONS = {
   'AI Question Generator': 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
   'AI Placement Predictions': 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
   'AI NL Query': 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z',
+  'Dev Tools': 'M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5',
 };
 
 export default function AdminLayout() {
@@ -48,6 +49,7 @@ export default function AdminLayout() {
       { to: '/admin/analytics/scheduled-reports', label: 'Scheduled Reports' },
       { to: '/admin/email', label: 'Send Email' },
       { to: '/admin/users', label: 'Students' },
+      { to: '/admin/dev-tools', label: 'Dev Tools' },
     ];
     if (user?.role === 'super_admin') {
       items.push({ to: '/admin/admins', label: 'Admins' });

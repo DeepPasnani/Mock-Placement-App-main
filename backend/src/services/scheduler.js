@@ -226,8 +226,8 @@ async function sendTestStartReminders() {
     SELECT t.id, t.title, t.description, t.department, t.start_time, t.end_time, t.duration_minutes
     FROM tests t
     WHERE t.status = 'published'
-      AND t.start_time BETWEEN $3 AND $1
-  `, [in60Min, now, in24H]);
+      AND t.start_time BETWEEN $1 AND $2
+  `, [now, in60Min]);
 
   for (const test of hourTests) {
     const { rows: [lastNotify] } = await query(`

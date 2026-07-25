@@ -530,6 +530,13 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_suspicious_flags_test ON suspicious_flags(test_id);
     CREATE INDEX IF NOT EXISTS idx_suspicious_flags_score ON suspicious_flags(suspicion_score DESC);
 
+    DO $$ BEGIN
+      ALTER TABLE suspicious_flags ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT false;
+      ALTER TABLE suspicious_flags ADD COLUMN IF NOT EXISTS severity VARCHAR(10) DEFAULT 'medium'
+        CHECK (severity IN ('low', 'medium', 'high', 'critical'));
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+
     -- Proctoring snapshots table
     CREATE TABLE IF NOT EXISTS proctoring_snapshots (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

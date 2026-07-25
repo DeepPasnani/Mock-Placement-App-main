@@ -1,7 +1,7 @@
 {
   "Servers": {
     "1": {
-      "Name": "PlacementPro (Local)",
+      "Name": "CampusTrack (Local)",
       "Group": "Servers",
       "Host": "postgres",
       "Port": 5432,

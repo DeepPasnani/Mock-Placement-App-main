@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: pp_postgres
     environment:
-      POSTGRES_DB: placementpro
+      POSTGRES_DB: campustrack
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_password_change_me
     ports:
@@ -41,7 +41,7 @@ services:
       NODE_ENV: production
       PORT: 5000
       FRONTEND_URL: http://localhost:2828
-      DATABASE_URL: postgresql://postgres:postgres_password_change_me@postgres:5432/placementpro
+      DATABASE_URL: postgresql://postgres:postgres_password_change_me@postgres:5432/campustrack
       REDIS_URL: redis://redis:6379
       JWT_SECRET: local-dev-jwt-secret-please-change-in-production
       JWT_EXPIRES_IN: 7d
@@ -71,7 +71,7 @@ services:
     container_name: pp_backend_init
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgres_password_change_me@postgres:5432/placementpro
+      DATABASE_URL: postgresql://postgres:postgres_password_change_me@postgres:5432/campustrack
       REDIS_URL: redis://redis:6379
     entrypoint: ["sh", "-c", "node src/db/migrate.js && node src/db/seed.js"]
     depends_on:
@@ -102,7 +102,7 @@ services:
     image: dpage/pgadmin4:latest
     container_name: pp_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@placementpro.io
+      PGADMIN_DEFAULT_EMAIL: admin@campustrack.io
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: "False"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"

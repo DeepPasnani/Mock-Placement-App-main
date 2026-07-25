@@ -117,7 +117,7 @@ async function getDriveStats(req, res) {
   if (!drive) return res.status(404).json({ error: 'Drive not found' });
 
   const { rows: testRows } = await query(
-    'SELECT id, title FROM drive_tests dt JOIN tests t ON dt.test_id = t.id WHERE dt.drive_id = $1',
+    'SELECT t.id, t.title FROM drive_tests dt JOIN tests t ON dt.test_id = t.id WHERE dt.drive_id = $1',
     [id]
   );
   const testIds = testRows.map(t => t.id);

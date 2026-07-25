@@ -21,6 +21,7 @@ const SecurityAlerts = lazy(() => import('./pages/admin/SecurityAlerts'));
 const AiQuestionGenerator = lazy(() => import('./pages/admin/AiQuestionGenerator'));
 const AiPlacementPredictions = lazy(() => import('./pages/admin/AiPlacementPredictions'));
 const AiNlQuery = lazy(() => import('./pages/admin/AiNlQuery'));
+const DevTools = lazy(() => import('./pages/admin/DevTools'));
 const Landing = lazy(() => import('./pages/Landing'));
 const CohortAnalytics = lazy(() => import('./pages/admin/analytics/CohortAnalytics'));
 const StudentGrowth = lazy(() => import('./pages/admin/analytics/StudentGrowth'));
@@ -114,6 +115,7 @@ export default function App() {
         <Route path="ai/question-generator" element={<ErrorBoundary><AiQuestionGenerator /></ErrorBoundary>} />
         <Route path="ai/placement-predictions" element={<ErrorBoundary><AiPlacementPredictions /></ErrorBoundary>} />
         <Route path="ai/nl-query" element={<ErrorBoundary><AiNlQuery /></ErrorBoundary>} />
+        <Route path="dev-tools" element={<ErrorBoundary><DevTools /></ErrorBoundary>} />
       </Route>
 
       {/* Student routes */}

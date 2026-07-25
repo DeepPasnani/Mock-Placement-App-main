@@ -2,7 +2,7 @@
 
 ## Overview
 
-PlacementPro uses a blue-green deployment pattern to achieve zero-downtime
+CampusTrack uses a blue-green deployment pattern to achieve zero-downtime
 deployments with instant rollback capability.
 
 Two identical production environments run simultaneously:
@@ -103,7 +103,7 @@ services:
     ports:
       - "5000:5000"
     networks:
-      - placementpro
+      - campustrack
     restart: unless-stopped
 
   backend-green:
@@ -117,7 +117,7 @@ services:
     ports:
       - "5001:5001"
     networks:
-      - placementpro
+      - campustrack
     restart: unless-stopped
 
   frontend:
@@ -126,11 +126,11 @@ services:
     ports:
       - "80:80"
     networks:
-      - placementpro
+      - campustrack
     restart: unless-stopped
 
 networks:
-  placementpro:
+  campustrack:
     external: true
 ```
 

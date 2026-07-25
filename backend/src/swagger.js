@@ -4,12 +4,12 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'PlacementPro API',
+      title: 'CampusTrack API',
       version: '1.0.0',
       description: 'Mock Placement Assessment Platform API',
       contact: {
-        name: 'PlacementPro Team',
-        email: 'support@placementpro.edu',
+        name: 'CampusTrack Team',
+        email: 'support@campustrack.edu',
       },
     },
     servers: [

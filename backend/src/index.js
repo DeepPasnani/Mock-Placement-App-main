@@ -44,7 +44,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'PlacementPro API Docs',
+  customSiteTitle: 'CampusTrack API Docs',
 }));
 
 // ── Middleware ──────────────────────────────────────────────────
@@ -137,6 +137,14 @@ app.use((_req, res) => {
 app.use((err, _req, res, _next) => {
   logger.error({ err }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
+});
+
+// ── Global error handlers (prevent crash on unhandled promise rejections) ──
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled promise rejection');
+});
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception');
 });
 
 // ── Create HTTP server with WebSocket support ──────────────────

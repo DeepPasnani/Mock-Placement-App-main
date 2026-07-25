@@ -17,7 +17,7 @@ services:
       - '9090:9090'
     restart: unless-stopped
     networks:
-      - placementpro
+      - campustrack
 
   grafana:
     image: grafana/grafana:latest
@@ -37,20 +37,20 @@ services:
     depends_on:
       - prometheus
     networks:
-      - placementpro
+      - campustrack
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: pp_pg_exporter
     environment:
-      DATA_SOURCE_NAME: 'postgresql://postgres:${DB_PASSWORD:-postgres_password_change_me}@postgres:5432/placementpro?sslmode=disable'
+      DATA_SOURCE_NAME: 'postgresql://postgres:${DB_PASSWORD:-postgres_password_change_me}@postgres:5432/campustrack?sslmode=disable'
     ports:
       - '9187:9187'
     restart: unless-stopped
     depends_on:
       - postgres
     networks:
-      - placementpro
+      - campustrack
 
   redis-exporter:
     image: oliver006/redis_exporter:latest
@@ -63,7 +63,7 @@ services:
     depends_on:
       - redis
     networks:
-      - placementpro
+      - campustrack
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -76,12 +76,12 @@ services:
       - '9100:9100'
     restart: unless-stopped
     networks:
-      - placementpro
+      - campustrack
 
 volumes:
   prometheus_data:
   grafana_data:
 
 networks:
-  placementpro:
+  campustrack:
     external: true

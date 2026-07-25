@@ -16,7 +16,7 @@ const logger = pino({
       return {
         pid: process.pid,
         hostname: require('os').hostname(),
-        service: 'placementpro-backend',
+        service: 'campustrack-backend',
         environment: process.env.NODE_ENV || 'development',
       };
     },

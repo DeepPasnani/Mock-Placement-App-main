@@ -23,7 +23,7 @@ Creates a compressed `pg_dump` custom-format backup.
 |---|---|---|
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5433` | PostgreSQL port |
-| `DB_NAME` | `placementpro` | Database name |
+| `DB_NAME` | `campustrack` | Database name |
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `postgres_password_change_me` | Database password |
 | `S3_BUCKET` | _(optional)_ | S3 bucket for cloud upload |
@@ -44,10 +44,10 @@ Add to crontab (`crontab -e`):
 
 ```cron
 # Run backup every night at 2 AM, then rotate
-0 2 * * * /opt/placementpro/scripts/backup-db.sh /opt/placementpro/backups && /opt/placementpro/scripts/backup-rotate.sh /opt/placementpro/backups
+0 2 * * * /opt/campustrack/scripts/backup-db.sh /opt/campustrack/backups && /opt/campustrack/scripts/backup-rotate.sh /opt/campustrack/backups
 
 # Upload to S3 (if configured) at 3 AM
-0 3 * * * /opt/placementpro/scripts/backup-db.sh /opt/placementpro/backups
+0 3 * * * /opt/campustrack/scripts/backup-db.sh /opt/campustrack/backups
 ```
 
 ## Docker Compose Service
@@ -61,7 +61,7 @@ backup:
   environment:
     DB_HOST: postgres
     DB_PORT: 5432
-    DB_NAME: placementpro
+    DB_NAME: campustrack
     DB_USER: postgres
     DB_PASSWORD: ${DB_PASSWORD}
     S3_BUCKET: ${S3_BUCKET}
@@ -97,5 +97,5 @@ fi
 
 ```bash
 # Restore from custom-format backup
-pg_restore -h localhost -p 5433 -U postgres -d placementpro --no-owner --no-acl -v campustrack_2025-01-15_02-00-01.sql.gz
+pg_restore -h localhost -p 5433 -U postgres -d campustrack --no-owner --no-acl -v campustrack_2025-01-15_02-00-01.sql.gz
 ```

@@ -14,7 +14,7 @@ const pool = new Pool(
     : {
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT) || 5432,
-        database: process.env.DB_NAME || 'placementpro',
+        database: process.env.DB_NAME || 'campustrack',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
         max: 20,
@@ -43,7 +43,7 @@ function getReadPool() {
         : {
             host: process.env.DB_HOST_READ || 'localhost',
             port: parseInt(process.env.DB_PORT_READ) || 5433,
-            database: process.env.DB_NAME_READ || 'placementpro',
+            database: process.env.DB_NAME_READ || 'campustrack',
             user: process.env.DB_USER_READ || process.env.DB_USER || 'postgres',
             password: process.env.DB_PASSWORD_READ || process.env.DB_PASSWORD,
             max: 30,

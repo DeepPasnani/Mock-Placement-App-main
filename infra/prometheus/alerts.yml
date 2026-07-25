@@ -1,5 +1,5 @@
 groups:
-  - name: placementpro-alerts
+  - name: campustrack-alerts
     interval: 30s
     rules:
       - alert: HighErrorRate

@@ -35,13 +35,13 @@ async function generateICS(req, res) {
     const { rows } = await query('SELECT id, title, description, start_time, end_time FROM tests WHERE id = $1', [testId]);
     if (!rows.length) return res.status(404).json({ error: 'Test not found' });
     const test = rows[0];
-    const cal = ical({ name: 'PlacementPro - ' + test.title });
+    const cal = ical({ name: 'CampusTrack - ' + test.title });
     cal.createEvent({
       start: test.start_time,
       end: test.end_time || new Date(new Date(test.start_time).getTime() + 90 * 60000),
       summary: test.title,
       description: test.description || '',
-      organizer: { name: 'PlacementPro', email: process.env.EMAIL_FROM || 'noreply@placementpro.com' },
+      organizer: { name: 'CampusTrack', email: process.env.EMAIL_FROM || 'noreply@campustrack.com' },
     });
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${test.title}.ics"`);
@@ -109,7 +109,7 @@ async function createGoogleEvent(req, res) {
       calendarId: 'primary',
       requestBody: {
         summary: test.title,
-        description: test.description || 'PlacementPro Test',
+        description: test.description || 'CampusTrack Test',
         start: { dateTime: test.start_time, timeZone: 'Asia/Kolkata' },
         end: { dateTime: test.end_time || new Date(new Date(test.start_time).getTime() + 90 * 60000).toISOString(), timeZone: 'Asia/Kolkata' },
       },
@@ -161,7 +161,7 @@ async function createOutlookEvent(req, res) {
     const test = tests[0];
     await axios.post('https://graph.microsoft.com/v1.0/me/events', {
       subject: test.title,
-      body: { contentType: 'text', content: test.description || 'PlacementPro Test' },
+      body: { contentType: 'text', content: test.description || 'CampusTrack Test' },
       start: { dateTime: test.start_time, timeZone: 'Asia/Kolkata' },
       end: { dateTime: test.end_time || new Date(new Date(test.start_time).getTime() + 90 * 60000).toISOString(), timeZone: 'Asia/Kolkata' },
     }, { headers: { Authorization: `Bearer ${rows[0].outlook_calendar_token}` } });
