@@ -20,6 +20,8 @@ const DEPARTMENTS = [
   'Civil Engineering',
 ];
 
+const CLASSES = ['CE 1', 'CE 2', 'CE 3', 'CE 4'];
+
 export default function LoginPage() {
   const { googleLogin, login, register, isLoading } = useStore();
   const navigate = useNavigate();
@@ -465,16 +467,19 @@ export default function LoginPage() {
                         />
                       </div>
                       <div>
-                        <label className="input-label">Batch</label>
-                        <input
-                          type="text"
+                        <label className="input-label">Class</label>
+                        <select
                           name="batch"
                           value={formData.batch}
                           onChange={handleChange}
-                          placeholder="e.g. CE Batch 2"
-                          className="input-field"
+                          className="select-field"
                           required={mode === 'register'}
-                        />
+                        >
+                          <option value="">Select class</option>
+                          {CLASSES.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   )}

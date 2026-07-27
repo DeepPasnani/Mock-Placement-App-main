@@ -124,7 +124,7 @@ async function generatePerformanceFeedback(userId, testId) {
 
   const { rows: questions } = await query(`
     SELECT q.genre, q.difficulty, q.text, q.correct_answer, q.explanation,
-           s.answers->>q.id::text as user_answer
+           sub.answers->>q.id::text as user_answer
     FROM submissions sub
     JOIN sections sec ON sec.test_id = sub.test_id
     JOIN questions q ON q.section_id = sec.id

@@ -22,7 +22,7 @@ async function getPerformanceHistory(req, res) {
   const { rows: genreAccuracy } = await query(
     `SELECT q.genre,
        COUNT(q.id) as total,
-       SUM(CASE WHEN (s.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1 ELSE 0 END) as correct
+       SUM(CASE WHEN (sub.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1 ELSE 0 END) as correct
      FROM submissions sub
      JOIN sections sec ON sub.test_id IN (SELECT test_id FROM sections WHERE id IN (SELECT section_id FROM questions WHERE id IN (SELECT UNNEST(ARRAY(SELECT jsonb_object_keys(sub.answers)::uuid)))))
      JOIN questions q ON q.section_id = sec.id

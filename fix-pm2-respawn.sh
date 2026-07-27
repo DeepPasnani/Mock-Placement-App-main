@@ -1,47 +1,77 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 ROOT="$HOME/Mock-Placement-App-main"
 cd "$ROOT"
 
-echo "=== 1. What is PM2 currently managing? ==="
-pm2 list || true
+echo "=== 1. Databases ==="
+sudo docker compose up -d postgres redis
 
-echo "=== 2. Tell PM2 to stop managing everything (this is what actually"
-echo "    prevents it from respawning what we kill — a raw 'kill' alone"
-echo "    just makes PM2 restart it again within seconds) ==="
-pm2 delete all 2>/dev/null || true
-pm2 save --force 2>/dev/null || true
+echo "=== 1b. Waiting for Postgres to accept connections ==="
+tries=0
+until sudo docker exec pp_postgres pg_isready -U postgres >/dev/null 2>&1; do
+  tries=$((tries+1))
+  if [ "$tries" -gt 30 ]; then
+    echo "❌ Postgres never became ready. Check: sudo docker logs pp_postgres --tail=100"
+    exit 1
+  fi
+  sleep 1
+done
+echo "✅ Postgres is ready"
 
-echo "=== 3. Confirm port 5000 is now actually free ==="
-sleep 2
-if sudo ss -tlnp | grep -q ':5000'; then
-  echo "  Still something there — force-killing directly as a fallback"
-  sudo fuser -k 5000/tcp 2>/dev/null || true
-  sleep 2
-fi
-sudo ss -tlnp | grep ':5000' && echo "⚠️  still occupied" || echo "✅ port 5000 is free"
-
-echo "=== 4. Remove any stale backend container and start the stack ==="
-sudo docker rm -f pp_backend 2>/dev/null || true
+echo "=== 2. Judge0 ==="
+cd "$ROOT/infra/judge0"
 sudo docker compose up -d
+cd "$ROOT"
 
-echo "=== 5. Health check ==="
+echo "=== 3. Node version check ==="
+NODE_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
+if [ "$NODE_MAJOR" -lt 20 ]; then
+  echo "⚠️  Node $(node -v) detected — several backend deps require Node 20+."
+  echo "    Run: nvm install 20 && nvm use 20  then re-run this script."
+  exit 1
+fi
+
+echo "=== 4. Backend ==="
+cd "$ROOT/backend"
+
+if [ ! -f .env ]; then
+  echo "⚠️  backend/.env not found — creating from .env.example"
+  cp .env.example .env
+  echo "⚠️  Edit backend/.env with your actual secrets, or press Enter to use defaults (dev only)"
+  read -r
+fi
+
+npm install
+npm run db:migrate
+npm run db:seed
+pm2 delete campustrack-backend 2>/dev/null || true
+pm2 start src/index.js --name campustrack-backend
+pm2 save --force
+cd "$ROOT"
+
+echo "=== 5. Frontend ==="
+cd "$ROOT/frontend"
+npm install
+npm run build
+
+pm2 delete campustrack-frontend 2>/dev/null || true
+pm2 start npm --name campustrack-frontend -- run preview -- --host 0.0.0.0 --port 5173
+pm2 save --force
+cd "$ROOT"
+
+echo "=== 6. Health check ==="
 tries=0
 until curl -sf http://localhost:5000/health | grep -q '"status":"ok"'; do
   tries=$((tries+1))
   if [ "$tries" -gt 40 ]; then
-    echo "❌ Still not healthy. Check: sudo docker compose logs backend --tail=100"
+    echo "❌ Still not healthy. Check: pm2 logs campustrack-backend --lines 100"
     exit 1
   fi
   sleep 3
 done
 echo "✅ Backend is up"
 
-echo "=== 6. Confirm your data is still there ==="
-sudo docker exec pp_postgres psql -U postgres -d campustrack -c \
-  "SELECT (SELECT COUNT(*) FROM tests) AS tests, (SELECT COUNT(*) FROM users) AS users;"
-
-sudo docker compose ps
+pm2 list
 echo ""
-echo "✅ DONE — Frontend: http://139.59.21.223:2828"
+echo "✅ DONE"

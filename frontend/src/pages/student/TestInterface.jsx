@@ -68,6 +68,9 @@ export default function TestInterface() {
 
   const autoSaveRef = useRef(null);
   const lockdownApplied = useRef(false);
+  const tabSwitchCountRef = useRef(0);
+  const handleSubmitRef = useRef(null);
+  const autoSubmitTriggeredRef = useRef(false);
 
   const { data: testData, isLoading: loadingTest } = useQuery({
     queryKey: ['test-full', testId],
@@ -203,14 +206,19 @@ export default function TestInterface() {
   }, []);
 
   useEffect(() => {
+    tabSwitchCountRef.current = tabSwitchCount;
+  }, [tabSwitchCount]);
+
+  useEffect(() => {
     if (!testStarted) return;
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const newCount = tabSwitchCount + 1;
+        const newCount = tabSwitchCountRef.current + 1;
+        tabSwitchCountRef.current = newCount;
         setTabSwitchCount(newCount);
         if (newCount > MAX_TAB_SWITCHES) {
           toast.error('Tab switch limit exceeded — submitting test.');
-          handleSubmit({ autoSubmitted: true });
+          handleSubmitRef.current?.({ autoSubmitted: true });
         } else {
           setShowTabWarning(true);
           setTimeout(() => setShowTabWarning(false), 3000);
@@ -219,7 +227,7 @@ export default function TestInterface() {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [testStarted, tabSwitchCount]);
+  }, [testStarted]);
 
   useEffect(() => {
     if (!testData || liveRemainingSeconds === null) return;
@@ -250,11 +258,15 @@ export default function TestInterface() {
           setTimeBombs(bombMap);
         }
       } catch {}
-    }, 5000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [testStarted, submissionId, testId]);
 
   const handleSubmit = useCallback(async (opts = {}) => {
+    if (opts.autoSubmitted) {
+      if (autoSubmitTriggeredRef.current) return;
+      autoSubmitTriggeredRef.current = true;
+    }
     setSubmitting(true);
     setConfirmSubmit(false);
     submitMut.mutate({
@@ -265,8 +277,17 @@ export default function TestInterface() {
       tabSwitchCount,
       selectedProblems,
       autoSubmitted: opts.autoSubmitted || false,
+    }, {
+      onError: () => {
+        // Allow a retry if the auto-submit attempt failed
+        autoSubmitTriggeredRef.current = false;
+      },
     });
   }, [testId, answers, codeSolutions, flagged, tabSwitchCount, selectedProblems]);
+
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  }, [handleSubmit]);
 
   const handleTimeExpired = useCallback(() => {
     setTimeExpired(true);
@@ -304,8 +325,12 @@ export default function TestInterface() {
       }
       const result = await submissionsAPI.runCode({ code, language: activeLang, testCases: visibleTests });
       setTestResults(result.results || []);
-    } catch {
-      toast.error('Test execution failed.');
+    } catch (err) {
+      if (err?.response?.status === 429) {
+        toast.error(err.response.data?.error || 'Too many runs in a short time — wait a few seconds and try again.');
+      } else {
+        toast.error(err?.response?.data?.error || 'Test execution failed. Please try again.');
+      }
     }
     setTestLoading(false);
   };
@@ -324,8 +349,12 @@ export default function TestInterface() {
         stdin: q.sample_input || '',
       });
       setRunResult(result);
-    } catch {
-      toast.error('Code execution failed.');
+    } catch (err) {
+      if (err?.response?.status === 429) {
+        toast.error(err.response.data?.error || 'Too many runs in a short time — wait a few seconds and try again.');
+      } else {
+        toast.error(err?.response?.data?.error || 'Code execution failed. Please try again.');
+      }
     }
     setRunLoading(false);
   };

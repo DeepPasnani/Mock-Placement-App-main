@@ -350,8 +350,9 @@ export default function TestCreator() {
 
   return (
     <div className="animate-fade-up">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      {/* Header — sticky so Save/Publish stay reachable while scrolling
+          through a long question list on the Questions step. */}
+      <div className="sticky top-11 lg:top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-5 bg-deck/95 backdrop-blur-sm border-b border-rim flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/admin/tests')}

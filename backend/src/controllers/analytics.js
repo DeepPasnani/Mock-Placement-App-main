@@ -527,7 +527,7 @@ async function getPlacementProbabilityStudent(req, res) {
 
   const { rows: genreData } = await query(`
     SELECT q.genre,
-      AVG(CASE WHEN (s.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1.0 ELSE 0.0 END) as accuracy
+      AVG(CASE WHEN (sub.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1.0 ELSE 0.0 END) as accuracy
     FROM submissions sub
     JOIN tests t ON sub.test_id = t.id
     JOIN sections sec ON sec.test_id = t.id

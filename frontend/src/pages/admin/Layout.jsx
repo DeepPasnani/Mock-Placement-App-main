@@ -81,7 +81,7 @@ export default function AdminLayout() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
+      <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-0.5">
         {NAV.map(({ to, label }) => {
           const path = NAV_ICONS[label] || '';
           return (
@@ -199,14 +199,14 @@ export default function AdminLayout() {
 
     <div className="flex h-screen bg-deck overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-52 bg-panel border-r border-rim shrink-0" role="navigation" aria-label="Admin navigation">
+      <aside className="hidden lg:flex flex-col w-52 bg-panel border-r border-rim shrink-0 overflow-y-auto" role="navigation" aria-label="Admin navigation">
         <SidebarContent />
       </aside>
 
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="w-60 bg-panel border-r border-rim flex flex-col">
+          <div className="w-60 bg-panel border-r border-rim flex flex-col overflow-y-auto">
             <div className="flex justify-end p-2">
               <button
                 onClick={() => setMobileOpen(false)}
@@ -238,6 +238,16 @@ export default function AdminLayout() {
             </svg>
           </button>
           <span className="font-display font-bold text-sm text-ink">CampusTrack</span>
+          <button
+            onClick={handleLogout}
+            className="ml-auto flex items-center justify-center w-8 h-8 rounded-md text-annotation hover:bg-sunken hover:text-ink transition-colors"
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
         </div>
         <div className="p-4 sm:p-6 max-w-6xl mx-auto page-enter">
           <Outlet />

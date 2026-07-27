@@ -43,6 +43,8 @@ function CodingQuestion({
   onPrev, onNext, isLast, onConfirmSubmit, submissionId, timeBomb,
 }) {
   const code = codeSolutions[q.id]?.[activeLang] || q.starter_code?.[activeLang] || '';
+  const totalTestCases = (q.test_cases || []).length;
+  const visibleTestCount = (q.test_cases || []).filter(tc => !tc.isHidden).length;
   const [activeTab, setActiveTab] = useState('code');
   const [formatLoading, setFormatLoading] = useState(false);
   const editorRef = useRef(null);
@@ -260,7 +262,7 @@ function CodingQuestion({
           </div>
 
           {/* Monaco Editor */}
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex flex-col h-[65vh] min-h-[420px]">
             <Editor
               height="100%"
               language={LANG_MAP[activeLang] || 'text'}
@@ -312,14 +314,26 @@ function CodingQuestion({
           </div>
 
           {/* Run All Tests button + results */}
-          <div className="flex items-center gap-3 mt-3">
+          <div className="flex flex-wrap items-center gap-3 mt-3">
             <Btn variant="primary" size="sm" onClick={onRunAllTests} disabled={testLoading || runLoading}>
               {testLoading ? <Spinner size={14} /> : '▶ Run All Visible Tests'}
             </Btn>
             {testResults && testResults.length > 0 && (
-              <span className="text-xs font-mono text-annotation">
-                {testResults.filter(r => r.passed).length}/{testResults.length} passed
-              </span>
+              <>
+                <span className="text-xs font-mono text-annotation">
+                  <span className={testResults.filter(r => r.passed).length === testResults.length ? 'text-verify font-bold' : 'text-ink font-bold'}>
+                    {testResults.filter(r => r.passed).length}/{testResults.length}
+                  </span>{' '}visible passed
+                </span>
+                {totalTestCases > visibleTestCount && (
+                  <span
+                    className="text-2xs font-mono text-annotation/60 px-1.5 py-0.5 rounded bg-panel border border-rim"
+                    title="Hidden test cases are only evaluated on submission and can't be shown here."
+                  >
+                    {visibleTestCount}/{totalTestCases} total test cases completed ({totalTestCases - visibleTestCount} hidden, checked on submit)
+                  </span>
+                )}
+              </>
             )}
           </div>
 

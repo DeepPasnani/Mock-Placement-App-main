@@ -353,7 +353,7 @@ async function getStudentAnalytics(req, res) {
   const { rows: genreAccuracy } = await query(`
     SELECT q.genre,
       COUNT(q.id) as total_questions,
-      SUM(CASE WHEN (s.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1 ELSE 0 END) as correct_count,
+      SUM(CASE WHEN (sub.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1 ELSE 0 END) as correct_count,
       COUNT(q.id) as attempted_count
     FROM submissions sub
     JOIN tests t ON sub.test_id = t.id

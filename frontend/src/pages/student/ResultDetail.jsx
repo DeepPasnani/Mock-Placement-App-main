@@ -18,6 +18,16 @@ export default function ResultDetail() {
     queryFn: () => submissionsAPI.get(submissionId),
   });
 
+  // Hooks must run unconditionally on every render (Rules of Hooks) —
+  // these were previously declared after the early returns below, which
+  // meant React saw a different number of hooks between the loading
+  // render and the loaded render and crashed with:
+  // "Minified React error #310: Rendered more hooks than during the
+  // previous render." Keeping all hooks above any conditional return
+  // fixes that crash.
+  const [showPlayback, setShowPlayback] = useState(false);
+  const [showQuality, setShowQuality] = useState(false);
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-24">
@@ -49,9 +59,6 @@ export default function ResultDetail() {
     ? sub.time_taken_seconds % 60
     : null;
   const passingScore = sub.test_settings?.passingScore || 40;
-
-  const [showPlayback, setShowPlayback] = useState(false);
-  const [showQuality, setShowQuality] = useState(false);
 
   return (
     <div className="animate-fade-up">
