@@ -15,18 +15,27 @@ services:
 
   backend:
     environment:
-      FRONTEND_URL: https://your-domain.com
-      GOOGLE_CLIENT_ID: your_google_client_id
-      GOOGLE_CLIENT_SECRET: your_google_client_secret
-      SMTP_HOST: your-smtp-host
-      SMTP_PORT: "587"
-      SMTP_USER: your-smtp-user
-      SMTP_PASS: your-smtp-password
-      EMAIL_FROM: noreply@your-domain.com
-      JUDGE0_API_URL: https://judge0-ce.p.rapidapi.com
-      JUDGE0_API_KEY: your-judge0-key
-      JUDGE0_API_HOST: judge0-ce.p.rapidapi.com
-      # Image uploads are stored locally — no Cloudinary needed
+      FRONTEND_URL: ${FRONTEND_URL:-https://your-domain.com}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # These pull from a `.env` file at the project root (see .env.example).
+      # Previously these were literal placeholder strings ("your-smtp-host",
+      # etc.) baked directly into this file — if you deployed without
+      # hand-editing every line, the backend would try to connect to a
+      # literal host named "your-smtp-host", fail, log the error, and the
+      # API would still report "OTP sent" (to avoid leaking which emails
+      # are registered), so no email ever arrived with no visible error.
+      # Fill in the real values in your root .env instead.
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST must be set in your root .env for production}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:?SMTP_USER must be set in your root .env for production}
+      SMTP_PASS: ${SMTP_PASS:?SMTP_PASS must be set in your root .env for production}
+      EMAIL_FROM: ${EMAIL_FROM:-CampusTrack <noreply@your-domain.com>}
+      JUDGE0_API_URL: ${JUDGE0_API_URL:-https://judge0-ce.p.rapidapi.com}
+      JUDGE0_API_KEY: ${JUDGE0_API_KEY:-}
+      JUDGE0_API_HOST: ${JUDGE0_API_HOST:-judge0-ce.p.rapidapi.com}
+      # Image uploads are stored as bytea rows in Postgres (images table) —
+      # no Cloudinary/S3 and no shared disk/volume needed
 
   postgres:
     environment:

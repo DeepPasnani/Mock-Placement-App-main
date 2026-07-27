@@ -15,6 +15,7 @@ const LANG_MAP = {
   rust: 'rust',
   ruby: 'ruby',
   kotlin: 'kotlin',
+  sql: 'sql',
 };
 
 const SNIPPETS = {
@@ -27,6 +28,7 @@ const SNIPPETS = {
   rust: 'fn main() {\n  // Write your code here\n  println!("Hello");\n}',
   ruby: 'def solve\n  # Write your code here\nend\n\nsolve',
   kotlin: 'fun main() {\n  // Write your code here\n  println("Hello")\n}',
+  sql: '-- Write your SQL query here\nSELECT *\nFROM table_name;\n',
 };
 
 function DifficultyBadge({ level }) {

@@ -12,6 +12,7 @@ const LANGUAGE_IDS = {
   rust:       73,   // Rust 1.40.0
   ruby:       72,   // Ruby 2.7.0
   kotlin:     78,   // Kotlin 1.3.70
+  sql:        82,   // SQL (SQLite 3.27.2)
 };
 
 // ── Client setup ─────────────────────────────────────────────────
@@ -41,16 +42,29 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
  * Run a single piece of code against one stdin (kept for ad-hoc "Run" clicks,
  * where there's only one input and no need for batching).
  */
+// SQL problems ship their schema + sample data as the test case's "input"
+// and the student's query as their "code" (same convention used by the
+// local Docker sandbox in services/sandbox.js). Judge0's SQL (SQLite)
+// runner just executes source_code as one script with no separate
+// schema-setup step, so we combine the two here and submit with empty
+// stdin, keeping grading behavior identical across both providers.
+function buildSubmissionSource(code, language, stdin) {
+  if (language === 'sql' && stdin) return `${stdin}\n${code}`;
+  return code;
+}
+
 async function runCode({ code, language, stdin = '', timeLimit = 5, memoryLimit = 256000 }) {
   const languageId = LANGUAGE_IDS[language];
   if (!languageId) throw new Error(`Unsupported language: ${language}`);
 
+  const isSql = language === 'sql';
+
   const { data: submission } = await judge0Client.post(
     '/submissions?base64_encoded=false&wait=false',
     {
-      source_code:    code,
+      source_code:    buildSubmissionSource(code, language, stdin),
       language_id:    languageId,
-      stdin,
+      stdin:          isSql ? '' : stdin,
       cpu_time_limit: timeLimit,
       memory_limit:   memoryLimit * 1024, // MB → KB
     }
@@ -100,10 +114,11 @@ async function judgeSubmission({ code, language, testCases, timeLimit = 5, memor
     }));
   }
 
+  const isSql = language === 'sql';
   const submissions = testCases.map((tc) => ({
-    source_code:      code,
+    source_code:      buildSubmissionSource(code, language, tc.input),
     language_id:      languageId,
-    stdin:            tc.input || '',
+    stdin:            isSql ? '' : (tc.input || ''),
     expected_output:  tc.output != null ? String(tc.output) : undefined,
     cpu_time_limit:   timeLimit,
     memory_limit:     memoryLimit * 1024,

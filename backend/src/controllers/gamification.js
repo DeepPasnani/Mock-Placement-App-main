@@ -258,51 +258,49 @@ async function getMyStats(req, res) {
 async function getLeaderboard(req, res) {
   try {
     const { type = 'alltime', batch, class: className } = req.query;
-    let dateFilter = '';
     const params = [];
+
+    const filters = [`u.role = 'student'`, `u.is_active = true`];
+    if (batch) { params.push(batch); filters.push(`u.batch = $${params.length}`); }
+    if (className) { params.push(className); filters.push(`u.branch = $${params.length}`); }
+
+    // For 'alltime' we can read the running total straight off student_xp.
+    // For 'weekly' / 'test' we need to sum the relevant xp_transactions rows
+    // instead, since student_xp only holds the all-time total.
+    let xpJoin = '';
+    let xpExpr = 'COALESCE(sx.xp_points, 0)';
+    let groupBy = '';
 
     if (type === 'test') {
       const { rows: [lastTest] } = await query(
         `SELECT id FROM tests WHERE status = 'published' AND end_time <= NOW() ORDER BY end_time DESC LIMIT 1`
       );
-      if (lastTest) {
-        params.push(lastTest.id);
-        dateFilter = `AND x.reference_type = 'submission' AND x.reference_id = $${params.length}`;
-      } else {
-        return res.json({ leaderboard: [], type });
-      }
+      if (!lastTest) return res.json({ leaderboard: [], type, myRank: null });
+
+      params.push(lastTest.id);
+      xpJoin = `LEFT JOIN xp_transactions xt ON xt.user_id = u.id
+                   AND xt.reference_type = 'submission' AND xt.reference_id = $${params.length}`;
+      xpExpr = 'COALESCE(SUM(xt.amount), 0)';
+      groupBy = 'GROUP BY u.id, u.name, u.email, u.avatar_url, u.branch, u.batch, u.roll_number, sx.level';
     } else if (type === 'weekly') {
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      params.push(weekAgo);
-      dateFilter = `AND x.created_at >= $${params.length}`;
+      params.push(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+      xpJoin = `LEFT JOIN xp_transactions xt ON xt.user_id = u.id AND xt.created_at >= $${params.length}`;
+      xpExpr = 'COALESCE(SUM(xt.amount), 0)';
+      groupBy = 'GROUP BY u.id, u.name, u.email, u.avatar_url, u.branch, u.batch, u.roll_number, sx.level';
     }
-
-    let batchFilter = '';
-    if (batch) {
-      params.push(batch);
-      batchFilter = `AND u.batch = $${params.length}`;
-    }
-
-    let classFilter = '';
-    if (className) {
-      params.push(className);
-      classFilter = `AND u.branch = $${params.length}`;
-    }
-
-    const paramsOffset = params.length;
 
     const { rows: leaderboard } = await query(`
       SELECT
         u.id, u.name, u.email, u.avatar_url, u.branch, u.batch, u.roll_number,
-        COALESCE(sx.xp_points, 0) as xp_points,
+        ${xpExpr} as xp_points,
         COALESCE(sx.level, 1) as level,
-        ROW_NUMBER() OVER (ORDER BY COALESCE(sx.xp_points, 0) DESC) as rank
+        ROW_NUMBER() OVER (ORDER BY ${xpExpr} DESC) as rank
       FROM users u
       LEFT JOIN student_xp sx ON sx.user_id = u.id
-      WHERE u.role = 'student' AND u.is_active = true
-        ${batchFilter}
-        ${classFilter}
-      ORDER BY sx.xp_points DESC NULLS LAST
+      ${xpJoin}
+      WHERE ${filters.join(' AND ')}
+      ${groupBy}
+      ORDER BY ${xpExpr} DESC
       LIMIT 100
     `, params);
 

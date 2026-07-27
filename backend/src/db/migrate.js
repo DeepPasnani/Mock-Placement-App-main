@@ -94,6 +94,20 @@ async function migrate() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
+    -- Images table (question / option images stored directly in Postgres as bytea,
+    -- so uploads survive redeploys/restarts and work across multiple backend instances
+    -- without needing a shared disk or a third-party file host)
+    CREATE TABLE IF NOT EXISTS images (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      data BYTEA NOT NULL,
+      mimetype VARCHAR(100) NOT NULL DEFAULT 'image/jpeg',
+      filename VARCHAR(255),
+      size_bytes INTEGER,
+      created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_images_created_by ON images(created_by);
+
     -- Submissions table
     CREATE TABLE IF NOT EXISTS submissions (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

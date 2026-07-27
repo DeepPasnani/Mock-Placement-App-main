@@ -101,6 +101,20 @@ const LANG_CONFIG = {
     timeout: 30,
     memoryLimit: 768,
   },
+  sql: {
+    // SQL problems ship their schema + sample data as the test case's
+    // "input" (stdin) and the student's query as their "code". We
+    // concatenate the two and pipe the combined script into sqlite3's
+    // in-memory database, so schema/data is always set up before the
+    // student's query runs against it; sqlite3 prints query results to
+    // stdout same as any other test-case comparison.
+    image: 'keinos/sqlite3:latest',
+    ext: '.sql',
+    compile: null,
+    run: (file) => `sh -c "cat /code/stdin.txt ${file} | sqlite3 :memory:"`,
+    timeout: 10,
+    memoryLimit: 256,
+  },
 };
 
 const MAX_CONCURRENT = 5;

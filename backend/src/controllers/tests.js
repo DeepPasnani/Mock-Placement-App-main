@@ -1,20 +1,17 @@
 const { query, getClient } = require('../db');
 const { cacheGet, cacheSet, cacheDel, cacheDelPattern } = require('../db/redis');
 
-// ── GET /api/tests (admin: own only; super_admin: all; student: published + their department)
+// ── GET /api/tests (admin/super_admin: all tests, so every admin account can
+// see tests created by teammates; student: published + their department)
 async function listTests(req, res) {
   const userRole = req.user.role;
-  const userId = req.user.id;
   const userDepartment = req.user.department;
 
   let whereClause = '';
   const params = [];
-  
-  if (userRole === 'super_admin') {
+
+  if (userRole === 'super_admin' || userRole === 'admin') {
     whereClause = '';
-  } else if (userRole === 'admin') {
-    whereClause = 'WHERE t.created_by = $1';
-    params.push(userId);
   } else if (userRole === 'student') {
     if (userDepartment) {
       whereClause = 'WHERE t.status = $1 AND (t.department = $2 OR t.department = \'all\')';
@@ -306,8 +303,8 @@ async function schedulePublish(req, res) {
   if (!scheduled_publish_at) return res.status(400).json({ error: 'scheduled_publish_at required' });
 
   const { rows } = await query(
-    'UPDATE tests SET scheduled_publish_at=$1 WHERE id=$2 AND created_by=$3 RETURNING *',
-    [scheduled_publish_at, req.params.id, req.user.id]
+    'UPDATE tests SET scheduled_publish_at=$1 WHERE id=$2 RETURNING *',
+    [scheduled_publish_at, req.params.id]
   );
   if (!rows.length) return res.status(404).json({ error: 'Test not found' });
 

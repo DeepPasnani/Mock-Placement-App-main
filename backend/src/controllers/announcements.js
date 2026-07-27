@@ -89,8 +89,7 @@ async function updateAnnouncement(req, res) {
          priority = COALESCE($3, priority),
          target_role = COALESCE($4, target_role),
          target_batches = COALESCE($5, target_batches),
-         expires_at = COALESCE($6, expires_at),
-         created_by = $7
+         expires_at = COALESCE($6, expires_at)
      WHERE id = $7
      RETURNING *`,
     [title, body, priority, targetRole, targetBatches ? JSON.stringify(targetBatches) : null, expiresAt, id]

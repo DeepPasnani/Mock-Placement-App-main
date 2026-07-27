@@ -1,10 +1,24 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: API_BASE,
   timeout: 30000,
 });
+
+// If the API is served from its own domain (e.g. frontend on Vercel,
+// backend on Render/Railway), a path like "/api/images/<id>" would resolve
+// against the *frontend's* origin in an <img src="..."> tag and 404. When
+// VITE_API_URL is a relative path ("/api"), the frontend and API share an
+// origin (nginx/dev-server proxy) and no prefix is needed.
+function apiOrigin() {
+  if (/^https?:\/\//i.test(API_BASE)) {
+    try { return new URL(API_BASE).origin; } catch { return ''; }
+  }
+  return '';
+}
 
 // Attach JWT on every request
 api.interceptors.request.use((config) => {
@@ -126,9 +140,13 @@ export const uploadAPI = {
   image: (file) => {
     const fd = new FormData();
     fd.append('image', file);
-    return api.post('/upload/image', fd).then(r => r.data);
+    return api.post('/upload/image', fd).then(r => {
+      const data = r.data;
+      if (data?.url) data.url = apiOrigin() + data.url;
+      return data;
+    });
   },
-  deleteImage: (filename) => api.delete(`/upload/image/${encodeURIComponent(filename)}`).then(r => r.data),
+  deleteImage: (idOrFilename) => api.delete(`/upload/image/${encodeURIComponent(idOrFilename)}`).then(r => r.data),
 };
 
 // ── Email ────────────────────────────────────────────────────

@@ -2,6 +2,18 @@ require('dotenv').config();
 const http = require('http');
 const path = require('path');
 const express = require('express');
+// MUST be required immediately after express and before ./routes (which
+// registers ~230 async route handlers) — this patches Express 4's router so
+// a thrown error/rejected promise inside an async handler is automatically
+// forwarded to the error-handling middleware below, instead of silently
+// hanging the request forever. Express 4 does not do this on its own (only
+// Express 5 does); prior to this, the ~90% of controller functions written
+// as `async function(req, res) {...}` with no try/catch of their own would
+// leave the client's request hanging with no response at all whenever a
+// query failed, a field was missing, or any other exception was thrown —
+// surfacing as random freezes/timeouts under any real usage or load rather
+// than a clean error message.
+require('express-async-errors');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -18,6 +30,32 @@ const { getRedis } = require('./db/redis');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// ── Trust proxy ───────────────────────────────────────────────
+// This app always sits behind at least one reverse proxy (the Nginx
+// container in docker-compose.yml / docker-compose.prod.yml, and often an
+// additional platform load balancer on top of that — Render, Railway,
+// Heroku, etc. all add one). Both proxies set X-Forwarded-For.
+//
+// Without `trust proxy` set, Express ignores X-Forwarded-For and req.ip
+// resolves to the socket address of whichever hop connected directly to
+// Node — i.e. the *proxy's* IP, which is identical for every single user.
+// express-rate-limit keys its buckets on req.ip by default, so every
+// visitor (every student login, every admin login, every API call) was
+// sharing ONE bucket. The admin login limiter allows only 20 requests per
+// 15 minutes total, across the whole site — that bucket emptied almost
+// immediately under any real traffic, which is why admin (and eventually
+// everyone) started seeing "Too many requests"/"Too many login attempts".
+//
+// Setting this to a hop count makes Express pick the correct
+// client-supplied IP out of X-Forwarded-For, so rate limits apply
+// per-visitor again. TRUST_PROXY lets you tune the hop count for your
+// topology (defaults to 1, matching the bundled single-Nginx setup);
+// bump it to 2 if you put this behind Nginx *and* a platform LB/CDN.
+const trustProxyHops = Number.isFinite(Number(process.env.TRUST_PROXY))
+  ? Number(process.env.TRUST_PROXY)
+  : 1;
+app.set('trust proxy', trustProxyHops);
 
 // ── Prometheus metrics ────────────────────────────────────
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
@@ -50,7 +88,18 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 
 // ── Middleware ──────────────────────────────────────────────────
-app.use(helmet());
+// Helmet's default Cross-Origin-Resource-Policy ("same-origin") makes
+// browsers silently refuse to render <img src="..."> whenever the frontend
+// is hosted on a different origin/domain than this API (e.g. Vercel +
+// Render/Railway, or even just http://localhost:5173 calling
+// http://localhost:5000 directly). The network request succeeds, but the
+// image never paints — this is one of the reasons uploaded question/option
+// images can appear broken on the test-taking page. "cross-origin" keeps
+// helmet's other protections while allowing images served from
+// GET /api/images/:id to be embedded from any origin.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(compression());
 app.use(pinoHttp({ logger }));
 app.use(cors({

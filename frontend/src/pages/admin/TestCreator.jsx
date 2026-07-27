@@ -47,6 +47,45 @@ const DEPARTMENTS = [
   'Civil Engineering',
 ];
 
+// The backend returns raw DB columns in snake_case (test_cases, starter_code,
+// input_format, correct_answer, ...) while AptQEditor/CodeQEditor are built
+// around camelCase fields (testCases, starterCode, inputFormat,
+// correctAnswer, ...). Without this normalization step, editing any
+// previously-saved question loads every one of those fields as `undefined` —
+// which crashes outright wherever the editor calls `.map()`/`Object.keys()`
+// on them (e.g. opening the Test Cases or Starter Code tab), and silently
+// blanks every text field otherwise, so saving the test would wipe that data.
+function normalizeQuestion(q, sectionType) {
+  if (sectionType === 'aptitude') {
+    return {
+      ...DEFAULT_APT_Q(),
+      ...q,
+      imageUrl: q.imageUrl ?? q.image_url ?? '',
+      optionImages: q.optionImages ?? q.option_images ?? ['', '', '', ''],
+      correctAnswer: q.correctAnswer ?? q.correct_answer ?? 0,
+      questionSet: q.questionSet ?? q.question_set ?? 'A',
+    };
+  }
+  return {
+    ...DEFAULT_CODE_Q(),
+    ...q,
+    imageUrl: q.imageUrl ?? q.image_url ?? '',
+    inputFormat: q.inputFormat ?? q.input_format ?? '',
+    outputFormat: q.outputFormat ?? q.output_format ?? '',
+    sampleInput: q.sampleInput ?? q.sample_input ?? '',
+    sampleOutput: q.sampleOutput ?? q.sample_output ?? '',
+    testCases: (q.testCases ?? q.test_cases)?.length
+      ? (q.testCases ?? q.test_cases)
+      : [{ input: '', output: '', isHidden: false }],
+    starterCode: {
+      ...DEFAULT_CODE_Q().starterCode,
+      ...(q.starterCode ?? q.starter_code ?? {}),
+    },
+    timeLimit: q.timeLimit ?? q.time_limit_seconds ?? 2,
+    memoryLimit: q.memoryLimit ?? q.memory_limit_mb ?? 256,
+  };
+}
+
 const DEFAULT_APT_Q = () => ({
   _id: genId(),
   type: 'mcq',
@@ -81,6 +120,16 @@ const DEFAULT_CODE_Q = () => ({
       'public class Solution {\n    public static void main(String[] args) {\n        // Write your solution\n    }\n}\n',
     cpp:
       '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your solution\n    return 0;\n}\n',
+    c:
+      '#include <stdio.h>\n\nint main() {\n    // Write your solution\n    return 0;\n}\n',
+    go:
+      'package main\n\nimport "fmt"\n\nfunc main() {\n    // Write your solution\n    _ = fmt.Sprint\n}\n',
+    rust:
+      'fn main() {\n    // Write your solution\n}\n',
+    ruby: '# Write your solution here\n',
+    kotlin:
+      'fun main() {\n    // Write your solution\n}\n',
+    sql: '-- Write your SQL query here\nSELECT *\nFROM table_name;\n',
   },
   timeLimit: 2,
   memoryLimit: 256,
@@ -135,7 +184,7 @@ export default function TestCreator() {
       sections: (editData.sections || []).map(s => ({
         ...s,
         questions: (s.questions || []).map(q => ({
-          ...q,
+          ...normalizeQuestion(q, s.type),
           _id: q.id || genId(),
         })),
       })),
@@ -574,8 +623,8 @@ export default function TestCreator() {
                 <p className="text-2xs text-annotation/70 font-mono uppercase tracking-wider mb-2">
                   Allowed Coding Languages
                 </p>
-                <div className="flex gap-4">
-                  {['python', 'javascript', 'java', 'cpp'].map(lang => (
+                <div className="flex gap-4 flex-wrap">
+                  {['python', 'javascript', 'java', 'cpp', 'c', 'go', 'rust', 'ruby', 'kotlin', 'sql'].map(lang => (
                     <label
                       key={lang}
                       className="flex items-center gap-1.5 text-sm text-ink cursor-pointer"

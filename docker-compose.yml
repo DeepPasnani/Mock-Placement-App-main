@@ -47,6 +47,20 @@ services:
       JWT_EXPIRES_IN: 7d
       REFRESH_TOKEN_SECRET: local-dev-refresh-secret-please-change-in-production
       TZ: Asia/Kolkata
+      # SMTP / email — NOT read from backend/.env (that file is only used
+      # when running the backend directly with `node src/index.js`; Docker
+      # never sees it — it's excluded via backend/.dockerignore and this
+      # environment: block is the only thing that reaches the container).
+      # Put real values in a `.env` file at the PROJECT ROOT (next to this
+      # docker-compose.yml — see .env.example) and Compose will substitute
+      # them here automatically. Leave the root .env entries blank/unset
+      # to keep email sending disabled (OTP/notification emails are then
+      # silently skipped, which is the previous default behavior).
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-CampusTrack <noreply@campustrack.local>}
     ports:
       - "5000:5000"
     depends_on:

@@ -13,6 +13,7 @@ const LANG_MAP = {
   rust: 'rust',
   ruby: 'ruby',
   kotlin: 'kotlin',
+  sql: 'sql',
 };
 
 export default function CodePlayback({ submissionId }) {

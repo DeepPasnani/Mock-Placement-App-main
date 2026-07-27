@@ -2,6 +2,7 @@ const { query } = require('../db');
 const logger = require('./logger');
 const { sendTestScheduledEmail, sendTestResultEmail, sendWeeklyDigestEmail, sendTestReminderEmail } = require('./email');
 const { createNotification } = require('../controllers/notifications');
+const { startDailyChallengeCheck } = require('../controllers/gamification');
 
 let intervalHandle = null;
 
@@ -44,6 +45,7 @@ async function publishScheduledTests() {
 async function runScheduledTasks() {
   try {
     await publishScheduledTests();
+    await startDailyChallengeCheck();
     await sendDriveReminders();
     await sendResultAnnouncements();
     await sendTestStartReminders();
