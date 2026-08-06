@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { emailAPI, usersAPI, batchesAPI } from '../../services/api';
 import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
@@ -6,10 +6,10 @@ import toast from 'react-hot-toast';
 
 const TEMPLATES = {
   blank: { label: 'Blank', subject: '', body: '' },
-  welcome: { label: 'Welcome', subject: '🎓 Welcome to CampusTrack!', body: '<p>Hi {name},</p><p>Your account has been successfully created on <strong>CampusTrack</strong>.</p><p>Best of luck with your placement journey! 🚀</p>' },
-  testScheduled: { label: 'Test Scheduled', subject: '📋 New Test Scheduled', body: '<p>Hi {name},</p><p>A new placement test has been scheduled. Log in for details.</p>' },
-  testResults: { label: 'Test Results', subject: '📊 Your Results', body: '<p>Hi {name},</p><p>Your results are now available. Log in to view.</p>' },
-  passwordReset: { label: 'Password Reset', subject: '🔐 Password Reset OTP', body: '<p>Hi {name},</p><p>Use the OTP provided to reset your password.</p>' },
+  welcome: { label: 'Welcome', subject: 'Welcome to CampusTrack!', body: '<p>Hi {name},</p><p>Your account has been successfully created on <strong>CampusTrack</strong>.</p><p>Best of luck with your placement journey!</p>' },
+  testScheduled: { label: 'Test Scheduled', subject: 'New Test Scheduled', body: '<p>Hi {name},</p><p>A new placement test has been scheduled. Log in for details.</p>' },
+  testResults: { label: 'Test Results', subject: 'Your Results', body: '<p>Hi {name},</p><p>Your results are now available. Log in to view.</p>' },
+  passwordReset: { label: 'Password Reset', subject: 'Password Reset OTP', body: '<p>Hi {name},</p><p>Use the OTP provided to reset your password.</p>' },
 };
 
 const DEPARTMENTS = ['CSE', 'IT', 'ECE', 'EEE', 'ME', 'CE', 'AI', 'CSIT'];
@@ -24,6 +24,7 @@ export default function SendEmail() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [template, setTemplate] = useState('blank');
   const [studentSearch, setStudentSearch] = useState('');
+  const bodyRef = useRef(null);
 
   const { data: batchData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
 
@@ -93,9 +94,22 @@ export default function SendEmail() {
     });
   };
 
-  // Insert HTML snippet at cursor position in the body textarea
+  // Insert an HTML snippet at the cursor position in the body textarea
   const insertAtCursor = (snippet) => {
-    setBody(b => b + snippet);
+    const el = bodyRef.current;
+    if (!el) {
+      setBody(b => b + snippet);
+      return;
+    }
+    const start = el.selectionStart ?? body.length;
+    const end = el.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + snippet + body.slice(end);
+    setBody(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const caret = start + snippet.length;
+      el.setSelectionRange(caret, caret);
+    });
   };
 
   return (
@@ -112,8 +126,9 @@ export default function SendEmail() {
         <div className="lg:col-span-3 space-y-5">
           {/* Template selector */}
           <div>
-            <label className="input-label">Template</label>
+            <label className="input-label" htmlFor="email-template">Template</label>
             <select
+              id="email-template"
               value={template}
               onChange={e => handleTemplateChange(e.target.value)}
               className="select-field"
@@ -126,8 +141,9 @@ export default function SendEmail() {
 
           {/* Subject */}
           <div>
-            <label className="input-label">Subject</label>
+            <label className="input-label" htmlFor="email-subject">Subject</label>
             <input
+              id="email-subject"
               value={subject}
               onChange={e => setSubject(e.target.value)}
               className="input-field"
@@ -137,7 +153,7 @@ export default function SendEmail() {
 
           {/* Body */}
           <div>
-            <label className="input-label">Body (HTML)</label>
+            <label className="input-label" htmlFor="email-body">Body (HTML)</label>
             <div className="flex gap-1 mb-2">
               <button
                 type="button"
@@ -159,7 +175,9 @@ export default function SendEmail() {
                 onClick={() => insertAtCursor('<a href=""></a>')}
                 title="Link"
                 aria-label="Insert link tag"
-              >🔗</button>
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-4 4a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l4-4a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
+              </button>
               <button
                 type="button"
                 className="btn-ghost-icon text-sm leading-none px-2"
@@ -169,6 +187,8 @@ export default function SendEmail() {
               >•</button>
             </div>
             <textarea
+              id="email-body"
+              ref={bodyRef}
               value={body}
               onChange={e => setBody(e.target.value)}
               className="textarea-field"
@@ -180,7 +200,7 @@ export default function SendEmail() {
           {/* Preview */}
           {body && (
             <div className="panel p-4">
-              <div className="text-label mb-2 text-annotation">Preview</div>
+              <div className="text-xs text-annotation font-medium mb-2">Preview</div>
               <div className="panel-muted p-4 text-ink max-h-64 overflow-y-auto">
                 <div
                   className="text-sm leading-relaxed"
@@ -208,7 +228,7 @@ export default function SendEmail() {
         {/* ── Right: Recipients ────────────────────────────── */}
         <div className="lg:col-span-2">
           <div className="panel p-4 space-y-4">
-            <h3 className="text-title text-sm">Recipients</h3>
+            <h3 className="text-sm font-display font-semibold text-ink">Recipients</h3>
 
             {/* All students */}
             <label className="flex items-center gap-2.5 pb-3 border-b border-rim">
@@ -218,14 +238,14 @@ export default function SendEmail() {
                 onChange={e => setAllStudents(e.target.checked)}
                 className="focus-ring accent-accent w-4 h-4"
               />
-              <span className="text-body">All Students</span>
+              <span className="text-sm text-ink">All Students</span>
             </label>
 
             {!allStudents && (
               <>
                 {/* Departments */}
                 <div>
-                  <p className="text-label mb-2">Departments</p>
+                  <p className="text-xs text-annotation font-medium mb-2">Departments</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEPARTMENTS.map(dept => {
                       const active = selectedDepts.includes(dept);
@@ -249,7 +269,7 @@ export default function SendEmail() {
 
                 {/* Batches */}
                 <div>
-                  <p className="text-label mb-2">Batches</p>
+                  <p className="text-xs text-annotation font-medium mb-2">Batches</p>
                   <div className="flex flex-wrap gap-1.5">
                     {(batchData?.batches || []).map(b => {
                       const active = selectedBatches.includes(b.id);
@@ -273,11 +293,12 @@ export default function SendEmail() {
 
                 {/* Individual students */}
                 <div>
-                  <p className="text-label mb-2">Individual Students</p>
+                  <p className="text-xs text-annotation font-medium mb-2">Individual Students</p>
                   <input
                     value={studentSearch}
                     onChange={e => setStudentSearch(e.target.value)}
                     placeholder="Search by name or email…"
+                    aria-label="Search students by name or email"
                     className="input-field text-sm mb-2"
                   />
                   <div className="rounded-sm max-h-40 overflow-y-auto">
@@ -297,10 +318,10 @@ export default function SendEmail() {
                             className="accent-accent w-3.5 h-3.5 shrink-0"
                           />
                           <div className="min-w-0">
-                            <div className="text-body text-sm truncate">
+                            <div className="text-sm text-ink truncate">
                               {s.name || s.email}
                             </div>
-                            <div className="text-caption text-annotation opacity-70 truncate">
+                            <div className="text-2xs text-annotation/70 truncate">
                               {s.email}
                             </div>
                           </div>
@@ -308,7 +329,7 @@ export default function SendEmail() {
                       );
                     })}
                     {studentSearch.length >= 2 && (studentResults?.users || []).length === 0 && (
-                      <p className="text-caption px-2 py-3 text-annotation">No students found</p>
+                      <p className="text-2xs text-annotation px-2 py-3">No students found</p>
                     )}
                   </div>
                 </div>
@@ -317,7 +338,7 @@ export default function SendEmail() {
 
             {/* Summary */}
             <div className="pt-3 border-t border-rim">
-              <div className="text-caption text-annotation">
+              <div className="text-2xs text-annotation">
                 Recipients: <strong className="text-ink">{getRecipientSummary()}</strong>
               </div>
             </div>

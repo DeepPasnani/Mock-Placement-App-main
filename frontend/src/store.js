@@ -40,9 +40,21 @@ export const useStore = create(
       googleLogin: async (credential) => {
         set({ isLoading: true });
         try {
-          const { token, user } = await authAPI.googleLogin(credential);
+          const { token, user, needsProfileCompletion } = await authAPI.googleLogin(credential);
           localStorage.setItem('pp_token', token);
           set({ user, token, isLoading: false });
+          return { user, needsProfileCompletion: needsProfileCompletion ?? !user.profileComplete };
+        } catch (err) {
+          set({ isLoading: false });
+          throw err;
+        }
+      },
+
+      completeProfile: async (data) => {
+        set({ isLoading: true });
+        try {
+          const { user } = await authAPI.completeProfile(data);
+          set({ user, isLoading: false });
           return { user };
         } catch (err) {
           set({ isLoading: false });
@@ -81,29 +93,13 @@ export const useStore = create(
 
       // Accessibility & preferences
       preferences: {
-        dyslexiaMode: false,
-        fontSize: 'md',
         onboardingCompleted: false,
-        dashboardWidgets: ['UpcomingTests', 'RecentScores', 'WeakTopics', 'XPProgress'],
-        widgetOrder: ['UpcomingTests', 'RecentScores', 'WeakTopics', 'LeaderboardRank', 'XPProgress', 'StreakCounter'],
       },
       updatePreference: (key, value) => set((s) => ({
         preferences: { ...s.preferences, [key]: value },
       })),
-      setDyslexiaMode: (v) => set((s) => ({
-        preferences: { ...s.preferences, dyslexiaMode: v },
-      })),
-      setFontSize: (v) => set((s) => ({
-        preferences: { ...s.preferences, fontSize: v },
-      })),
       completeOnboarding: () => set((s) => ({
         preferences: { ...s.preferences, onboardingCompleted: true },
-      })),
-      setDashboardWidgets: (widgets) => set((s) => ({
-        preferences: { ...s.preferences, dashboardWidgets: widgets },
-      })),
-      setWidgetOrder: (order) => set((s) => ({
-        preferences: { ...s.preferences, widgetOrder: order },
       })),
     }),
     {

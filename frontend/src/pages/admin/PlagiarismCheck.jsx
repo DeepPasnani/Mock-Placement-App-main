@@ -157,12 +157,12 @@ export default function PlagiarismCheck() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pair.similarity >= 85 ? '#ef4444' : pair.similarity >= 70 ? '#f59e0b' : '#3b82f6' }} />
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pair.similarity >= 85 ? 'var(--ct-alert)' : pair.similarity >= 70 ? 'var(--ct-accent)' : 'var(--ct-clarify)' }} />
                       <span className={`text-lg font-bold font-mono ${
                         pair.similarity >= 85 ? 'text-alert' : pair.similarity >= 70 ? 'text-accent' : 'text-clarify'
                       }`}>{pair.similarity}%</span>
                     </div>
-                    <Badge color={pair.similarity >= 85 ? 'red' : pair.similarity >= 70 ? 'yellow' : 'blue'}>
+                    <Badge color={pair.similarity >= 85 ? 'alert' : pair.similarity >= 70 ? 'accent' : 'clarify'}>
                       {pair.similarity >= 85 ? 'High' : pair.similarity >= 70 ? 'Medium' : 'Low'}
                     </Badge>
                   </div>
@@ -199,10 +199,10 @@ export default function PlagiarismCheck() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: showCode.similarity >= 85 ? '#ef4444' : '#f59e0b' }} />
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: showCode.similarity >= 85 ? 'var(--ct-alert)' : 'var(--ct-accent)' }} />
                 <span className="text-sm font-bold text-ink">{showCode.similarity}% similar</span>
               </div>
-              <Badge color={showCode.similarity >= 85 ? 'red' : 'yellow'}>{showCode.language}</Badge>
+              <Badge color={showCode.similarity >= 85 ? 'alert' : 'accent'}>{showCode.language}</Badge>
               {showCode.matched_passages?.length > 0 && (
                 <span className="text-2xs text-annotation/50">{showCode.matched_passages.length} matching passages</span>
               )}

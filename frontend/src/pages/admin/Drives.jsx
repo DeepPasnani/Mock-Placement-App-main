@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { drivesAPI, testsAPI, batchesAPI } from '../../services/api';
-import { Btn, Spinner, Modal, Badge } from '../../components/shared/UI';
+import { Btn, Spinner, Modal, Badge, ConfirmModal } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { ALLOWED_DEPARTMENTS } from '../../lib/departments';
+
+const DRIVE_DEPARTMENTS = [...ALLOWED_DEPARTMENTS, 'All Departments'];
 
 const toLocalDatetimeString = (utcStr) => {
   if (!utcStr) return '';
@@ -68,8 +71,8 @@ export default function AdminDrives() {
   });
 
   const statusColor = (s) => {
-    const map = { draft: 'yellow', published: 'blue', in_progress: 'green', completed: 'gray', archived: 'gray' };
-    return map[s] || 'gray';
+    const map = { draft: 'accent', published: 'clarify', in_progress: 'verify', completed: 'annotation', archived: 'annotation' };
+    return map[s] || 'annotation';
   };
 
   return (
@@ -173,45 +176,45 @@ function DriveFormModal({ isOpen, onClose, initial, onSave }) {
     <Modal isOpen={isOpen} onClose={onClose} title={initial ? 'Edit Drive' : 'Create Drive'} width="max-w-xl">
       <div className="space-y-3">
         <div>
-          <label className="input-label">Title *</label>
-          <input className="input-field" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+          <label htmlFor="dr-title" className="input-label">Title *</label>
+          <input className="input-field" id="dr-title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
         </div>
         <div>
-          <label className="input-label">Description</label>
-          <textarea className="textarea-field" rows={2} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <label htmlFor="dr-description" className="input-label">Description</label>
+          <textarea className="textarea-field" id="dr-description" rows={2} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="input-label">Department</label>
-            <select className="select-field" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}>
-              {['Computer Engineering', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'All Departments'].map(d => (
+            <label htmlFor="dr-department" className="input-label">Department</label>
+            <select className="select-field" id="dr-department" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}>
+              {DRIVE_DEPARTMENTS.map(d => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="input-label">Passing Score (%)</label>
-            <input className="input-field" type="number" min={0} max={100} value={form.passing_score} onChange={e => setForm({ ...form, passing_score: +e.target.value })} />
+            <label htmlFor="dr-passing" className="input-label">Passing Score (%)</label>
+            <input className="input-field" id="dr-passing" type="number" min={0} max={100} value={form.passing_score} onChange={e => setForm({ ...form, passing_score: +e.target.value })} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="input-label">MCQ Duration (min)</label>
-            <input className="input-field" type="number" min={1} value={form.mcq_duration_minutes} onChange={e => setForm({ ...form, mcq_duration_minutes: +e.target.value })} />
+            <label htmlFor="dr-mcq-dur" className="input-label">MCQ Duration (min)</label>
+            <input className="input-field" id="dr-mcq-dur" type="number" min={1} value={form.mcq_duration_minutes} onChange={e => setForm({ ...form, mcq_duration_minutes: +e.target.value })} />
           </div>
           <div>
-            <label className="input-label">Coding Duration (min)</label>
-            <input className="input-field" type="number" min={1} value={form.coding_duration_minutes} onChange={e => setForm({ ...form, coding_duration_minutes: +e.target.value })} />
+            <label htmlFor="dr-coding-dur" className="input-label">Coding Duration (min)</label>
+            <input className="input-field" id="dr-coding-dur" type="number" min={1} value={form.coding_duration_minutes} onChange={e => setForm({ ...form, coding_duration_minutes: +e.target.value })} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="input-label">Start Time</label>
-            <input className="input-field" type="datetime-local" value={form.start_time ? toLocalDatetimeString(form.start_time) : ''} onChange={e => setForm({ ...form, start_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
+            <label htmlFor="dr-start" className="input-label">Start Time</label>
+            <input className="input-field" id="dr-start" type="datetime-local" value={form.start_time ? toLocalDatetimeString(form.start_time) : ''} onChange={e => setForm({ ...form, start_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
           </div>
           <div>
-            <label className="input-label">End Time</label>
-            <input className="input-field" type="datetime-local" value={form.end_time ? toLocalDatetimeString(form.end_time) : ''} onChange={e => setForm({ ...form, end_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
+            <label htmlFor="dr-end" className="input-label">End Time</label>
+            <input className="input-field" id="dr-end" type="datetime-local" value={form.end_time ? toLocalDatetimeString(form.end_time) : ''} onChange={e => setForm({ ...form, end_time: e.target.value ? new Date(e.target.value).toISOString() : '' })} />
           </div>
         </div>
       </div>
@@ -229,6 +232,7 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
   const [addTestId, setAddTestId] = useState('');
   const [addBatchId, setAddBatchId] = useState('');
   const [roundNum, setRoundNum] = useState(1);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!isOpen || !drive) return null;
 
@@ -243,7 +247,7 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
     <Modal isOpen={isOpen} onClose={onClose} title={drive.title} width="max-w-2xl">
       <div className="space-y-5">
         <div className="flex items-center gap-2">
-          <Badge color={{ draft: 'yellow', published: 'blue', in_progress: 'green', completed: 'gray' }[drive.status] || 'gray'}>{drive.status}</Badge>
+          <Badge color={{ draft: 'accent', published: 'clarify', in_progress: 'verify', completed: 'annotation' }[drive.status] || 'annotation'}>{drive.status}</Badge>
           <span className="text-xs text-annotation/60">{drive.department}</span>
         </div>
         {drive.description && <p className="text-sm text-annotation">{drive.description}</p>}
@@ -260,11 +264,11 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
             <h4 className="text-xs font-bold text-ink">Tests ({driveTests.length})</h4>
             {availableTests.length > 0 && (
               <div className="flex gap-2 items-center">
-                <select className="select-field text-xs py-1 max-w-40" value={addTestId} onChange={e => setAddTestId(e.target.value)}>
+                <select className="select-field text-xs py-1 max-w-40" value={addTestId} onChange={e => setAddTestId(e.target.value)} aria-label="Test to add to drive">
                   <option value="">Select test…</option>
                   {availableTests.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
                 </select>
-                <input className="input-field text-xs py-1 w-16" type="number" min={1} value={roundNum} onChange={e => setRoundNum(+e.target.value)} placeholder="Round" />
+                <input className="input-field text-xs py-1 w-16" type="number" min={1} value={roundNum} onChange={e => setRoundNum(+e.target.value)} placeholder="Round" aria-label="Round number" />
                 <Btn variant="primary" size="sm" disabled={!addTestId} onClick={() => { onAddTest(addTestId, roundNum); setAddTestId(''); }}>Add</Btn>
               </div>
             )}
@@ -278,7 +282,7 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
                   <div className="flex items-center gap-2">
                     <span className="text-2xs font-mono text-annotation/50">R{t.round_number}</span>
                     <span className="text-sm text-ink">{t.test_title}</span>
-                    <Badge color={t.test_status === 'published' ? 'green' : 'yellow'}>{t.test_status}</Badge>
+                    <Badge color={t.test_status === 'published' ? 'verify' : 'accent'}>{t.test_status}</Badge>
                   </div>
                   <button onClick={() => onRemoveTest(t.test_id)} className="btn-ghost-icon text-annotation hover:text-alert" title="Remove">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -297,7 +301,7 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
             <h4 className="text-xs font-bold text-ink">Batches ({driveBatches.length})</h4>
             {availableBatches.length > 0 && (
               <div className="flex gap-2 items-center">
-                <select className="select-field text-xs py-1 max-w-40" value={addBatchId} onChange={e => setAddBatchId(e.target.value)}>
+                <select className="select-field text-xs py-1 max-w-40" value={addBatchId} onChange={e => setAddBatchId(e.target.value)} aria-label="Batch to add to drive">
                   <option value="">Select batch…</option>
                   {availableBatches.map(b => <option key={b.id} value={b.id}>{b.batch_name} ({b.department})</option>)}
                 </select>
@@ -312,7 +316,7 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
               {driveBatches.map(b => (
                 <span key={b.id} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-accent/10 text-xs text-accent">
                   {b.batch_name}
-                  <button onClick={() => onRemoveBatch(b.batch_id)} className="hover:text-alert">
+                  <button onClick={() => onRemoveBatch(b.batch_id)} className="hover:text-alert" aria-label={`Remove ${b.batch_name} batch`}>
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -332,9 +336,17 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
               onClose();
             }}>Move to {drive.status === 'draft' ? 'Published' : drive.status === 'published' ? 'In Progress' : 'Completed'}</Btn>
           )}
-          <Btn variant="danger" size="sm" onClick={() => { if (confirm('Delete this drive?')) onDelete(); }}>Delete Drive</Btn>
+          <Btn variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>Delete Drive</Btn>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={onDelete}
+        title="Delete Drive"
+        confirmLabel="Delete"
+        message="This will permanently delete this drive. Cannot be undone."
+      />
     </Modal>
   );
 }

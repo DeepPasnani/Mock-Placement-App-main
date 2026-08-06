@@ -2,6 +2,10 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './e2e',
+  // Without this, e2e/global-setup.js (which creates the admin@test.edu /
+  // student@test.edu accounts every spec logs in as) never runs, and every
+  // spec fails at the login step.
+  globalSetup: require.resolve('./e2e/global-setup.js'),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

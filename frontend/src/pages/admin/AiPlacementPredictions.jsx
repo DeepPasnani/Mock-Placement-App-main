@@ -6,7 +6,7 @@ import { Btn, Select, Spinner, Badge, Modal, ProgressBar } from '../../component
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const PROB_COLOR = (p) => p >= 80 ? 'text-verify' : p >= 50 ? 'text-accent' : 'text-alert';
-const BADGE_COLOR = (p) => p >= 80 ? 'green' : p >= 50 ? 'yellow' : 'red';
+const BADGE_COLOR = (p) => p >= 80 ? 'verify' : p >= 50 ? 'accent' : 'alert';
 
 export default function AiPlacementPredictions() {
   const [selectedBatch, setSelectedBatch] = useState('');
@@ -125,7 +125,7 @@ export default function AiPlacementPredictions() {
                       <td>
                         <div className="flex flex-wrap gap-1">
                           {(p.recommended_focus || []).slice(0, 2).map(f => (
-                            <Badge key={f} color="blue">{f}</Badge>
+                            <Badge key={f} color="clarify">{f}</Badge>
                           ))}
                         </div>
                       </td>
@@ -165,7 +165,7 @@ export default function AiPlacementPredictions() {
                 <label className="input-label">Recommended Focus Areas</label>
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {individualPred.recommended_focus.map(f => (
-                    <Badge key={f} color="red">{f}</Badge>
+                    <Badge key={f} color="alert">{f}</Badge>
                   ))}
                 </div>
               </div>

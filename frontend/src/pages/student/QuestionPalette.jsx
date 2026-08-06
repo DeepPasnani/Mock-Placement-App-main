@@ -1,8 +1,8 @@
-function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswered, onNavigate, selectedProblems = [], questionOrder, optionOrders, timeBombs = {} }) {
+function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswered, onNavigate, selectedProblems = [], questionOrder, optionOrders, timeBombs = {}, stacked = false }) {
   return (
-    <div className="w-48 bg-panel border-l border-rim overflow-y-auto shrink-0 hidden md:block">
+    <div className={stacked ? 'w-full' : 'w-48 bg-panel border-l border-rim overflow-y-auto shrink-0 hidden md:block'}>
       <div className="p-3">
-        <div className="text-2xs font-semibold text-annotation uppercase tracking-wider mb-3 font-mono">
+        <div className="eyebrow mb-3">
           Questions
         </div>
         {sections.map((sec, si) => {
@@ -20,7 +20,7 @@ function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswer
 
           return (
             <div key={sec.id} className="mb-4">
-              <div className="text-xs font-medium text-annotation/70 mb-2">{sec.name}</div>
+              <div className="text-xs font-medium text-annotation mb-2">{sec.name}</div>
               <div className="flex flex-wrap gap-1.5">
                 {displayQuestions.map((qq, qi) => {
                   const ans = isAnswered(sec, qq);
@@ -61,7 +61,7 @@ function QuestionPalette({ sections, currentSection, currentQ, flagged, isAnswer
             ['q-grid-btn--flagged', 'Flagged'],
             ['q-grid-btn--default', 'Unanswered'],
           ].map(([cls, lbl]) => (
-            <div key={lbl} className="flex items-center gap-1.5 text-2xs text-annotation">
+            <div key={lbl} className="flex items-center gap-1.5 text-xs text-annotation">
               <span className={`w-3 h-3 rounded border ${cls} inline-block shrink-0`} />
               {lbl}
             </div>

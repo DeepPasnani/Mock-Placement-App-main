@@ -27,7 +27,7 @@ function CodeBlock({ text }) {
       const code = langMatch ? inner.slice(langMatch[0].length) : inner;
       return (
         <pre key={i} className="bg-deck border border-rim rounded-lg p-3 my-2 overflow-x-auto text-sm">
-          {lang && <div className="text-2xs text-annotation/50 font-mono mb-1">{lang}</div>}
+          {lang && <div className="text-2xs text-annotation font-mono mb-1">{lang}</div>}
           <code className="text-ink leading-relaxed whitespace-pre font-mono text-xs">{code}</code>
         </pre>
       );
@@ -94,7 +94,7 @@ function AptitudeQuestion({
       {timeBomb?.expired && (q.type === 'mcq' || q.type === 'msq') && (
         <div className="p-4 mb-4 bg-alert/5 rounded-lg border border-alert/20 text-center">
           <p className="text-sm text-alert font-medium">This question has expired</p>
-          <p className="text-xs text-annotation/60 mt-1">The time limit for this question has passed.</p>
+          <p className="text-xs text-annotation mt-1">The time limit for this question has passed.</p>
         </div>
       )}
 
@@ -178,6 +178,7 @@ function AptitudeQuestion({
             value={answers[q.id] || ''}
             onChange={e => setAnswer(q.id, e.target.value)}
             placeholder={q.type === 'numerical' ? 'Enter numeric answer…' : 'Type your answer…'}
+            aria-label="Your answer"
             className="input-field max-w-xs"
             autoComplete="off"
           />
@@ -187,7 +188,7 @@ function AptitudeQuestion({
       <div className="flex items-center justify-between pt-4 border-t border-rim">
         <button
           onClick={() => setAnswer(q.id, undefined)}
-          className="text-xs text-annotation/60 hover:text-alert transition-colors"
+          className="text-xs text-annotation hover:text-alert transition-colors"
         >
           Clear response
         </button>

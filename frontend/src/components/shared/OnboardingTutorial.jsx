@@ -16,8 +16,8 @@ const STEPS = [
     body: 'This is your placement dashboard. Track upcoming tests, review your scores, and see where you stand on the leaderboard — all in one place.',
   },
   {
-    title: 'Customize your dashboard',
-    body: 'Use the gear icon in the top right to add, remove, or reorder widgets so your dashboard shows what matters most to you.',
+    title: 'Take a test',
+    body: 'Open My Tests to start an aptitude or coding assessment. Your answers auto-save as you go, and you can flag questions to revisit before submitting.',
   },
   {
     title: 'Stay sharp',

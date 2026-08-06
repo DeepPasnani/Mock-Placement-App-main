@@ -1,4 +1,4 @@
-import { useState, useRef, forwardRef } from 'react';
+import { useState, useRef, useEffect, forwardRef, useId } from 'react';
 
 /* ═══════════════════════════════════════════════════════════
  * CampusTrack — Shared Component Library
@@ -26,37 +26,42 @@ export function Btn({ variant = 'primary', size = 'md', className = '', children
   const cls = map[variant] || 'btn-primary';
   const sz  = sizes[size] || '';
   return (
-    <button className={`${cls} ${sz} ${className}`} {...props}>
+    <button className={`btn ${cls} ${sz} ${className}`} {...props}>
       {children}
     </button>
   );
 }
 
 // ── Input ──────────────────────────────────────────────────
-export const Input = forwardRef(({ label, error, hint, className = '', ...props }, ref) => (
-  <div className="w-full">
-    {label && (
-      <label className="input-label">
-        {label}{props.required && <span className="text-alert ml-0.5">*</span>}
-      </label>
-    )}
-    <input
-      ref={ref}
-      className={`input-field ${error ? 'input-error' : ''} ${className}`}
-      {...props}
-    />
-    {error && <p className="text-xs text-alert mt-1">{error}</p>}
-    {hint && !error && <p className="input-hint">{hint}</p>}
-  </div>
-));
+export const Input = forwardRef(({ label, error, hint, className = '', ...props }, ref) => {
+  const id = useId();
+  return (
+    <div className="w-full">
+      {label && (
+        <label className="input-label" htmlFor={id}>
+          {label}{props.required && <span className="text-alert ml-0.5">*</span>}
+        </label>
+      )}
+      <input
+        id={id}
+        ref={ref}
+        className={`input-field ${error ? 'input-error' : ''} ${className}`}
+        {...props}
+      />
+      {error && <p className="text-xs text-alert mt-1">{error}</p>}
+      {hint && !error && <p className="input-hint">{hint}</p>}
+    </div>
+  );
+});
 Input.displayName = 'Input';
 
 // ── Select ─────────────────────────────────────────────────
 export function Select({ label, hint, className = '', children, ...props }) {
+  const id = useId();
   return (
     <div className="w-full">
-      {label && <label className="input-label">{label}</label>}
-      <select className={`select-field ${className}`} {...props}>
+      {label && <label className="input-label" htmlFor={id}>{label}</label>}
+      <select id={id} className={`select-field ${className}`} {...props}>
         {children}
       </select>
       {hint && <p className="input-hint">{hint}</p>}
@@ -66,10 +71,11 @@ export function Select({ label, hint, className = '', children, ...props }) {
 
 // ── Textarea ───────────────────────────────────────────────
 export function Textarea({ label, hint, className = '', ...props }) {
+  const id = useId();
   return (
     <div className="w-full">
-      {label && <label className="input-label">{label}</label>}
-      <textarea className={`textarea-field ${className}`} {...props} />
+      {label && <label className="input-label" htmlFor={id}>{label}</label>}
+      <textarea id={id} className={`textarea-field ${className}`} {...props} />
       {hint && <p className="input-hint">{hint}</p>}
     </div>
   );
@@ -77,10 +83,57 @@ export function Textarea({ label, hint, className = '', ...props }) {
 
 // ── Modal ──────────────────────────────────────────────────
 export function Modal({ isOpen, onClose, title, children, width = 'max-w-lg', footer }) {
+  const contentRef = useRef(null);
+  const lastActive = useRef(null);
+
+useEffect(() => {
+    if (!isOpen) return;
+    lastActive.current = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    // Move focus into the dialog
+    const timer = requestAnimationFrame(() => contentRef.current?.focus?.());
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose?.();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      // Simple focus trap across focusable elements inside the dialog
+      const nodes = contentRef.current?.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!nodes || nodes.length === 0) return;
+      const list = Array.from(nodes);
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      cancelAnimationFrame(timer);
+      if (lastActive.current && typeof lastActive.current.focus === 'function') {
+        lastActive.current.focus();
+      }
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className={`modal-content ${width}`}>
+      <div ref={contentRef} className={`modal-content ${width}`} role="dialog" aria-modal="true"
+        aria-label={typeof title === 'string' ? title : undefined} tabIndex={-1}>
         <div className="modal-header">
           <h3 className="text-base font-display font-bold text-ink">{title}</h3>
           <button onClick={onClose} className="btn-ghost-icon text-annotation hover:text-ink" aria-label="Close">
@@ -121,16 +174,15 @@ export function Alert({ type = 'info', children, className = '' }) {
 }
 
 // ── Badge ──────────────────────────────────────────────────
-export function Badge({ color = 'gray', children }) {
+export function Badge({ color = 'annotation', children }) {
   const map = {
-    green:  'badge-verify',
-    red:    'badge-alert',
-    yellow: 'badge-accent',
-    blue:   'badge-clarify',
-    gray:   'badge-annotation',
-    purple: 'badge-clarify',
+    accent:     'badge-accent',
+    verify:     'badge-verify',
+    alert:      'badge-alert',
+    clarify:    'badge-clarify',
+    annotation: 'badge-annotation',
   };
-  return <span className={`${map[color] || map.gray}`}>{children}</span>;
+  return <span className={`${map[color] || map.annotation}`}>{children}</span>;
 }
 
 // ── Stat Card ──────────────────────────────────────────────

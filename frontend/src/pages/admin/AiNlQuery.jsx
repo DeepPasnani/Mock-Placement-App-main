@@ -41,9 +41,10 @@ export default function AiNlQuery() {
       <div className="panel p-5">
         <div className="space-y-4">
           <div>
-            <label className="input-label">Ask a question about your data</label>
+            <label htmlFor="nlq-query" className="input-label">Ask a question about your data</label>
             <div className="flex gap-2">
               <input
+                id="nlq-query"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && submit()}

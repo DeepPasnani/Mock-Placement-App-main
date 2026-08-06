@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
 import { Btn, Spinner, Badge } from '../../components/shared/UI';
 import { format } from 'date-fns';
@@ -50,9 +50,12 @@ export default function StudentAnalytics() {
           <h1 className="text-display">{student.name}</h1>
           <p className="section-subtitle">{student.email} · {student.branch || 'No branch'} · {student.roll_number || 'No roll no'}</p>
         </div>
-        <div className="flex gap-2 text-xs text-annotation/70">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="panel px-2 py-1">Batch: {student.batch || '—'}</span>
           <span className="panel px-2 py-1">Year: {student.year_of_study || '—'}</span>
+          <Link to={`/admin/analytics/growth/${studentId}`} className="btn-ghost text-xs">
+            Growth Trajectory
+          </Link>
         </div>
       </div>
 
@@ -153,7 +156,7 @@ export default function StudentAnalytics() {
                       </span>
                     </td>
                     <td>
-                      <Badge color={t.status === 'submitted' ? (t.passed ? 'green' : 'red') : 'yellow'}>
+                      <Badge color={t.status === 'submitted' ? (t.passed ? 'verify' : 'alert') : 'accent'}>
                         {t.status === 'submitted' ? (t.passed ? 'Passed' : 'Failed') : t.status}
                       </Badge>
                     </td>

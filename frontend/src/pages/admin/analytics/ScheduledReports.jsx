@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { analyticsAPI } from '../../../services/api';
-import { Btn, Spinner, Modal } from '../../../components/shared/UI';
+import { Btn, Spinner, Modal, ConfirmModal } from '../../../components/shared/UI';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -24,6 +24,7 @@ export default function ScheduledReports() {
   const [alertForm, setAlertForm] = useState({
     name: '', student_id: '', threshold_pct: 20, email_recipients: '', enabled: true,
   });
+  const [confirmTarget, setConfirmTarget] = useState(null);
 
   const { data: reportsData, isLoading } = useQuery({
     queryKey: ['scheduled-reports'],
@@ -129,13 +130,14 @@ export default function ScheduledReports() {
               </div>
               <button
                 onClick={() => toggleMut.mutate({ id: r.id, enabled: !r.enabled })}
+                role="switch"
+                aria-checked={r.enabled}
+                aria-label={`${r.enabled ? 'Disable' : 'Enable'} report ${r.name}`}
                 className={`relative w-10 h-5 rounded-full transition-colors ${r.enabled ? 'bg-verify' : 'bg-rim'}`}
               >
                 <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${r.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
               </button>
-              <Btn variant="ghost" size="sm" onClick={() => {
-                if (confirm('Delete this report?')) deleteMut.mutate(r.id);
-              }}>
+              <Btn variant="ghost" size="sm" onClick={() => setConfirmTarget({ type: 'report', id: r.id })}>
                 Delete
               </Btn>
             </div>
@@ -159,9 +161,7 @@ export default function ScheduledReports() {
                   {a.last_triggered_at ? ` · Last triggered: ${format(new Date(a.last_triggered_at), 'dd MMM')}` : ''}
                 </div>
               </div>
-              <Btn variant="ghost" size="sm" onClick={() => {
-                if (confirm('Delete this alert?')) deleteAlertMut.mutate(a.id);
-              }}>
+              <Btn variant="ghost" size="sm" onClick={() => setConfirmTarget({ type: 'alert', id: a.id })}>
                 Delete
               </Btn>
             </div>
@@ -172,12 +172,12 @@ export default function ScheduledReports() {
       <Modal isOpen={showCreate} onClose={() => { setShowCreate(false); resetForm(); }} title="Create Scheduled Report" width="max-w-md">
         <div className="space-y-3">
           <div>
-            <label className="text-2xs text-annotation/60 mb-1">Report Name</label>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="Weekly Performance Report" />
+            <label className="text-2xs text-annotation/60 mb-1" htmlFor="report-name">Report Name</label>
+            <input id="report-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="Weekly Performance Report" />
           </div>
           <div>
-            <label className="text-2xs text-annotation/60 mb-1">Schedule</label>
-            <select value={form.schedule} onChange={e => setForm(f => ({ ...f, schedule: e.target.value }))} className="select-field">
+            <label className="text-2xs text-annotation/60 mb-1" htmlFor="report-schedule">Schedule</label>
+            <select id="report-schedule" value={form.schedule} onChange={e => setForm(f => ({ ...f, schedule: e.target.value }))} className="select-field">
               <option value="weekly">Weekly</option>
               <option value="fortnightly">Fortnightly</option>
               <option value="monthly">Monthly</option>
@@ -205,8 +205,8 @@ export default function ScheduledReports() {
             </div>
           </div>
           <div>
-            <label className="text-2xs text-annotation/60 mb-1">Email Recipients (comma-separated)</label>
-            <input value={form.recipients} onChange={e => setForm(f => ({ ...f, recipients: e.target.value }))} className="input-field" placeholder="admin@college.edu, hod@college.edu" />
+            <label className="text-2xs text-annotation/60 mb-1" htmlFor="report-recipients">Email Recipients (comma-separated)</label>
+            <input id="report-recipients" value={form.recipients} onChange={e => setForm(f => ({ ...f, recipients: e.target.value }))} className="input-field" placeholder="admin@college.edu, hod@college.edu" />
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Btn variant="ghost" size="sm" onClick={() => { setShowCreate(false); resetForm(); }}>Cancel</Btn>
@@ -220,21 +220,21 @@ export default function ScheduledReports() {
       <Modal isOpen={showAlert} onClose={() => setShowAlert(false)} title="Create Threshold Alert" width="max-w-md">
         <div className="space-y-3">
           <div>
-            <label className="text-2xs text-annotation/60 mb-1">Alert Name</label>
-            <input value={alertForm.name} onChange={e => setAlertForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="Student Performance Drop" />
+            <label className="text-2xs text-annotation/60 mb-1" htmlFor="alert-name">Alert Name</label>
+            <input id="alert-name" value={alertForm.name} onChange={e => setAlertForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="Student Performance Drop" />
           </div>
           <div>
-            <label className="text-2xs text-annotation/60 mb-1">Student ID (UUID)</label>
-            <input value={alertForm.student_id} onChange={e => setAlertForm(f => ({ ...f, student_id: e.target.value }))} className="input-field" placeholder="Enter student UUID" />
+            <label className="text-2xs text-annotation/60 mb-1" htmlFor="alert-student">Student ID (UUID)</label>
+            <input id="alert-student" value={alertForm.student_id} onChange={e => setAlertForm(f => ({ ...f, student_id: e.target.value }))} className="input-field" placeholder="Enter student UUID" />
           </div>
           <div>
-            <label className="text-2xs text-annotation/60 mb-1">Drop Threshold (%)</label>
-            <input type="number" value={alertForm.threshold_pct} onChange={e => setAlertForm(f => ({ ...f, threshold_pct: Number(e.target.value) }))} className="input-field" />
+            <label className="text-2xs text-annotation/60 mb-1" htmlFor="alert-threshold">Drop Threshold (%)</label>
+            <input id="alert-threshold" type="number" value={alertForm.threshold_pct} onChange={e => setAlertForm(f => ({ ...f, threshold_pct: Number(e.target.value) }))} className="input-field" />
             <p className="text-2xs text-annotation/50 mt-0.5">Alert when average drops more than this % from previous 3 tests</p>
           </div>
           <div>
-            <label className="text-2xs text-annotation/60 mb-1">Email Recipients (comma-separated)</label>
-            <input value={alertForm.email_recipients} onChange={e => setAlertForm(f => ({ ...f, email_recipients: e.target.value }))} className="input-field" placeholder="admin@college.edu" />
+            <label className="text-2xs text-annotation/60 mb-1" htmlFor="alert-recipients">Email Recipients (comma-separated)</label>
+            <input id="alert-recipients" value={alertForm.email_recipients} onChange={e => setAlertForm(f => ({ ...f, email_recipients: e.target.value }))} className="input-field" placeholder="admin@college.edu" />
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Btn variant="ghost" size="sm" onClick={() => setShowAlert(false)}>Cancel</Btn>
@@ -244,6 +244,17 @@ export default function ScheduledReports() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!confirmTarget}
+        onClose={() => setConfirmTarget(null)}
+        onConfirm={() => confirmTarget?.type === 'report'
+          ? deleteMut.mutate(confirmTarget.id)
+          : deleteAlertMut.mutate(confirmTarget.id)}
+        title={confirmTarget?.type === 'alert' ? 'Delete Threshold Alert' : 'Delete Scheduled Report'}
+        confirmLabel="Delete"
+        message="This will permanently delete this item. Cannot be undone."
+      />
     </div>
   );
 }

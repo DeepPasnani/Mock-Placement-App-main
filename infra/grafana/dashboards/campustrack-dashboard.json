@@ -44,7 +44,7 @@
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "judge0_queue_depth",
+          "expr": "codebox_queue_depth",
           "legendFormat": "queue depth"
         }
       ],

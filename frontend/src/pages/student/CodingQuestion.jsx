@@ -39,7 +39,7 @@ function DifficultyBadge({ level }) {
 
 function CodingQuestion({
   q, qi, section, codeSolutions, setCode, activeLang, setActiveLang,
-  allowedLangs, flagged, toggleFlag, runResult, runLoading, onRunCode, testResults, testLoading, onRunAllTests,
+  allowedLangs,   flagged, toggleFlag, runResult, runLoading, onRunCode, testResults, testSummary, testLoading, onRunAllTests,
   onPrev, onNext, isLast, onConfirmSubmit, submissionId, timeBomb,
 }) {
   const code = codeSolutions[q.id]?.[activeLang] || q.starter_code?.[activeLang] || '';
@@ -132,7 +132,7 @@ function CodingQuestion({
   if (!q) return null;
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col flex-1 p-4 sm:p-5 animate-fade-up">
+    <div className="max-w-7xl mx-auto flex flex-col flex-1 p-4 sm:p-5 animate-fade-up">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -165,60 +165,65 @@ function CodingQuestion({
         </button>
       </div>
 
-      {/* Problem statement */}
-      <div className="panel p-4 mb-4">
-        <h3 className="font-display font-bold text-base text-ink mb-2">{q.title || `Problem ${qi + 1}`}</h3>
-        <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink mb-3">{q.description}</p>
-        {q.input_format && (
-          <div className="space-y-1 text-xs">
-            <p className="font-mono text-annotation font-semibold">Input Format</p>
-            <p className="font-mono text-ink bg-deck p-2 rounded">{q.input_format}</p>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:gap-5 flex-1 min-h-0">
+        {/* Left: problem statement (scrolls independently on desktop) */}
+        <div className="lg:w-[44%] xl:w-[40%] lg:shrink-0 lg:max-h-[calc(100vh-12.5rem)] lg:overflow-y-auto lg:sticky lg:top-0 lg:pr-1 motion-safe:lg:max-h-[calc(100vh-12.5rem)]">
+          <div className="panel p-4 mb-4">
+            <h3 className="font-display font-bold text-base text-ink mb-2">{q.title || `Problem ${qi + 1}`}</h3>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink mb-3">{q.description}</p>
+            {q.input_format && (
+              <div className="space-y-1 text-xs">
+                <p className="font-mono text-annotation font-semibold">Input Format</p>
+                <p className="font-mono text-ink bg-deck p-2 rounded">{q.input_format}</p>
+              </div>
+            )}
+            {q.output_format && (
+              <div className="space-y-1 text-xs mt-2">
+                <p className="font-mono text-annotation font-semibold">Output Format</p>
+                <p className="font-mono text-ink bg-deck p-2 rounded">{q.output_format}</p>
+              </div>
+            )}
+            {q.constraints && (
+              <div className="space-y-1 text-xs mt-2">
+                <p className="font-mono text-annotation font-semibold">Constraints</p>
+                <p className="font-mono text-ink bg-deck p-2 rounded">{q.constraints}</p>
+              </div>
+            )}
+            {q.sample_input && q.sample_output && (
+              <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                <div>
+                  <p className="font-mono text-annotation font-semibold mb-1">Sample Input</p>
+                  <pre className="font-mono text-ink bg-deck p-2 rounded whitespace-pre-wrap">{q.sample_input}</pre>
+                </div>
+                <div>
+                  <p className="font-mono text-annotation font-semibold mb-1">Sample Output</p>
+                  <pre className="font-mono text-verify bg-deck p-2 rounded whitespace-pre-wrap">{q.sample_output}</pre>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-        {q.output_format && (
-          <div className="space-y-1 text-xs mt-2">
-            <p className="font-mono text-annotation font-semibold">Output Format</p>
-            <p className="font-mono text-ink bg-deck p-2 rounded">{q.output_format}</p>
-          </div>
-        )}
-        {q.constraints && (
-          <div className="space-y-1 text-xs mt-2">
-            <p className="font-mono text-annotation font-semibold">Constraints</p>
-            <p className="font-mono text-ink bg-deck p-2 rounded">{q.constraints}</p>
-          </div>
-        )}
-        {q.sample_input && q.sample_output && (
-          <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-            <div>
-              <p className="font-mono text-annotation font-semibold mb-1">Sample Input</p>
-              <pre className="font-mono text-ink bg-deck p-2 rounded whitespace-pre-wrap">{q.sample_input}</pre>
-            </div>
-            <div>
-              <p className="font-mono text-annotation font-semibold mb-1">Sample Output</p>
-              <pre className="font-mono text-verify bg-deck p-2 rounded whitespace-pre-wrap">{q.sample_output}</pre>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* Tab bar: Code / Custom Test */}
-      <div className="flex items-center gap-1 mb-3 border-b border-rim">
-        {['code', 'custom_test'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 -mb-[1px] ${
-              activeTab === tab
-                ? 'border-accent text-accent'
-                : 'border-transparent text-annotation hover:text-ink'
-            }`}
-          >
-            {tab === 'code' ? 'Code' : 'Custom Test'}
-          </button>
-        ))}
-      </div>
+        {/* Right: editor pane (sticky on desktop) */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Tab bar: Code / Custom Test */}
+          <div className="flex items-center gap-1 mb-3 border-b border-rim">
+            {['code', 'custom_test'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 -mb-[1px] ${
+                  activeTab === tab
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-annotation hover:text-ink'
+                }`}
+              >
+                {tab === 'code' ? 'Code' : 'Custom Test'}
+              </button>
+            ))}
+          </div>
 
-      {activeTab === 'code' && (
+          {activeTab === 'code' && (
         <>
           {/* Language selector + toolbar */}
           <div className="flex items-center justify-between mb-2">
@@ -276,7 +281,7 @@ function CodingQuestion({
             {/* Lint warnings */}
             {lints.length > 0 && (
               <div className="panel mt-2 p-2 border border-accent/30 rounded-lg max-h-28 overflow-y-auto">
-                <div className="text-2xs font-mono text-annotation/60 mb-1">Diagnostics</div>
+                <div className="text-2xs font-mono text-annotation mb-1">Diagnostics</div>
                 {lints.map((l, i) => (
                   <div key={i} className="flex items-start gap-1.5 text-xs py-0.5">
                     <span className={`shrink-0 w-2 h-2 rounded-full mt-0.5 ${
@@ -305,7 +310,7 @@ function CodingQuestion({
                   {runResult.stdout || runResult.output || runResult.stderr || 'No output'}
                 </pre>
                 {runResult.time && (
-                  <p className="text-2xs text-annotation/60 mt-1 font-mono">
+                  <p className="text-2xs text-annotation mt-1 font-mono">
                     Time: {runResult.time}s · Memory: {runResult.memory ? Math.round(runResult.memory / 1024) : 0} MB
                   </p>
                 )}
@@ -316,33 +321,63 @@ function CodingQuestion({
           {/* Run All Tests button + results */}
           <div className="flex flex-wrap items-center gap-3 mt-3">
             <Btn variant="primary" size="sm" onClick={onRunAllTests} disabled={testLoading || runLoading}>
-              {testLoading ? <Spinner size={14} /> : '▶ Run All Visible Tests'}
+              {testLoading ? <Spinner size={14} /> : '▶ Run All Tests'}
             </Btn>
-            {testResults && testResults.length > 0 && (
-              <>
-                <span className="text-xs font-mono text-annotation">
-                  <span className={testResults.filter(r => r.passed).length === testResults.length ? 'text-verify font-bold' : 'text-ink font-bold'}>
-                    {testResults.filter(r => r.passed).length}/{testResults.length}
-                  </span>{' '}visible passed
-                </span>
-                {totalTestCases > visibleTestCount && (
-                  <span
-                    className="text-2xs font-mono text-annotation/60 px-1.5 py-0.5 rounded bg-panel border border-rim"
-                    title="Hidden test cases are only evaluated on submission and can't be shown here."
-                  >
-                    {visibleTestCount}/{totalTestCases} total test cases completed ({totalTestCases - visibleTestCount} hidden, checked on submit)
-                  </span>
-                )}
-              </>
-            )}
           </div>
 
           {testResults && testResults.length > 0 && (
-            <div className="panel p-3 rounded-lg mt-2 animate-fade-in">
-              <div className="overflow-x-auto">
+            <div className="panel rounded-lg mt-2 animate-fade-in overflow-hidden">
+              {/* Summary banner */}
+              {(() => {
+                const summary = testSummary || null;
+                const passed = summary ? summary.passed : testResults.filter(r => r.passed).length;
+                const total = summary ? summary.total : testResults.length;
+                const allPassed = passed === total;
+                const pct = Math.round((passed / total) * 100);
+                return (
+                  <div className={`px-4 py-3 border-b ${
+                    allPassed ? 'bg-verify/8 border-verify/20' : 'bg-alert/5 border-alert/15'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-sm font-display font-bold text-ink">
+                          {passed}<span className="text-annotation font-normal">/{total}</span>
+                        </span>
+                        <span className="text-xs text-annotation ml-2">test cases passed</span>
+                        {summary && (
+                          <span className="text-xs text-annotation ml-2 font-mono" title="Total includes hidden test cases">
+                            (hidden + visible)
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                        allPassed ? 'text-verify bg-verify/10' : pct >= 50 ? 'text-accent bg-accent/10' : 'text-alert bg-alert/10'
+                      }`}>
+                        {pct}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-rim/50 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          allPassed ? 'bg-verify' : 'bg-alert'
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    {summary && (
+                      <div className="flex items-center gap-3 mt-2 text-2xs font-mono">
+                        <span className="text-annotation">Visible <b className={summary.visiblePassed === summary.visibleTotal ? 'text-verify' : 'text-ink'}>{summary.visiblePassed}/{summary.visibleTotal}</b></span>
+                        <span className="text-annotation">Hidden <b className={summary.hiddenPassed === summary.hiddenTotal ? 'text-verify' : 'text-ink'}>{summary.hiddenPassed}/{summary.hiddenTotal}</b></span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="p-3 overflow-x-auto">
                 <table className="w-full text-xs font-mono">
                   <thead>
-                    <tr className="text-annotation/60 border-b border-rim">
+                    <tr className="text-annotation border-b border-rim">
                       <th className="text-left py-1 pr-2">#</th>
                       <th className="text-left py-1 pr-2">Input</th>
                       <th className="text-left py-1 pr-2">Expected</th>
@@ -387,7 +422,7 @@ function CodingQuestion({
             setCode(q.id, activeLang, SNIPPETS[activeLang] || '');
             if (submissionId) saveSnapshot('manual');
           }}
-          className="text-xs text-annotation/60 hover:text-alert transition-colors"
+          className="text-xs text-annotation hover:text-alert transition-colors"
         >
           Reset code
         </button>
@@ -413,6 +448,8 @@ function CodingQuestion({
               </svg>
             </Btn>
           )}
+        </div>
+        </div>
         </div>
       </div>
     </div>

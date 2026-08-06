@@ -1,11 +1,68 @@
 const { query, getClient } = require('../db');
 const { cacheGet, cacheSet, cacheDel, cacheDelPattern } = require('../db/redis');
+const { ALLOWED_DEPARTMENTS } = require('../config/departments');
+
+const VALID_DEPARTMENTS = ALLOWED_DEPARTMENTS;
+
+function normalizeDepartments({ department, departments }) {
+  let list = Array.isArray(departments) ? departments.slice() : [];
+  if (!list.length && department) list = [department];
+  list = [...new Set(list.map((d) => String(d || '').trim()).filter(Boolean))];
+
+  if (!list.length) {
+    const err = new Error('At least one target department is required');
+    err.status = 400;
+    throw err;
+  }
+
+  if (list.includes('all')) {
+    return { departments: ['all'], department: 'all' };
+  }
+
+  for (const d of list) {
+    if (!VALID_DEPARTMENTS.includes(d)) {
+      const err = new Error(`Invalid department: ${d}`);
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  return { departments: list, department: list[0] };
+}
+
+function studentCanAccessTest(test, userDepartment, userBatch, userYear) {
+  // Department check
+  const depts = Array.isArray(test.departments) && test.departments.length
+    ? test.departments
+    : (test.department ? [test.department] : []);
+  if (depts.length && !depts.includes('all')) {
+    const deptOk = depts.includes(userDepartment) || test.department === userDepartment;
+    if (!deptOk) return false;
+  }
+
+  // Batch check: if specific batches are selected, student must be in one.
+  const batchList = Array.isArray(test.batches) ? test.batches.filter(Boolean) : [];
+  if (batchList.length && !batchList.includes('all')) {
+    if (!userBatch || !batchList.includes(userBatch)) return false;
+  }
+
+  // Year check: if specific years are selected, student's year must match.
+  const years = Array.isArray(test.years) ? test.years.filter(y => y !== null && y !== '') : [];
+  if (years.length && !years.includes('all')) {
+    const yStr = String(userYear);
+    if (!userYear || !years.map(String).includes(yStr)) return false;
+  }
+
+  return true;
+}
 
 // ── GET /api/tests (admin/super_admin: all tests, so every admin account can
 // see tests created by teammates; student: published + their department)
 async function listTests(req, res) {
   const userRole = req.user.role;
   const userDepartment = req.user.department;
+  const userBatch = req.user.batch;
+  const userYear = req.user.year_of_study;
 
   let whereClause = '';
   const params = [];
@@ -13,13 +70,45 @@ async function listTests(req, res) {
   if (userRole === 'super_admin' || userRole === 'admin') {
     whereClause = '';
   } else if (userRole === 'student') {
+    whereClause = 'WHERE t.status = $1';
+    params.push('published');
+
+    const conditions = [];
+    const addParam = (v) => {
+      params.push(v);
+      return `$${params.length}`;
+    };
+
     if (userDepartment) {
-      whereClause = 'WHERE t.status = $1 AND (t.department = $2 OR t.department = \'all\')';
-      params.push('published', userDepartment);
+      const p = addParam(userDepartment);
+      conditions.push(`(t.department = 'all' OR t.department = ${p}
+          OR COALESCE(t.departments, '[]'::jsonb) @> to_jsonb(${p}::text)
+          OR COALESCE(t.departments, '[]'::jsonb) @> '"all"'::jsonb)`);
     } else {
-      whereClause = 'WHERE t.status = $1 AND t.department = $2';
-      params.push('published', 'all');
+      conditions.push(`(t.department = 'all' OR COALESCE(t.departments, '[]'::jsonb) @> '"all"'::jsonb)`);
     }
+
+    if (userBatch) {
+      const p = addParam(userBatch);
+      conditions.push(`(COALESCE(t.batches, '[]'::jsonb) = '[]'::jsonb
+          OR COALESCE(t.batches, '[]'::jsonb) @> '"all"'::jsonb
+          OR COALESCE(t.batches, '[]'::jsonb) @> to_jsonb(${p}::text))`);
+    } else {
+      conditions.push(`(COALESCE(t.batches, '[]'::jsonb) = '[]'::jsonb
+          OR COALESCE(t.batches, '[]'::jsonb) @> '"all"'::jsonb)`);
+    }
+
+    if (userYear) {
+      const p = addParam(userYear);
+      conditions.push(`(COALESCE(t.years, '[]'::jsonb) = '[]'::jsonb
+          OR COALESCE(t.years, '[]'::jsonb) @> '"all"'::jsonb
+          OR COALESCE(t.years, '[]'::jsonb) @> to_jsonb(${p}::text))`);
+    } else {
+      conditions.push(`(COALESCE(t.years, '[]'::jsonb) = '[]'::jsonb
+          OR COALESCE(t.years, '[]'::jsonb) @> '"all"'::jsonb)`);
+    }
+
+    whereClause += ' AND ' + conditions.join(' AND ');
   }
 
   const { rows } = await query(`
@@ -58,8 +147,7 @@ async function getTest(req, res) {
     if (test.status !== 'published') {
       return res.status(403).json({ error: 'Test not available' });
     }
-    // Check department match for students
-    if (userDepartment && test.department !== userDepartment && test.department !== 'all') {
+    if (!studentCanAccessTest(test, userDepartment, req.user.batch, req.user.year_of_study)) {
       return res.status(403).json({ error: 'Test not available for your department' });
     }
   }
@@ -113,32 +201,31 @@ async function getTest(req, res) {
 
 // ── POST /api/tests (admin only)
 async function createTest(req, res) {
-  const { title, description, status, startTime, endTime, durationMinutes, settings, sections, department } = req.body;
+  const { title, description, status, startTime, endTime, durationMinutes, settings, sections, department, departments, years, batches } = req.body;
 
   if (!title) return res.status(400).json({ error: 'Title required' });
-  if (!department) return res.status(400).json({ error: 'Department is required' });
 
-  const validDepartments = [
-    'Computer Engineering',
-    'Computer Science and Design',
-    'Aeronautical Engineering',
-    'Electrical Engineering',
-    'Electronics and Communication Engineering',
-    'Civil Engineering'
-  ];
-  if (!validDepartments.includes(department)) {
-    return res.status(400).json({ error: 'Invalid department' });
+  let norm;
+  try {
+    norm = normalizeDepartments({ department, departments });
+  } catch (err) {
+    return res.status(err.status || 400).json({ error: err.message });
   }
+const finalDepartment = norm.department;
+  const finalDepartments = norm.departments;
+  const finalYears = Array.isArray(years) ? years.filter(y => y !== null && y !== '').map(String) : [];
+  const finalBatches = Array.isArray(batches) ? batches.filter(b => b !== null && b !== '').map(String) : [];
 
   const client = await getClient();
   try {
     await client.query('BEGIN');
 
     const { rows: [test] } = await client.query(
-      `INSERT INTO tests (title, description, status, start_time, end_time, duration_minutes, department, settings, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      `INSERT INTO tests (title, description, status, start_time, end_time, duration_minutes, department, departments, years, batches, settings, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [title, description, status || 'draft', startTime || null, endTime || null,
-       durationMinutes || 90, department, JSON.stringify(settings || {}), req.user.id]
+       durationMinutes || 90, finalDepartment, JSON.stringify(finalDepartments),
+       JSON.stringify(finalYears), JSON.stringify(finalBatches), JSON.stringify(settings || {}), req.user.id]
     );
 
     if (sections?.length) {
@@ -190,7 +277,18 @@ async function createTest(req, res) {
 // ── PUT /api/tests/:id
 async function updateTest(req, res) {
   const { id } = req.params;
-  const { title, description, status, startTime, endTime, durationMinutes, settings, sections } = req.body;
+  const { title, description, status, startTime, endTime, durationMinutes, settings, sections, department, departments, years, batches } = req.body;
+
+  let norm;
+  try {
+    norm = normalizeDepartments({ department, departments });
+  } catch (err) {
+    return res.status(err.status || 400).json({ error: err.message });
+  }
+  const finalDepartment = norm.department;
+  const finalDepartments = norm.departments;
+  const finalYears = Array.isArray(years) ? years.filter(y => y !== null && y !== '').map(String) : [];
+  const finalBatches = Array.isArray(batches) ? batches.filter(b => b !== null && b !== '').map(String) : [];
 
   const client = await getClient();
   try {
@@ -198,9 +296,10 @@ async function updateTest(req, res) {
 
     const { rows } = await client.query(
       `UPDATE tests SET title=$1, description=$2, status=$3, start_time=$4, end_time=$5,
-       duration_minutes=$6, settings=$7, updated_at=NOW() WHERE id=$8 RETURNING *`,
+       duration_minutes=$6, department=$7, departments=$8, years=$9, batches=$10, settings=$11, updated_at=NOW() WHERE id=$12 RETURNING *`,
       [title, description, status, startTime || null, endTime || null,
-       durationMinutes, JSON.stringify(settings || {}), id]
+       durationMinutes, finalDepartment, JSON.stringify(finalDepartments),
+       JSON.stringify(finalYears), JSON.stringify(finalBatches), JSON.stringify(settings || {}), id]
     );
 
     if (!rows.length) {

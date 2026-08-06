@@ -68,22 +68,47 @@ export default function AdminDashboard() {
     passing: b >= 40,
   }));
 
-  // ── Batch breakdown ────────────────────────────────────
-  const batchMap = {};
+  // ── Cluster breakdown: department → year → batch ──────────
+  const deptOrder = ['Computer Engineering', 'Computer Science and Design'];
+  const clusterMap = {};
   scoredSubs.forEach(sb => {
-    const batch = sb.batch_display || 'Unknown';
-    if (!batchMap[batch]) batchMap[batch] = { count: 0, totalPct: 0, passCount: 0 };
-    batchMap[batch].count++;
+    const dept  = sb.user_department || sb.department || 'Unknown';
+    const year  = sb.year_display ?? sb.user_year ?? 'Any';
+    const batch = sb.batch_display || sb.user_batch || 'Unknown';
+    if (!clusterMap[dept]) clusterMap[dept] = {};
+    if (!clusterMap[dept][year]) clusterMap[dept][year] = {};
+    if (!clusterMap[dept][year][batch]) clusterMap[dept][year][batch] = { count: 0, totalPct: 0, passCount: 0 };
+    const d = clusterMap[dept][year][batch];
+    d.count++;
     const pct = sb.max_score > 0 ? (sb.score / sb.max_score) * 100 : 0;
-    batchMap[batch].totalPct += pct;
-    if (pct >= 40) batchMap[batch].passCount++;
+    d.totalPct += pct;
+    if (pct >= 40) d.passCount++;
   });
-  const batchData = Object.entries(batchMap).map(([batch, d]) => ({
-    batch,
-    count: d.count,
-    avg: Math.round(d.totalPct / d.count),
-    passRate: Math.round((d.passCount / d.count) * 100),
-  }));
+  const clusterData = Object.entries(clusterMap)
+    .sort((a, b) => {
+      const ai = deptOrder.indexOf(a[0]);
+      const bi = deptOrder.indexOf(b[0]);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([department, years]) => ({
+      department,
+      years: Object.entries(years)
+        .sort((a, b) => (Number(a[0]) || 0) - (Number(b[0]) || 0))
+        .map(([year, batches]) => ({
+          year,
+          batches: Object.entries(batches)
+            .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+            .map(([batch, d]) => ({
+              batch,
+              count: d.count,
+              avg: Math.round(d.totalPct / d.count),
+              passRate: Math.round((d.passCount / d.count) * 100),
+            })),
+        })),
+    }));
 
   const genreData = (s.genreStats || []).map(g => ({
     name: g.genre.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -239,12 +264,12 @@ export default function AdminDashboard() {
           <h3 className="text-label text-annotation mb-3">Score Distribution {selectedTest !== 'all' ? '(selected test)' : '(recent)'}</h3>
           <ResponsiveContainer width="100%" height={140}>
             <BarChart data={distData} margin={{ top: 0, right: 0, bottom: 0, left: -16 }}>
-              <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#8A8066' }} />
-              <YAxis tick={{ fontSize: 10, fill: '#8A8066' }} allowDecimals={false} />
-              <Tooltip formatter={v => [`${v} students`]} contentStyle={{ background: '#FBF9F2', border: '1px solid #DFD4B8', borderRadius: '8px', color: '#2A2419', fontSize: '12px' }} />
+              <XAxis dataKey="range" tick={{ fontSize: 10, fill: 'var(--ct-annotation)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--ct-annotation)' }} allowDecimals={false} />
+              <Tooltip formatter={v => [`${v} students`]} contentStyle={{ background: 'var(--ct-panel)', border: '1px solid var(--ct-rim)', borderRadius: '8px', color: 'var(--ct-ink)', fontSize: '12px' }} />
               <Bar dataKey="count" radius={[3, 3, 0, 0]}>
                 {distData.map((d, i) => (
-                  <Cell key={i} fill={d.passing ? '#4B7B3F' : '#AE4331'} />
+                  <Cell key={i} fill={d.passing ? 'var(--ct-verify)' : 'var(--ct-alert)'} />
                 ))}
               </Bar>
             </BarChart>
@@ -256,28 +281,23 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Class-wise Breakdown */}
-      {batchData.length > 1 && (
+      {/* Class-wise Breakdown (department → year → batch) */}
+      {clusterData.length > 0 && (
         <div className="panel p-4">
-          <h3 className="text-label text-annotation mb-3">Class-wise Breakdown</h3>
+          <h3 className="text-label text-annotation mb-3">Cluster-wise Breakdown (Dept / Year / Batch)</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-rim">
-                  <th className="text-left py-2 font-medium text-annotation">Batch</th>
+                  <th className="text-left py-2 font-medium text-annotation">Cluster</th>
                   <th className="text-right py-2 font-medium text-annotation">Submitted</th>
                   <th className="text-right py-2 font-medium text-annotation">Average</th>
                   <th className="text-right py-2 font-medium text-annotation">Pass Rate</th>
                 </tr>
               </thead>
               <tbody>
-                {batchData.map(b => (
-                  <tr key={b.batch} className="border-b border-rim/30">
-                    <td className="py-1.5 font-medium text-ink">{b.batch}</td>
-                    <td className="text-right py-1.5 font-mono">{b.count}</td>
-                    <td className="text-right py-1.5 font-mono">{b.avg}%</td>
-                    <td className="text-right py-1.5 font-mono">{b.passRate}%</td>
-                  </tr>
+                {clusterData.map(d => (
+                  <ClusterRows key={d.department} cluster={d} />
                 ))}
               </tbody>
             </table>
@@ -311,7 +331,7 @@ export default function AdminDashboard() {
                     </Link>
                     <span className="text-2xs text-annotation/60 font-mono">{t.duration_minutes} min · {t.section_count || 0} sections</span>
                   </div>
-                  <Badge color={t.status === 'published' ? 'green' : t.status === 'archived' ? 'gray' : 'yellow'}>
+                  <Badge color={t.status === 'published' ? 'verify' : t.status === 'archived' ? 'annotation' : 'accent'}>
                     {t.status}
                   </Badge>
                 </div>
@@ -357,6 +377,51 @@ export default function AdminDashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Renders a cluster (department → year → batch) as table rows ── */
+const yearOrdinal = (y) => {
+  const n = Number(y);
+  if (!Number.isFinite(n) || y === '' || y === null) return `Year ${y}`;
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${(s[(v - 20) % 10] || s[v] || s[0])} Year`;
+};
+
+function ClusterRows({ cluster }) {
+  return (
+    <>
+      <tr className="bg-deck/40 border-b border-rim/40">
+        <td className="py-1.5 pl-2 font-semibold text-ink">{cluster.department}</td>
+        <td className="text-right py-1.5 font-mono text-annotation" colSpan={3}>
+          {cluster.years.reduce((sum, y) => sum + y.batches.reduce((a, b) => a + b.count, 0), 0)} submitted
+        </td>
+      </tr>
+      {cluster.years.map(y => (
+        <tr key={`${cluster.department}-${y.year}`} className="border-b border-rim/20">
+          <td className="py-1 pl-6 text-clarify font-medium">
+            {yearOrdinal(y.year)}
+            <span className="text-annotation/50 font-normal"> (Year)</span>
+          </td>
+          <td className="text-right py-1 font-mono text-annotation/80">
+            {y.batches.reduce((a, b) => a + b.count, 0)}
+          </td>
+          <td />
+          <td />
+        </tr>
+        ))}
+      {cluster.years.flatMap(y =>
+        y.batches.map(b => (
+          <tr key={`${cluster.department}-${y.year}-${b.batch}`} className="border-b border-rim/30">
+            <td className="py-1.5 pl-10 font-medium text-ink">{b.batch}</td>
+            <td className="text-right py-1.5 font-mono">{b.count}</td>
+            <td className="text-right py-1.5 font-mono">{b.avg}%</td>
+            <td className="text-right py-1.5 font-mono">{b.passRate}%</td>
+          </tr>
+        ))
+      )}
+    </>
   );
 }
 

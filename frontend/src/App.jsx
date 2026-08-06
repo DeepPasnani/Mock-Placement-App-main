@@ -4,6 +4,7 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import { useStore } from './store';
 
 const LoginPage = lazy(() => import('./pages/Login'));
+const CompleteProfilePage = lazy(() => import('./pages/CompleteProfile'));
 const AdminLayout = lazy(() => import('./pages/admin/Layout'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminTests = lazy(() => import('./pages/admin/Tests'));
@@ -60,14 +61,32 @@ function SuspenseFallback() {
   );
 }
 
+function needsProfile(user) {
+  if (!user || user.role !== 'student') return false;
+  if (user.profileComplete === true) return false;
+  if (user.profileComplete === false) return true;
+  // Persisted sessions from before this flag existed
+  return !(user.roll_number && user.batch && user.year_of_study);
+}
+
+function homeFor(user) {
+  if (!user) return '/login';
+  if (needsProfile(user)) return '/complete-profile';
+  if (user.role === 'admin' || user.role === 'super_admin') return '/admin';
+  return '/student';
+}
+
 function RequireAuth({ children, role }) {
   const { user } = useStore();
   const location = useLocation();
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (needsProfile(user) && location.pathname !== '/complete-profile') {
+    return <Navigate to="/complete-profile" replace />;
+  }
   if (role) {
     const allowedRoles = role === 'admin' ? ['admin', 'super_admin'] : [role];
     if (!allowedRoles.includes(user.role)) {
-      return <Navigate to={user.role === 'admin' || user.role === 'super_admin' ? '/admin' : '/student'} replace />;
+      return <Navigate to={homeFor(user)} replace />;
     }
   }
   return children;
@@ -78,13 +97,28 @@ export default function App() {
 
   useEffect(() => {
     const token = localStorage.getItem('pp_token');
-    if (token && !user) refreshUser();
+    if (token) refreshUser();
   }, []);
 
   return (
     <Suspense fallback={<SuspenseFallback />}>
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'admin' || user.role === 'super_admin' ? '/admin' : '/student'} replace /> : <ErrorBoundary><LoginPage /></ErrorBoundary>} />
+      <Route
+        path="/login"
+        element={user ? <Navigate to={homeFor(user)} replace /> : <ErrorBoundary><LoginPage /></ErrorBoundary>}
+      />
+      <Route
+        path="/complete-profile"
+        element={
+          !user ? (
+            <Navigate to="/login" replace />
+          ) : needsProfile(user) ? (
+            <ErrorBoundary><CompleteProfilePage /></ErrorBoundary>
+          ) : (
+            <Navigate to={homeFor(user)} replace />
+          )
+        }
+      />
 
       {/* Admin routes */}
       <Route path="/admin" element={<RequireAuth role="admin"><AdminLayout /></RequireAuth>}>
@@ -137,7 +171,7 @@ export default function App() {
       <Route path="/test/:testId" element={<RequireAuth role="student"><ErrorBoundary><TestInterface /></ErrorBoundary></RequireAuth>} />
 
       {/* Public landing page (redirects straight to dashboard if already signed in) */}
-      <Route path="/" element={user ? <Navigate to={user.role === 'admin' || user.role === 'super_admin' ? '/admin' : '/student'} replace /> : <ErrorBoundary><Landing /></ErrorBoundary>} />
+      <Route path="/" element={user ? <Navigate to={homeFor(user)} replace /> : <ErrorBoundary><Landing /></ErrorBoundary>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </Suspense>

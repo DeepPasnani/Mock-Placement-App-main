@@ -1,7 +1,27 @@
 const logger = require('../services/logger');
 const { query, getClient } = require('../db');
 const { setActiveSession, getActiveSession, deleteActiveSession, trackActiveUser, getActiveUserCount } = require('../db/redis');
-const { judgeSubmission: codeJudge, isDockerAvailable } = require('../services/runner');
+const { judgeSubmission: codeJudge, submitRunCode, pollSubmissionStatus } = require('../services/runner');
+
+function studentCanAccessTest(test, userDepartment, userBatch, userYear) {
+  const depts = Array.isArray(test.departments) && test.departments.length
+    ? test.departments
+    : (test.department ? [test.department] : []);
+  if (depts.length && !depts.includes('all')) {
+    const deptOk = depts.includes(userDepartment) || test.department === userDepartment;
+    if (!deptOk) return false;
+  }
+  const batchList = Array.isArray(test.batches) ? test.batches.filter(Boolean) : [];
+  if (batchList.length && !batchList.includes('all')) {
+    if (!userBatch || !batchList.includes(userBatch)) return false;
+  }
+  const years = Array.isArray(test.years) ? test.years.filter(y => y !== null && y !== '') : [];
+  if (years.length && !years.includes('all')) {
+    const yStr = String(userYear);
+    if (!userYear || !years.map(String).includes(yStr)) return false;
+  }
+  return true;
+}
 
 // POST /api/submissions/start
 async function startTest(req, res) {
@@ -24,6 +44,10 @@ async function startTest(req, res) {
   );
   const test = testRows[0];
   if (!test) return res.status(404).json({ error: 'Test not found or not available.' });
+
+  if (!studentCanAccessTest(test, req.user.department, req.user.batch, req.user.year_of_study)) {
+    return res.status(403).json({ error: 'This test is not available for your class.' });
+  }
 
   const now = new Date();
   if (test.start_time && now < new Date(test.start_time)) return res.status(400).json({ error: 'Test has not started yet.' });
@@ -223,19 +247,57 @@ async function submitTest(req, res) {
         const lang = Object.keys(sol).find(l => sol[l]?.trim());
         if (!lang || !sol[lang]?.trim()) continue;
 
-        // Run against hidden test cases using the built-in Docker runner
+        // Run against hidden + visible test cases using the built-in runner
         try {
+          const testCases = Array.isArray(p.test_cases) ? p.test_cases : [];
           const results = await codeJudge({
             code: sol[lang], language: lang,
-            testCases: p.test_cases || [],
+            testCases,
             timeLimit: p.time_limit_seconds,
             memoryLimit: p.memory_limit_mb,
           });
-          const passed = results.filter(r => r.passed).length;
+
           const total = results.length || 1;
-          const earned = Math.round((passed / total) * p.marks);
+          // Default scoring: honestly divide the problem's marks equally across
+          // all test cases. If the creator set an explicit `marks` on a test case,
+          // that per-case value is used instead for that test case.
+          const equalShare = p.marks / total;
+          let anyCustomMarks = false;
+          let earned = 0;
+
+          const enriched = results.map((r, i) => {
+            const tc = testCases[i] || {};
+            const custom = Number(tc.marks);
+            const hasCustom = Number.isFinite(custom) && custom > 0;
+            if (hasCustom) anyCustomMarks = true;
+            const weight = hasCustom ? custom : equalShare;
+            const isHidden = !!tc.isHidden;
+            const earnedCase = r.passed ? weight : 0;
+            earned += earnedCase;
+            // Strip hidden test-case inputs/expected outputs so grading
+            // stays confidential, while keeping the error the student hit.
+            return {
+              ...r,
+              hidden: isHidden,
+              marks: weight,
+              earned: earnedCase,
+              ...(isHidden ? { input: '', expected: '', actual: r.actual || r.stdout || '' } : {}),
+            };
+          });
+
+          const passed = results.filter(r => r.passed).length;
+          const visiblePassed = results.filter(r => !r.hidden && r.passed).length;
+          const hiddenPassed = results.filter(r => r.hidden && r.passed).length;
+
+          earned = Math.round(earned);
           totalScore += earned;
-          detailedResults[p.id] = { earned, passed, total, results: results.filter(r => !r.hidden) };
+          detailedResults[p.id] = {
+            earned, passed, total,
+            problemMarks: p.marks,
+            visiblePassed, hiddenPassed,
+            perCaseMarks: anyCustomMarks,
+            results: enriched,
+          };
         } catch (e) {
           logger.error({ err: e }, 'Code execution error');
           const earned = Math.round(p.marks * 0.1);
@@ -294,6 +356,7 @@ async function getMySubmissions(req, res) {
 async function getTestSubmissions(req, res) {
   const { rows } = await query(
     `SELECT s.*, u.name as user_name, u.email as user_email, u.branch, u.roll_number,
+       u.department as user_department, u.batch as user_batch, u.year_of_study as user_year,
        COALESCE(s.batch_snapshot, u.batch) as batch_display,
        COALESCE(s.year_snapshot, u.year_of_study) as year_display
      FROM submissions s JOIN users u ON s.user_id = u.id
@@ -320,27 +383,157 @@ async function getSubmission(req, res) {
   res.json({ submission: sub });
 }
 
+const { v4: uuidv4 } = require('uuid');
+
+// ── In-memory cache for async run-code results ────────────────
+const pendingRunCodeResults = new Map();
+
 // POST /api/submissions/run-code (live code testing)
-// Also supports testCases array for per-test-case results
+// Also supports testCases array for per-test-case results. When a problemId is
+// supplied the full suite (hidden + visible) is judged so the student can see
+// their progress against every test case, while hidden-case contents stay
+// confidential — only pass counts for those are returned.
 async function runCode(req, res) {
-  const { code, language, stdin, testCases, timeLimit, memoryLimit } = req.body;
+  const { code, language, stdin, testCases, timeLimit, memoryLimit, problemId } = req.body;
   if (!code || !language) return res.status(400).json({ error: 'Code and language required' });
 
-  if (testCases && Array.isArray(testCases) && testCases.length > 0) {
-    // Run against each visible test case
+  const hasVisibleTests = testCases && Array.isArray(testCases) && testCases.length > 0;
+  if (hasVisibleTests || problemId) {
+    let suite = hasVisibleTests ? testCases.filter(tc => !tc.isHidden) : [];
+    let timeLimitSec = timeLimit || 5;
+    let memoryLimitMb = memoryLimit || 256;
+
+    if (problemId) {
+      const { rows } = await query(
+        `SELECT cp.test_cases, cp.time_limit_seconds, cp.memory_limit_mb
+         FROM coding_problems cp
+         JOIN sections s ON s.id = cp.section_id
+         JOIN submissions sub ON sub.test_id = s.test_id
+         WHERE cp.id=$1 AND sub.user_id=$2 AND sub.status='in_progress'
+         LIMIT 1`,
+        [problemId, req.user.id]
+      );
+      if (!rows.length) {
+        return res.status(403).json({ error: 'Problem not available in an active test.' });
+      }
+      const full = Array.isArray(rows[0].test_cases) ? rows[0].test_cases : [];
+      if (full.length) {
+        suite = full;
+        if (rows[0].time_limit_seconds) timeLimitSec = rows[0].time_limit_seconds;
+        if (rows[0].memory_limit_mb) memoryLimitMb = rows[0].memory_limit_mb;
+      }
+    }
+
+    const emptySummary = {
+      results: [],
+      summary: { passed: 0, total: 0, visiblePassed: 0, visibleTotal: 0, hiddenPassed: 0, hiddenTotal: 0 },
+    };
+    if (!suite.length) return res.json(emptySummary);
+
     const results = await codeJudge({
       code, language,
-      testCases: testCases.filter(tc => !tc.isHidden),
-      timeLimit: timeLimit || 5,
-      memoryLimit: memoryLimit || 256,
+      testCases: suite,
+      timeLimit: timeLimitSec,
+      memoryLimit: memoryLimitMb,
     });
-    return res.json({ results });
+
+    const visible = results.filter(r => !r.hidden);
+    const hidden = results.filter(r => r.hidden);
+
+    return res.json({
+      results: visible,
+      summary: {
+        passed: results.filter(r => r.passed).length,
+        total: results.length,
+        visiblePassed: visible.filter(r => r.passed).length,
+        visibleTotal: visible.length,
+        hiddenPassed: hidden.filter(r => r.passed).length,
+        hiddenTotal: hidden.length,
+      },
+    });
   }
 
-  // Single execution using the built-in Docker runner
-  const { runCode: dockerRun } = require('../services/runner');
-  const result = await dockerRun({ code, language, stdin: stdin || '', timeLimit: timeLimit || 5, memoryLimit: memoryLimit || 256 });
-  res.json(result);
+  const id = uuidv4();
+  const entry = {
+    userId: req.user.id, result: null,
+    code, language, stdin: stdin || '',
+    timeLimit: timeLimit || 5,
+    memoryLimit: memoryLimit || 256,
+  };
+  pendingRunCodeResults.set(id, entry);
+
+  res.json({ id });
+
+  submitAndPushRunCodeResult(id, entry);
+}
+
+async function submitAndPushRunCodeResult(id, entry) {
+  let token;
+  try {
+    token = await submitRunCode({
+      code: entry.code, language: entry.language,
+      stdin: entry.stdin, timeLimit: entry.timeLimit,
+      memoryLimit: entry.memoryLimit,
+    });
+  } catch (err) {
+    const errorResult = {
+      status: 'Error', statusId: 0, stdout: '', stderr: '',
+      compileOutput: '', time: null, memory: null, passed: false,
+      error: err.message,
+    };
+    pendingRunCodeResults.set(id, { userId: entry.userId, result: errorResult });
+    try {
+      const { sendToUser } = require('../services/websocket');
+      sendToUser(entry.userId, { type: 'CODE_EXECUTION_RESULT', id, ...errorResult });
+    } catch {}
+    return;
+  }
+
+  pendingRunCodeResults.set(id, { userId: entry.userId, result: null, codeboxToken: token });
+
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const result = await pollSubmissionStatus(token);
+      if (!result) continue;
+
+      pendingRunCodeResults.set(id, { userId: entry.userId, result });
+
+      const { sendToUser } = require('../services/websocket');
+      sendToUser(entry.userId, {
+        type: 'CODE_EXECUTION_RESULT',
+        id,
+        ...result,
+      });
+      return;
+    } catch {
+      // transient error, keep polling
+    }
+  }
+
+  const errorResult = {
+    status: 'Error', statusId: 0, stdout: '', stderr: '',
+    compileOutput: '', time: null, memory: null, passed: false,
+    error: 'Execution timed out',
+  };
+  pendingRunCodeResults.set(id, { userId: entry.userId, result: errorResult });
+
+  try {
+    const { sendToUser } = require('../services/websocket');
+    sendToUser(entry.userId, {
+      type: 'CODE_EXECUTION_RESULT',
+      id,
+      ...errorResult,
+    });
+  } catch {}
+}
+
+// GET /api/submissions/run-code/result/:id (fallback if WS message missed)
+async function getRunCodeResult(req, res) {
+  const entry = pendingRunCodeResults.get(req.params.id);
+  if (!entry) return res.status(404).json({ error: 'Not found' });
+  if (!entry.result) return res.json({ status: 'pending' });
+  res.json(entry.result);
 }
 
 // ── POST /api/submissions/resume/:id (admin only) ──────────
@@ -793,4 +986,4 @@ async function getTimeBombStatus(req, res) {
   res.json({ bombs: bombStatus, elapsedSeconds: elapsed });
 }
 
-module.exports = { startTest, saveAnswers, submitTest, getMySubmissions, getTestSubmissions, getSubmission, runCode, deleteSubmission, resumeTest, exportResultsPdf, exportResultsCsv, getQuestionAnalytics, checkPlagiarism, submitFingerprint, verifyFingerprint, logFullscreenViolation, getTimeBombStatus };
+module.exports = { startTest, saveAnswers, submitTest, getMySubmissions, getTestSubmissions, getSubmission, runCode, getRunCodeResult, deleteSubmission, resumeTest, exportResultsPdf, exportResultsCsv, getQuestionAnalytics, checkPlagiarism, submitFingerprint, verifyFingerprint, logFullscreenViolation, getTimeBombStatus };

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { securityAPI, submissionsAPI } from '../../services/api';
-import { Btn, Spinner, Badge, Modal, Select } from '../../components/shared/UI';
+import { Btn, Spinner, Badge, Modal, Select, ConfirmModal } from '../../components/shared/UI';
 import toast from 'react-hot-toast';
 
 const SEVERITY_COLORS = {
@@ -36,6 +36,7 @@ export default function SecurityAlerts() {
   const [filterReviewed, setFilterReviewed] = useState('false');
   const [expandedAlert, setExpandedAlert] = useState(null);
   const [sessionModal, setSessionModal] = useState(null);
+  const [disqualifyTarget, setDisqualifyTarget] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['security-alerts', filterSeverity, filterType, filterReviewed],
@@ -206,11 +207,7 @@ export default function SecurityAlerts() {
                       <Btn variant="ghost" size="sm" onClick={() => reviewMut.mutate({ id: alert.id, action: 'warn' })}>
                         Warn
                       </Btn>
-                      <Btn variant="danger" size="sm" onClick={() => {
-                        if (window.confirm(`Disqualify ${alert.user_name}? This action cannot be undone.`)) {
-                          disqualifyMut.mutate(alert.submission_id);
-                        }
-                      }}>
+                      <Btn variant="danger" size="sm" onClick={() => setDisqualifyTarget(alert)}>
                         Disqualify
                       </Btn>
                       <Btn variant="ghost" size="sm" onClick={() => reviewMut.mutate({ id: alert.id, action: 'ignore' })}>
@@ -295,6 +292,15 @@ export default function SecurityAlerts() {
           </div>
         )}
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!disqualifyTarget}
+        onClose={() => setDisqualifyTarget(null)}
+        onConfirm={() => disqualifyMut.mutate(disqualifyTarget.submission_id)}
+        title="Disqualify Student"
+        confirmLabel="Disqualify"
+        message={disqualifyTarget ? `Disqualify ${disqualifyTarget.user_name}? This action cannot be undone.` : ''}
+      />
     </div>
   );
 }

@@ -131,7 +131,7 @@ export default function MockInterview() {
       <div className="animate-fade-up space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge color="blue">MCQ Round</Badge>
+            <Badge color="clarify">MCQ Round</Badge>
             <span className="text-xs text-annotation">{currentQuestion + 1}/{mcqQ.length}</span>
           </div>
           <div className="flex items-center gap-2 text-sm font-mono">
@@ -197,7 +197,7 @@ export default function MockInterview() {
       <div className="animate-fade-up space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Badge color="purple">Coding Round</Badge>
+            <Badge color="clarify">Coding Round</Badge>
             <span className="text-xs text-annotation">{currentProblem + 1}/{codingP.length}</span>
           </div>
           <div className="flex items-center gap-2 text-sm font-mono">
@@ -238,6 +238,7 @@ export default function MockInterview() {
               className="textarea-field font-mono text-sm"
               rows={10}
               placeholder="// Write your solution here"
+              aria-label="Write your solution here"
               value={code}
               onChange={e => setCode(e.target.value)}
             />
@@ -307,7 +308,7 @@ export default function MockInterview() {
             <div key={i} className="panel p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-display font-bold text-ink">{section.section}</h3>
-                <Badge color={section.percentage >= 60 ? 'green' : 'yellow'}>{section.percentage}%</Badge>
+                <Badge color={section.percentage >= 60 ? 'verify' : 'accent'}>{section.percentage}%</Badge>
               </div>
               <ProgressBar value={section.score} max={section.maxScore} color={section.percentage >= 60 ? 'bg-verify' : 'bg-accent'} />
               <div className="mt-2 space-y-1">

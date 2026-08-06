@@ -130,7 +130,7 @@ export default function FullScreenEnforcer({ onViolation, onThresholdExceeded, e
         >
           Return to Full Screen ({countdown}s)
         </Btn>
-        <p className="text-2xs text-white/40">
+        <p className="text-sm text-white/85 font-medium">
           Test will auto-submit in {countdown} seconds
         </p>
       </div>

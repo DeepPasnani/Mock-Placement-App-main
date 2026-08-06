@@ -127,11 +127,16 @@ export default function SubmissionAnswersModal({ submissionId, test, onClose }) 
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h3 className="text-sm font-display font-bold text-ink">{currentProblem.title}</h3>
                     <div className="flex items-center gap-2 shrink-0">
-                      {currentLang && <Badge color="gray">{currentLang}</Badge>}
+                      {currentLang && <Badge color="annotation">{currentLang}</Badge>}
                       {currentResult ? (
                         <span className="text-xs font-mono font-bold text-ink">
                           {currentResult.earned}/{currentProblem.marks} marks
                           {currentResult.total ? ` · ${currentResult.passed}/${currentResult.total} tests` : ''}
+                          {currentResult.passed != null && currentResult.total ? (
+                            <span className="text-annotation/60">
+                              {' '}({currentResult.visiblePassed || 0} visible · {currentResult.hiddenPassed || 0} hidden)
+                            </span>
+                          ) : null}
                         </span>
                       ) : (
                         <span className="text-xs text-annotation/50">Not attempted</span>
@@ -181,24 +186,39 @@ export default function SubmissionAnswersModal({ submissionId, test, onClose }) 
                         <tbody>
                           {currentResult.results.map((tr, i) => (
                             <tr key={i} className="border-b border-rim/50">
-                              <td className="py-1.5 pr-2 text-annotation">{i + 1}</td>
-                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">{tr.input}</td>
-                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">{tr.expected}</td>
-                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">{tr.actual}</td>
+                              <td className="py-1.5 pr-2 text-annotation">
+                                {i + 1}
+                                {tr.hidden && <span className="badge-accent text-2xs ml-1">Hidden</span>}
+                              </td>
+                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">{tr.hidden ? '—' : tr.input}</td>
+                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">{tr.hidden ? '—' : tr.expected}</td>
+                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">
+                                {tr.actual}
+                                {!tr.passed && (tr.stderr || tr.compileOutput) && (
+                                  <span className="ml-1 text-alert" title={(tr.compileOutput || tr.stderr)}>
+                                    {(tr.compileOutput || tr.stderr).trim().split('\n')[0]}
+                                  </span>
+                                )}
+                              </td>
                               <td className="py-1.5 text-right">
                                 <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold uppercase ${
                                   tr.passed ? 'bg-verify/12 text-verify' : 'bg-alert/12 text-alert'
                                 }`}>
                                   {tr.passed ? 'Pass' : 'Fail'}
                                 </span>
+                                {tr.marks != null && (
+                                  <span className="ml-1 text-2xs text-annotation/60 font-mono">
+                                    {tr.earned || 0}/{tr.marks}
+                                  </span>
+                                )}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      {currentResult.total > currentResult.results.length && (
+                      {currentResult.perCaseMarks && (
                         <p className="text-2xs text-annotation/50 mt-2">
-                          {currentResult.total - currentResult.results.length} additional hidden test case(s) also ran and are included in the score above.
+                          Custom marks configured per test case (visible/hidden inputs are shown as — where confidential).
                         </p>
                       )}
                     </div>

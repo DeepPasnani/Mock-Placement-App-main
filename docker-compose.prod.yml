@@ -31,9 +31,9 @@ services:
       SMTP_USER: ${SMTP_USER:?SMTP_USER must be set in your root .env for production}
       SMTP_PASS: ${SMTP_PASS:?SMTP_PASS must be set in your root .env for production}
       EMAIL_FROM: ${EMAIL_FROM:-CampusTrack <noreply@your-domain.com>}
-      JUDGE0_API_URL: ${JUDGE0_API_URL:-https://judge0-ce.p.rapidapi.com}
-      JUDGE0_API_KEY: ${JUDGE0_API_KEY:-}
-      JUDGE0_API_HOST: ${JUDGE0_API_HOST:-judge0-ce.p.rapidapi.com}
+      CODEBOX_API_URL: ${CODEBOX_API_URL:-http://codebox-api:3000}
+      CODEBOX_AUTH_TOKEN: ${CODEBOX_AUTH_TOKEN:-}
+      CODE_EXECUTION_PROVIDER: codebox
       # Image uploads are stored as bytea rows in Postgres (images table) —
       # no Cloudinary/S3 and no shared disk/volume needed
 

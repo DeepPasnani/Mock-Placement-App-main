@@ -1,6 +1,7 @@
 const { query } = require('../db');
 const { analyzeCode } = require('../services/codeAnalysis');
-const { runSandbox, judgeSandbox } = require('../services/sandbox');
+const { runCode: runnerRunCode } = require('../services/runner');
+const { outputsMatch } = require('../services/codebox');
 const logger = require('../services/logger');
 
 // POST /api/code/lint
@@ -233,17 +234,17 @@ async function getQualityReport(req, res) {
 
 // POST /api/submissions/run-custom-test
 async function runCustomTest(req, res) {
-  const { code, language, stdin, expectedOutput, timeLimit, memoryLimit } = req.body;
+  const { code, language, stdin, expectedOutput, timeLimit, memoryLimit, tolerance } = req.body;
   if (!code || !language) return res.status(400).json({ error: 'Code and language required' });
 
-  const result = await runSandbox({
-    code, language, stdin: stdin || '', timeLimit: timeLimit || 5, memoryLimit: memoryLimit || 256, userId: req.user.id,
+  const result = await runnerRunCode({
+    code, language, stdin: stdin || '', timeLimit: timeLimit || 5, memoryLimit: memoryLimit || 256,
   });
 
   let matchesExpected = null;
   if (expectedOutput !== undefined && expectedOutput !== null) {
-    const actualOutput = (result.stdout || '').trimEnd();
-    matchesExpected = actualOutput === String(expectedOutput).trimEnd();
+    const actualOutput = result.stdout || '';
+    matchesExpected = outputsMatch(actualOutput, expectedOutput, tolerance);
   }
 
   res.json({

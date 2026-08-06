@@ -7,9 +7,9 @@ const pool = new Pool(
     ? {
         connectionString: process.env.DATABASE_URL,
         ssl: false,
-        max: 20,
+        max: parseInt(process.env.DB_POOL_MAX) || 50,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: parseInt(process.env.DB_POOL_TIMEOUT) || 5000,
       }
     : {
         host: process.env.DB_HOST || 'localhost',
@@ -17,9 +17,9 @@ const pool = new Pool(
         database: process.env.DB_NAME || 'campustrack',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
-        max: 20,
+        max: parseInt(process.env.DB_POOL_MAX) || 50,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: parseInt(process.env.DB_POOL_TIMEOUT) || 5000,
       }
 );
 

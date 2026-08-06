@@ -147,8 +147,9 @@ export default function CustomTestExplorer({ code, language, problemId }) {
 
       {/* Input */}
       <div className="mb-2">
-        <label className="text-2xs text-annotation/60 font-mono uppercase mb-1 block">Input</label>
+        <label htmlFor="cte-input" className="text-2xs text-annotation/60 font-mono uppercase mb-1 block">Input</label>
         <textarea
+          id="cte-input"
           value={stdin}
           onChange={e => setStdin(e.target.value)}
           rows={3}
@@ -159,8 +160,9 @@ export default function CustomTestExplorer({ code, language, problemId }) {
 
       {/* Expected output */}
       <div className="mb-3">
-        <label className="text-2xs text-annotation/60 font-mono uppercase mb-1 block">Expected Output (optional)</label>
+        <label htmlFor="cte-expected" className="text-2xs text-annotation/60 font-mono uppercase mb-1 block">Expected Output (optional)</label>
         <textarea
+          id="cte-expected"
           value={expectedOutput}
           onChange={e => setExpectedOutput(e.target.value)}
           rows={2}
@@ -185,6 +187,7 @@ export default function CustomTestExplorer({ code, language, problemId }) {
               value={testName}
               onChange={e => setTestName(e.target.value)}
               placeholder="Name..."
+              aria-label="Saved test name"
               className="text-xs border border-rim rounded px-1.5 py-0.5 bg-panel text-ink w-24 outline-none focus:border-accent"
             />
             <Btn variant="ghost" size="xs" onClick={handleSave}>Save</Btn>

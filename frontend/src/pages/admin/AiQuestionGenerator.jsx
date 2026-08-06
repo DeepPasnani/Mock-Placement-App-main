@@ -81,8 +81,8 @@ export default function AiQuestionGenerator() {
             <Input label="Topic" value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. Binary Search Trees, Time Complexity, Profit & Loss" />
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="input-label">Count</label>
-                <input type="range" min={1} max={20} value={count} onChange={e => setCount(+e.target.value)} className="w-full accent-accent" />
+                <label htmlFor="qg-count" className="input-label">Count</label>
+                <input type="range" min={1} max={20} value={count} onChange={e => setCount(+e.target.value)} className="w-full accent-accent" id="qg-count" />
                 <span className="text-xs text-annotation">{count} questions</span>
               </div>
               <Select label="Difficulty" value={difficulty} onChange={e => setDifficulty(e.target.value)}>
@@ -156,8 +156,8 @@ export default function AiQuestionGenerator() {
                   ))}
                 </div>
                 <div className="flex items-center gap-2 text-2xs">
-                  <Badge color={q.difficulty === 'hard' ? 'red' : q.difficulty === 'easy' ? 'green' : 'yellow'}>{q.difficulty}</Badge>
-                  <Badge color="blue">{GENRES.find(g => g.value === q.genre)?.label || q.genre}</Badge>
+                  <Badge color={q.difficulty === 'hard' ? 'alert' : q.difficulty === 'easy' ? 'verify' : 'accent'}>{q.difficulty}</Badge>
+                  <Badge color="clarify">{GENRES.find(g => g.value === q.genre)?.label || q.genre}</Badge>
                   <span className="text-annotation/50">{q.marks} marks</span>
                 </div>
               </div>

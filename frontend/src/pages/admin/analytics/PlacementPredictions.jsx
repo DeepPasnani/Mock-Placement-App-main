@@ -70,19 +70,19 @@ export default function PlacementPredictions() {
 
       <div className="panel p-3 flex flex-wrap gap-3 items-end">
         <div>
-          <label className="text-2xs text-annotation/60 mb-1.5">Batch</label>
-          <select value={batchFilter} onChange={e => setBatchFilter(e.target.value)} className="select-field max-w-xs">
+          <label htmlFor="pp-batch" className="text-2xs text-annotation/60 mb-1.5">Batch</label>
+          <select value={batchFilter} onChange={e => setBatchFilter(e.target.value)} className="select-field max-w-xs" id="pp-batch">
             <option value="">All batches</option>
             {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-2xs text-annotation/60 mb-1.5">Department</label>
-          <input value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. CSE" className="input-field max-w-28 text-xs" />
+          <label htmlFor="pp-dept" className="text-2xs text-annotation/60 mb-1.5">Department</label>
+          <input value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. CSE" className="input-field max-w-28 text-xs" id="pp-dept" />
         </div>
         <div>
-          <label className="text-2xs text-annotation/60 mb-1.5">Min Probability</label>
-          <input type="number" min={0} max={100} value={minProb} onChange={e => setMinProb(Number(e.target.value))} className="input-field max-w-20 text-xs" />
+          <label htmlFor="pp-minprob" className="text-2xs text-annotation/60 mb-1.5">Min Probability</label>
+          <input type="number" min={0} max={100} value={minProb} onChange={e => setMinProb(Number(e.target.value))} className="input-field max-w-20 text-xs" id="pp-minprob" />
         </div>
       </div>
 

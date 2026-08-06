@@ -121,7 +121,7 @@ export default function Resources() {
                       <p className="text-xs text-annotation/70 mt-0.5 line-clamp-2">{resource.description}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1.5">
-                      <Badge color={resource.type === 'note' ? 'blue' : resource.type === 'video' ? 'yellow' : 'green'}>
+                      <Badge color={resource.type === 'note' ? 'clarify' : resource.type === 'video' ? 'accent' : 'verify'}>
                         {resource.type}
                       </Badge>
                       {resource.genre && <span className="text-2xs text-annotation/50">{resource.genre}</span>}

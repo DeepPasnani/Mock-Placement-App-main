@@ -34,6 +34,7 @@ export default function AdminResults() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('');
   const [sortDir, setSortDir] = useState('desc');
+  const [showDetails, setShowDetails] = useState(true);
 
   const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
   const { data: subData, isLoading } = useQuery({
@@ -328,10 +329,11 @@ export default function AdminResults() {
       {/* Test selector */}
       <div className="panel p-3 mb-5 flex flex-wrap items-end gap-4">
         <div>
-          <label className="text-2xs text-annotation/60 mb-1.5">
+          <label htmlFor="results-test" className="text-2xs text-annotation/60 mb-1.5">
             Select Test
           </label>
           <select
+            id="results-test"
             value={selectedTest}
             onChange={e => { setSelectedTest(e.target.value); setBatchFilter('all'); setSearchQuery(''); }}
             className="select-field max-w-sm"
@@ -346,10 +348,11 @@ export default function AdminResults() {
         </div>
         {selectedTest && batchOptions.length > 0 && (
           <div>
-            <label className="text-2xs text-annotation/60 mb-1.5">
+            <label htmlFor="results-batch" className="text-2xs text-annotation/60 mb-1.5">
               Class / Batch
             </label>
             <select
+              id="results-batch"
               value={batchFilter}
               onChange={e => setBatchFilter(e.target.value)}
               className="select-field max-w-xs"
@@ -363,10 +366,11 @@ export default function AdminResults() {
         )}
         {selectedTest && (
           <div className="ml-auto">
-            <label className="text-2xs text-annotation/60 mb-1.5">
+            <label htmlFor="results-search" className="text-2xs text-annotation/60 mb-1.5">
               Search student
             </label>
             <input
+              id="results-search"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Name, email, or roll…"
@@ -432,8 +436,8 @@ export default function AdminResults() {
               </h3>
               <ResponsiveContainer width="100%" height={140}>
                 <BarChart data={dist} margin={{ top: 0, right: 0, bottom: 0, left: -16 }}>
-                  <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#8A8066' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#8A8066' }} allowDecimals={false} />
+                  <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#6E6444' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6E6444' }} allowDecimals={false} />
                   <Tooltip
                     formatter={v => [`${v} students`]}
                     contentStyle={{
@@ -499,6 +503,19 @@ export default function AdminResults() {
           )}
 
           {/* ── Leaderboard Table ──────────────────────────── */}
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-display font-bold text-base text-ink">Leaderboard</h3>
+            <button
+              onClick={() => setShowDetails(v => !v)}
+              className="inline-flex items-center gap-1.5 text-xs text-annotation hover:text-ink transition-colors"
+              aria-pressed={showDetails}
+            >
+              {showDetails ? 'Compact view' : 'Full view'}
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
           <div className="table-wrap">
             <div className="overflow-x-auto">
               <table>
@@ -508,9 +525,11 @@ export default function AdminResults() {
                     <th className="cursor-pointer hover:text-accent select-none" onClick={() => handleSort('name')}>
                       Student <SortIcon field="name" />
                     </th>
-                    <th className="hidden sm:table-cell cursor-pointer hover:text-accent select-none" onClick={() => handleSort('roll')}>
-                      Roll / Branch <SortIcon field="roll" />
-                    </th>
+                    {showDetails && (
+                      <th className="hidden sm:table-cell cursor-pointer hover:text-accent select-none" onClick={() => handleSort('roll')}>
+                        Roll / Branch <SortIcon field="roll" />
+                      </th>
+                    )}
                     <th className="cursor-pointer hover:text-accent select-none" onClick={() => handleSort('score')}>
                       Score <SortIcon field="score" />
                     </th>
@@ -518,17 +537,19 @@ export default function AdminResults() {
                       % <SortIcon field="percentage" />
                     </th>
                     <th>Status</th>
-                    <th className="hidden md:table-cell cursor-pointer hover:text-accent select-none" onClick={() => handleSort('time')}>
-                      Time <SortIcon field="time" />
-                    </th>
-                    <th className="hidden lg:table-cell">Submitted</th>
+                    {showDetails && (
+                      <th className="hidden md:table-cell cursor-pointer hover:text-accent select-none" onClick={() => handleSort('time')}>
+                        Time <SortIcon field="time" />
+                      </th>
+                    )}
+                    {showDetails && <th className="hidden lg:table-cell">Submitted</th>}
                     <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {rankedSubs.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-10">
+                      <td colSpan={showDetails ? 9 : 5} className="text-center py-10">
                         <div className="flex flex-col items-center gap-2">
                           <svg className="w-8 h-8 text-annotation/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -565,12 +586,14 @@ export default function AdminResults() {
                               {s.user_email}
                             </div>
                           </td>
+                          {showDetails && (
                           <td className="hidden sm:table-cell">
                             <span className="text-xs text-annotation/70">
                               {s.roll_number || '—'}
                               {s.branch ? ` · ${s.branch}` : ''}
                             </span>
                           </td>
+                          )}
                           <td>
                             <span className="font-mono font-bold text-sm text-ink score-digit">
                               {isPending ? '—' : `${s.score}/${s.max_score}`}
@@ -593,11 +616,12 @@ export default function AdminResults() {
                             {isPending ? (
                               <span className="badge-accent text-2xs">In Progress</span>
                             ) : (
-                              <Badge color={isPassed ? 'green' : 'red'}>
+                              <Badge color={isPassed ? 'verify' : 'alert'}>
                                 {isPassed ? 'Passed' : 'Failed'}
                               </Badge>
                             )}
                           </td>
+                          {showDetails && (
                           <td className="hidden md:table-cell">
                             <span className="text-xs text-annotation/60 font-mono">
                               {s.time_taken_seconds
@@ -607,6 +631,8 @@ export default function AdminResults() {
                                 : '—'}
                             </span>
                           </td>
+                          )}
+                          {showDetails && (
                           <td className="hidden lg:table-cell">
                             <span className="text-xs text-annotation/60 font-mono">
                               {s.submitted_at
@@ -617,6 +643,7 @@ export default function AdminResults() {
                                 : '—'}
                             </span>
                           </td>
+                          )}
                           <td>
                             <div className="flex gap-0.5 justify-end">
                               {!isPending && (

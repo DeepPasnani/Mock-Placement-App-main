@@ -851,6 +851,39 @@ async function migrate() {
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
+    -- Multi-department targeting: a test can be shown to several branches.
+    -- 'department' is kept as the primary/legacy single value (first selected
+    -- or 'all'); 'departments' holds the full JSON array.
+    DO $$ BEGIN
+      ALTER TABLE tests ADD COLUMN IF NOT EXISTS departments JSONB DEFAULT '[]'::jsonb;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+    UPDATE tests
+       SET departments = CASE
+             WHEN department = 'all' THEN '["all"]'::jsonb
+             WHEN department IS NOT NULL AND department <> '' THEN jsonb_build_array(department)
+             ELSE '[]'::jsonb
+           END
+     WHERE departments IS NULL
+        OR departments = '[]'::jsonb
+        OR departments = 'null'::jsonb;
+
+    -- Year-of-study targeting: which academic years can sit this test.
+    -- 'years' holds a JSON array of integers (e.g. [1, 3]); an empty array
+    -- means all years.
+    DO $$ BEGIN
+      ALTER TABLE tests ADD COLUMN IF NOT EXISTS years JSONB DEFAULT '[]'::jsonb;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+
+    -- Batch targeting: which batches can sit this test. 'batches' holds a
+    -- JSON array of batch names (matching users.batch); an empty array means
+    -- every batch.
+    DO $$ BEGIN
+      ALTER TABLE tests ADD COLUMN IF NOT EXISTS batches JSONB DEFAULT '[]'::jsonb;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+
     -- ═══════════════════════════════════════════════════════════
     -- 2FA / TOTP
     -- ═══════════════════════════════════════════════════════════
@@ -1109,6 +1142,19 @@ async function migrate() {
   );
   CREATE INDEX IF NOT EXISTS idx_question_feedback_question_id ON question_feedback(question_id);
   CREATE INDEX IF NOT EXISTS idx_question_feedback_status ON question_feedback(status);
+
+  -- ═══════════════════════════════════════════════════════════
+  -- DEPARTMENT RESTRICTION
+  -- The platform is restricted to Computer Engineering and
+  -- Computer Science and Design only. Existing student accounts
+  -- that belong to any other department are deactivated so they
+  -- can no longer sign in or sit tests.
+  -- ═══════════════════════════════════════════════════════════
+  UPDATE users
+     SET is_active = false,
+         updated_at = NOW()
+   WHERE role = 'student'
+     AND COALESCE(department, '') NOT IN ('Computer Engineering', 'Computer Science and Design');
   `);
 
   console.log('✅ Migrations complete.');

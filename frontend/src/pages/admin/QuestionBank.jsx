@@ -83,8 +83,8 @@ function McqBankTab() {
   const columns = [
     { key: 'idx', label: '#', render: (_, i) => <span className="text-annotation">{i + 1}</span> },
     { key: 'text', label: 'Question', render: (r) => <span className="line-clamp-2 max-w-md block">{r.data?.text}</span> },
-    { key: 'genre', label: 'Genre', render: (r) => <Badge color="blue">{GENRES.find(g => g.value === r.genre)?.label || r.genre}</Badge> },
-    { key: 'difficulty', label: 'Difficulty', render: (r) => <Badge color={r.difficulty === 'hard' ? 'red' : r.difficulty === 'easy' ? 'green' : 'yellow'}>{r.difficulty}</Badge> },
+    { key: 'genre', label: 'Genre', render: (r) => <Badge color="clarify">{GENRES.find(g => g.value === r.genre)?.label || r.genre}</Badge> },
+    { key: 'difficulty', label: 'Difficulty', render: (r) => <Badge color={r.difficulty === 'hard' ? 'alert' : r.difficulty === 'easy' ? 'verify' : 'accent'}>{r.difficulty}</Badge> },
     { key: 'marks', label: 'Marks' },
     { key: 'actions', label: '', align: 'text-right', render: (r) => (
       <button className="text-alert text-xs hover:underline" onClick={() => setDeleteId(r.id)}>Delete</button>
@@ -285,6 +285,7 @@ function McqImportModal({ open, onClose }) {
                 <input
                   type="file"
                   accept=".csv"
+                  aria-label="Upload CSV file"
                   onChange={e => {
                     const file = e.target.files[0];
                     if (file) {
@@ -344,12 +345,12 @@ function CodingBankTab() {
             <div key={q.id} className="panel p-4">
               <div className="flex items-start justify-between gap-2 mb-1.5">
                 <h4 className="font-display font-bold text-sm text-ink">{q.data?.title}</h4>
-                <Badge color={q.difficulty === 'hard' ? 'red' : q.difficulty === 'easy' ? 'green' : 'yellow'}>{q.difficulty}</Badge>
+                <Badge color={q.difficulty === 'hard' ? 'alert' : q.difficulty === 'easy' ? 'verify' : 'accent'}>{q.difficulty}</Badge>
               </div>
               <p className="text-xs text-annotation line-clamp-2 mb-2">{q.data?.description}</p>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Badge color="gray">{q.marks} marks</Badge>
-                {(q.data?.testCases || []).length > 0 && <Badge color="gray">{q.data.testCases.length} test case(s)</Badge>}
+                <Badge color="annotation">{q.marks} marks</Badge>
+                {(q.data?.testCases || []).length > 0 && <Badge color="annotation">{q.data.testCases.length} test case(s)</Badge>}
                 <button className="ml-auto text-alert text-xs hover:underline" onClick={() => setDeleteId(q.id)}>Delete</button>
               </div>
             </div>

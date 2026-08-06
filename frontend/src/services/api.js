@@ -69,11 +69,12 @@ export const authAPI = {
   login:           (data)       => api.post('/auth/login', data).then(r => r.data),
   register:        (data)       => api.post('/auth/register', data).then(r => r.data),
   googleLogin:     (credential) => api.post('/auth/google', { credential }).then(r => r.data),
+  completeProfile: (data)       => api.post('/auth/complete-profile', data).then(r => r.data),
   logout:          ()           => api.post('/auth/logout').then(r => r.data),
   getMe:           ()           => api.get('/auth/me').then(r => r.data),
   changePassword:  (data)       => api.post('/auth/change-password', data).then(r => r.data),
-  forgotPassword:  (data)       => api.post('/auth/forgot-password', data).then(r => r.data),  // NEW
-  resetPassword:   (data)       => api.post('/auth/reset-password', data).then(r => r.data),   // NEW
+  forgotPassword:  (data)       => api.post('/auth/forgot-password', data).then(r => r.data),
+  resetPassword:   (data)       => api.post('/auth/reset-password', data).then(r => r.data),
 };
 
 // ── Tests ─────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ export const questionBankAPI = {
   import:  (data)   => api.post('/question-bank/import', data).then(r => r.data),
   importCsv: (data) => api.post('/question-bank/import-csv', data).then(r => r.data),
   importJson: (data) => api.post('/question-bank/import-json', data).then(r => r.data),
+  importFromTest: (testId, data) => api.post(`/question-bank/from-test/${testId}`, data).then(r => r.data),
   delete:  (id)     => api.delete(`/question-bank/${id}`).then(r => r.data),
 };
 

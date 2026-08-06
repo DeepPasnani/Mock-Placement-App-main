@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { usersAPI } from '../../services/api';
@@ -6,8 +6,23 @@ import { Btn, Table, Badge, Modal, Input, Alert, ConfirmModal, Spinner } from '.
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
+const DEPT_ORDER = ['Computer Engineering', 'Computer Science and Design'];
+
+const ordinal = (n) => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+};
+
+const yearLabel = (y) => {
+  if (y === null || y === undefined || y === '' || y === 'Any') return 'Any year';
+  const num = Number(y);
+  return Number.isFinite(num) ? `${num}${ordinal(num)} Year` : String(y);
+};
+
 /* ═══════════════════════════════════════════════════════════
- * Admin Users — Student management
+ * Admin Users — Student management (clustered by
+ * department → year of study → batch)
  * ═══════════════════════════════════════════════════════════ */
 
 export default function AdminUsers() {
@@ -76,6 +91,49 @@ export default function AdminUsers() {
 
   const users = data?.users || [];
 
+  const clusters = useMemo(() => {
+    const deptMap = new Map();
+    users.forEach(u => {
+      const dept = u.department || 'Unassigned';
+      const year = u.year_of_study ?? 'Any';
+      const batch = u.batch || 'Unassigned';
+
+      if (!deptMap.has(dept)) deptMap.set(dept, { department: dept, years: new Map(), total: 0 });
+      const deptGroup = deptMap.get(dept);
+      deptGroup.total++;
+
+      if (!deptGroup.years.has(year)) deptGroup.years.set(year, { year, batches: new Map() });
+      const yearGroup = deptGroup.years.get(year);
+
+      if (!yearGroup.batches.has(batch)) yearGroup.batches.set(batch, { batch, students: [] });
+      yearGroup.batches.get(batch).students.push(u);
+    });
+
+    return [...deptMap.values()]
+      .sort((a, b) => {
+        const da = DEPT_ORDER.indexOf(a.department);
+        const db = DEPT_ORDER.indexOf(b.department);
+        if (da !== -1 && db !== -1) return da - db;
+        if (da !== -1) return -1;
+        if (db !== -1) return 1;
+        return a.department.localeCompare(b.department);
+      })
+      .map(dept => ({
+        ...dept,
+        years: [...dept.years.values()]
+          .sort((a, b) => {
+            const ay = a.year === 'Any' ? 0 : Number(a.year) || 99;
+            const by = b.year === 'Any' ? 0 : Number(b.year) || 99;
+            return ay - by;
+          })
+          .map(year => ({
+            ...year,
+            batches: [...year.batches.values()]
+              .sort((a, b) => a.batch.localeCompare(b.batch, undefined, { numeric: true })),
+          })),
+      }));
+  }, [users]);
+
   const columns = [
     {
       key: 'name',
@@ -97,10 +155,21 @@ export default function AdminUsers() {
       ),
     },
     {
+      key: 'cluster',
+      label: 'Department / Year / Batch',
+      render: (u) => (
+        <div className="flex flex-wrap gap-1 items-center">
+          <Badge color="verify">{u.department || 'Unassigned'}</Badge>
+          <Badge color="annotation">{yearLabel(u.year_of_study)}</Badge>
+          <Badge color="clarify">{u.batch || 'Unassigned'}</Badge>
+        </div>
+      ),
+    },
+    {
       key: 'login',
       label: 'Login',
       render: (u) => (
-        <Badge color={u.google_id ? 'blue' : 'gray'}>
+        <Badge color={u.google_id ? 'clarify' : 'annotation'}>
           {u.google_id ? 'Google' : 'Email'}
         </Badge>
       ),
@@ -109,7 +178,7 @@ export default function AdminUsers() {
       key: 'status',
       label: 'Status',
       render: (u) => (
-        <Badge color={u.is_active ? 'green' : 'red'}>
+        <Badge color={u.is_active ? 'verify' : 'alert'}>
           {u.is_active ? 'Active' : 'Inactive'}
         </Badge>
       ),
@@ -197,6 +266,7 @@ export default function AdminUsers() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search by name or email…"
+          aria-label="Search by name or email"
           className="input-field max-w-xs"
         />
       </div>
@@ -205,12 +275,57 @@ export default function AdminUsers() {
         <div className="flex justify-center py-16">
           <Spinner size={28} className="text-accent" />
         </div>
+      ) : clusters.length === 0 ? (
+        <div className="text-center py-16 text-annotation text-sm">
+          No students found.
+        </div>
       ) : (
-        <Table
-          columns={columns}
-          data={users}
-          emptyMessage="No students found."
-        />
+        <div className="space-y-5">
+          {clusters.map(dept => (
+            <div key={dept.department} className="panel overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 bg-deck/40 border-b border-rim">
+                <h3 className="font-display font-semibold text-sm text-ink">
+                  {dept.department}
+                </h3>
+                <span className="text-2xs font-mono text-annotation/70">
+                  {dept.total} student{dept.total === 1 ? '' : 's'}
+                </span>
+              </div>
+              <div className="divide-y divide-rim">
+                {dept.years.map(yr => (
+                  <div key={`${dept.department}-${yr.year}`}>
+                    <div className="px-4 py-1.5 bg-deck/20 flex items-center gap-2">
+                      <svg className="w-3 h-3 text-annotation/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-xs font-medium text-annotation">
+                        {yearLabel(yr.year)}
+                      </span>
+                    </div>
+                    {yr.batches.map(b => (
+                      <div key={`${dept.department}-${yr.year}-${b.batch}`} className="border-t border-rim/40">
+                        <div className="px-4 py-1.5 flex items-center gap-2 bg-deck/10">
+                          <svg className="w-3 h-3 text-accent/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="text-xs font-semibold text-ink">{b.batch}</span>
+                          <span className="text-2xs font-mono text-annotation/60">
+                            {b.students.length} student{b.students.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        <Table
+                          columns={columns}
+                          data={b.students}
+                          emptyMessage="No students in this cluster."
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Bulk Import Modal */}
@@ -240,15 +355,16 @@ export default function AdminUsers() {
         <p className="text-xs text-annotation/70 mb-3 font-mono bg-deck p-2 rounded border border-rim">
           name,email,branch,rollNumber
           <br />
-          Alice Smith,alice@college.edu,CSE,CS001
+          Alice Smith,alice@college.edu,Computer Engineering,CS001
           <br />
-          Bob Jones,bob@college.edu,IT,IT042
+          Bob Jones,bob@college.edu,Computer Science and Design,CSD042
         </p>
         <textarea
           value={csvText}
           onChange={e => setCsvText(e.target.value)}
           rows={10}
           placeholder="Paste CSV data here…"
+          aria-label="Paste CSV data here"
           className="textarea-field"
         />
         {importMut.data && (
@@ -288,6 +404,7 @@ export default function AdminUsers() {
           onChange={e => setBatchCsvText(e.target.value)}
           rows={10}
           placeholder="Paste CSV data here (email,batch,year_of_study)..."
+          aria-label="Paste CSV data here (email,batch,year_of_study)"
           className="textarea-field"
         />
         {batchUpdateMut.data && (

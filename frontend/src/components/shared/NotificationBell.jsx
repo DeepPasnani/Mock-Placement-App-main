@@ -90,10 +90,6 @@ export default function NotificationBell() {
     if (d.testId) {
       const role = user?.role;
       navigate(role === 'admin' || role === 'super_admin' ? `/admin/results/${d.testId}` : `/test/${d.testId}`);
-    } else if (d.announcementId) {
-      navigate(user?.role === 'student' ? '/student/announcements' : '/admin/announcements');
-    } else {
-      navigate(user?.role === 'student' ? '/student/notifications' : '/admin/notifications');
     }
   };
 
@@ -158,15 +154,6 @@ export default function NotificationBell() {
                 </button>
               ))
             )}
-          </div>
-
-          <div className="border-t border-rim px-3 py-2">
-            <button
-              onClick={() => { setOpen(false); navigate(user?.role === 'student' ? '/student/notifications' : '/admin/notifications'); }}
-              className="w-full text-center text-2xs text-annotation hover:text-ink py-1"
-            >
-              View all notifications
-            </button>
           </div>
         </div>
       )}

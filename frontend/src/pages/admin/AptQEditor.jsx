@@ -116,6 +116,7 @@ export default function AptQEditor({ q, onChange, onRemove }) {
                 <input
                   type={q.type === 'msq' ? 'checkbox' : 'radio'}
                   name={`correct_${q._id}`}
+                  aria-label={`Mark option ${String.fromCharCode(65 + i)} as correct`}
                   checked={
                     q.type === 'msq'
                       ? Array.isArray(q.correctAnswer) && q.correctAnswer.includes(i)
@@ -138,6 +139,7 @@ export default function AptQEditor({ q, onChange, onRemove }) {
                   value={opt}
                   onChange={e => updateOption(i, e.target.value)}
                   placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                  aria-label={`Option ${String.fromCharCode(65 + i)}`}
                   className="input-field text-sm py-1.5 flex-1"
                 />
               </div>

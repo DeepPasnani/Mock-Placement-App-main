@@ -130,7 +130,7 @@ export default function StudentGrowth() {
                     type="monotone"
                     dataKey="accuracy"
                     name={genre.genre.replace(/_/g, ' ')}
-                    stroke={['var(--ct-accent)', 'var(--ct-clarify)', 'var(--ct-verify)', 'var(--ct-alert)', '#8B5CF6', '#F59E0B'][i % 6]}
+                    stroke={['var(--ct-accent)', 'var(--ct-clarify)', 'var(--ct-verify)', 'var(--ct-alert)', 'var(--ct-trophy-gold)', 'var(--ct-trophy-silver)'][i % 6]}
                     strokeWidth={2}
                     dot={{ r: 2 }}
                     connectNulls

@@ -6,9 +6,9 @@ import { useStore } from '../../store';
 import { Trophy, Medal, Award, User, ChevronRight } from 'lucide-react';
 
 const rankIcons = {
-  1: { icon: Trophy, color: 'text-yellow-500', label: 'Gold' },
-  2: { icon: Medal, color: 'text-gray-400', label: 'Silver' },
-  3: { icon: Award, color: 'text-amber-600', label: 'Bronze' },
+  1: { icon: Trophy, color: 'text-trophy-gold', tint: 'bg-trophy-gold/10', label: 'Gold' },
+  2: { icon: Medal, color: 'text-trophy-silver', tint: 'bg-trophy-silver/10', label: 'Silver' },
+  3: { icon: Award, color: 'text-trophy-bronze', tint: 'bg-trophy-bronze/10', label: 'Bronze' },
 };
 
 export default function Leaderboard() {
@@ -87,14 +87,14 @@ export default function Leaderboard() {
           {leaderboard.slice(0, 3).map((entry, idx) => {
             const rank = idx + 1;
             const RankIcon = rankIcons[rank]?.icon;
-            const rankColor = rankIcons[rank]?.color;
+            const rankInfo = rankIcons[rank];
             return (
               <div
                 key={entry.id}
                 className={`panel p-4 flex items-center gap-4 ${user?.id === entry.id ? 'ring-2 ring-accent/40' : ''}`}
               >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${rank === 1 ? 'bg-yellow-100' : rank === 2 ? 'bg-gray-100' : 'bg-amber-100'}`}>
-                  {RankIcon ? <RankIcon size={20} className={rankColor} /> : <span className="text-lg font-bold text-ink">{rank}</span>}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${rankInfo?.tint || 'bg-sunken'}`}>
+                  {RankIcon ? <RankIcon size={20} className={rankInfo?.color ?? 'text-annotation'} /> : <span className="text-lg font-bold text-ink">{rank}</span>}
                 </div>
                 <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-xs font-bold text-accent uppercase shrink-0">
                   {entry.name?.charAt(0) || '?'}
@@ -102,7 +102,7 @@ export default function Leaderboard() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-display font-semibold text-ink truncate">
-                      {entry.name} {user?.id === entry.id && <Badge color="blue">You</Badge>}
+                      {entry.name} {user?.id === entry.id && <Badge color="clarify">You</Badge>}
                     </span>
                   </div>
                   <div className="text-xs text-annotation/60">
@@ -132,7 +132,7 @@ export default function Leaderboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="text-xs font-medium text-ink">
-                        {entry.name} {user?.id === entry.id && <Badge color="blue">You</Badge>}
+                        {entry.name} {user?.id === entry.id && <Badge color="clarify">You</Badge>}
                       </span>
                     </div>
                     <div className="text-right">

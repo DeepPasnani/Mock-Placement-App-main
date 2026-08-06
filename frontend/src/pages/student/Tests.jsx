@@ -92,14 +92,14 @@ export default function StudentTests() {
                       {test.title}
                     </h2>
                     {submitted && (
-                      <Badge color={passed ? 'green' : 'red'}>
+                      <Badge color={passed ? 'verify' : 'alert'}>
                         {passed ? 'Passed' : 'Failed'}
                       </Badge>
                     )}
                     {inProgress && <Badge color="accent">In Progress</Badge>}
-                    {!started && <Badge color="gray">Upcoming</Badge>}
+                    {!started && <Badge color="annotation">Upcoming</Badge>}
                     {started && !notEnded && !submitted && (
-                      <Badge color="red">Ended</Badge>
+                      <Badge color="alert">Ended</Badge>
                     )}
                   </div>
 

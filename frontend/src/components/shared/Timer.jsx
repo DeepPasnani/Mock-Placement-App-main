@@ -3,13 +3,15 @@ import { useState, useEffect, useRef } from 'react';
 /* ═══════════════════════════════════════════════════════════
  * Timer — CampusTrack Signature Element
  *
- * Three visual phases:
- *   Calm   (>40% remaining) — neutral white digits on dark
- *   Warning (20–40%)        — amber digits, subtle border
- *   Urgent (<20%)           — red digits, pulsing border
+ * Four visual phases (voice escalates as pressure accumulates):
+ *   Calm      (>40% remaining) — neutral ink digits on sunken fill
+ *   Warning   (20–40%)         — accent digits, subtle border
+ *   Urgent    (10–20%)         — red digits, pulsing bar + "Low" tag
+ *   Critical  (<10%)           — filled red pill, white digits, "Final"
  *
- * A thin progress rail beneath the digits shows remaining
- * time at a glance. At 0, the parent's onExpire fires.
+ * A thin progress rail beneath the digits shows remaining time.
+ * At 0, the parent's onExpire fires. All motion defers to the
+ * global reduced-motion guard.
  * ═══════════════════════════════════════════════════════════ */
 
 export default function Timer({ totalSeconds, onExpire, onTick, testId, token }) {
@@ -55,15 +57,41 @@ export default function Timer({ totalSeconds, onExpire, onTick, testId, token })
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
 
-  const display = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  // MM:SS when under an hour, HH:MM:SS otherwise — keeps the clock calm
+  // for short rounds and avoids fixed-width noise.
+  const display =
+    h > 0
+      ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 
   const phaseClass =
+    pct < 10 ? 'timer-box--critical' :
     pct < 20 ? 'timer-box--urgent' :
     pct < 40 ? 'timer-box--warning' :
     'timer-box--calm';
 
+  const stateLabel =
+    phaseClass === 'timer-box--critical' ? 'Final' :
+    phaseClass === 'timer-box--urgent' ? 'Low' : '';
+
+  // Announce only meaningful thresholds, not the countdown second-by-second
+  // (a live region that re-renders every 1s spams screen readers).
+  const prevPhase = useRef(phaseClass);
+  const [liveNote, setLiveNote] = useState('');
+  useEffect(() => {
+    if (prevPhase.current !== phaseClass) {
+      setLiveNote(
+        phaseClass === 'timer-box--critical' ? 'Under 10% time remaining — final stretch.'
+          : phaseClass === 'timer-box--urgent' ? 'Less than 20% time remaining.'
+          : phaseClass === 'timer-box--warning' ? 'Less than 40% time remaining.'
+          : ''
+      );
+      prevPhase.current = phaseClass;
+    }
+  }, [phaseClass]);
+
   return (
-    <div className={`timer-box ${phaseClass} relative overflow-hidden`} role="timer" aria-live="polite" aria-label={`Time remaining: ${display}`}>
+    <div className={`timer-box ${phaseClass} relative overflow-hidden`} role="timer" aria-label={`Time remaining: ${display}`}>
       {/* Clock icon — hidden on very small screens */}
       <svg className="w-4 h-4 hidden sm:block shrink-0 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -74,10 +102,18 @@ export default function Timer({ totalSeconds, onExpire, onTick, testId, token })
         {display}
       </span>
 
-      {/* Thin progress rail at the bottom */}
+      {/* Verbal state tag — appears only when pressure is on */}
+      <span className={`timer-state ${stateLabel ? `timer-state--${phaseClass.replace('timer-box--', '')}` : ''}`}>
+        {stateLabel}
+      </span>
+
+      {/* Threshold announcements, asserted only when a break is crossed */}
+      <span aria-live="assertive" className="sr-only">{liveNote}</span>
+
+      {/* Thin progress rail at the bottom — scales on transform to avoid layout animation */}
       <span
         className="timer-rail"
-        style={{ width: `${pct}%` }}
+        style={{ transform: `scaleX(${pct / 100})` }}
         aria-hidden="true"
       />
     </div>

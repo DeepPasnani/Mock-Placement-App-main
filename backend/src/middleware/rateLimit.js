@@ -48,10 +48,41 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
-// Strict limit for auth endpoints (pre-authentication, so always by IP)
+// ── Auth limiter (login / register / Google / password reset) ────
+// Previously keyed only by IP with max:20 / 15 min. On a campus network
+// many students share one public NAT IP, so ~15 successful logins
+// exhausted the bucket for the whole hall and everyone else got
+// "please wait 15 minutes". Fix:
+//   • Prefer a per-email bucket when the body includes an email
+//     (login/register/forgot/reset) — 300 students each signing in
+//     once no longer collide.
+//   • Fall back to a high per-IP ceiling for Google OAuth (no email
+//     in the request body) and other email-less auth traffic so a
+//     lab of 300+ can still sign in together behind one NAT.
+function authKey(req) {
+  const email = req.body?.email;
+  if (typeof email === 'string' && email.trim()) {
+    return `auth:email:${email.trim().toLowerCase()}`;
+  }
+  return `auth:ip:${req.ip}`;
+}
+
+const AUTH_PER_EMAIL = parseInt(process.env.AUTH_RATE_LIMIT_PER_EMAIL, 10) || 40;
+const AUTH_PER_IP = parseInt(process.env.AUTH_RATE_LIMIT_PER_IP, 10) || 2000;
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: (req) => {
+    const email = req.body?.email;
+    if (typeof email === 'string' && email.trim()) return AUTH_PER_EMAIL;
+    return AUTH_PER_IP;
+  },
+  keyGenerator: authKey,
+  // Custom key already includes IP when email is absent; disable the
+  // v7 validation that expects keyGenerator to call ipKeyGenerator.
+  validate: { keyGeneratorIpFallback: false },
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Too many login attempts, please wait 15 minutes.' },
 });
 

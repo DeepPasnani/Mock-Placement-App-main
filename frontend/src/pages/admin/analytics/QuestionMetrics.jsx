@@ -79,6 +79,7 @@ export default function QuestionMetrics() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search questions..."
+            aria-label="Search questions"
             className="input-field max-w-56 text-xs"
           />
           <Btn variant="ghost" size="sm" onClick={exportCsv} disabled={!questions.length}>

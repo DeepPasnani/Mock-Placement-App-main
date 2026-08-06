@@ -101,7 +101,7 @@ export default function DailyChallenge() {
 
       <div className="panel p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Badge color={isMcq ? 'blue' : 'purple'}>{isMcq ? 'MCQ' : 'Coding'}</Badge>
+          <Badge color="clarify">{isMcq ? 'MCQ' : 'Coding'}</Badge>
           <span className="text-xs text-annotation">+{challenge.xp_reward} XP</span>
         </div>
 
@@ -141,6 +141,7 @@ export default function DailyChallenge() {
                 className="textarea-field mb-4 font-mono text-sm"
                 rows={8}
                 placeholder="Write your solution here..."
+                aria-label="Write your solution here"
                 value={answer || ''}
                 onChange={e => setAnswer(e.target.value)}
               />

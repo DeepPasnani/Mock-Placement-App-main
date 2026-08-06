@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { query }        = require('../db');
 const { cacheSet, cacheDel, cacheGet } = require('../db/redis');
+const { normalizeDepartment, ALLOWED_DEPARTMENTS } = require('../config/departments');
 const {
   sendWelcomeEmail,
   sendPasswordResetEmail,
@@ -18,13 +19,95 @@ function signToken(userId, role) {
   });
 }
 
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar_url: user.avatar_url,
+    department: user.department || null,
+    branch: user.branch || null,
+    roll_number: user.roll_number || null,
+    batch: user.batch || null,
+    year_of_study: user.year_of_study || null,
+    profileComplete: isStudentProfileComplete(user),
+  };
+}
+
+function isStudentProfileComplete(user) {
+  if (!user) return false;
+  if (user.role && user.role !== 'student') return true;
+  return Boolean(
+    user.roll_number &&
+    String(user.roll_number).trim() &&
+    user.batch &&
+    String(user.batch).trim() &&
+    user.year_of_study
+  );
+}
+
+async function assignUserToCluster({ userId, rollNumber, batchName, department, yearOfStudy }) {
+  const year = parseInt(yearOfStudy, 10) || 1;
+  const dept = department || null;
+  const batch = batchName.trim();
+  const roll = rollNumber.trim();
+
+  await query(
+    `UPDATE users SET
+       roll_number = $1,
+       batch = $2,
+       year_of_study = $3,
+       department = COALESCE($4, department),
+       branch = COALESCE(branch, $4)
+     WHERE id = $5`,
+    [roll, batch, year, dept, userId]
+  );
+
+  // Ensure a batches row exists so the student lands in the same cluster
+  // admins use for test/drive mapping.
+  if (dept) {
+    const { rows: [batchRow] } = await query(
+      `INSERT INTO batches (name, department, year_of_study)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (name, department) DO UPDATE SET
+         year_of_study = COALESCE(EXCLUDED.year_of_study, batches.year_of_study)
+       RETURNING id`,
+      [batch, dept, year]
+    );
+
+    if (batchRow?.id) {
+      const semester = process.env.CURRENT_SEMESTER || `${new Date().getFullYear()}-Spring`;
+      await query(
+        `INSERT INTO student_batches (user_id, batch_id, year_of_study, semester)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, semester) DO UPDATE SET
+           batch_id = EXCLUDED.batch_id,
+           year_of_study = EXCLUDED.year_of_study`,
+        [userId, batchRow.id, year, semester]
+      );
+    }
+  }
+
+  await cacheDel(`user:${userId}`);
+
+  const { rows: [user] } = await query(
+    `SELECT id, name, email, role, avatar_url, department, branch, roll_number, batch, year_of_study, is_active
+     FROM users WHERE id = $1`,
+    [userId]
+  );
+  return user;
+}
+
 // ── POST /api/auth/login ──────────────────────────────────────
 async function login(req, res) {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
   const { rows } = await query(
-    'SELECT id, name, email, role, password_hash, is_active, avatar_url FROM users WHERE email = $1',
+    `SELECT id, name, email, role, password_hash, is_active, avatar_url,
+            department, branch, roll_number, batch, year_of_study
+     FROM users WHERE email = $1`,
     [email.toLowerCase().trim()]
   );
 
@@ -37,9 +120,8 @@ async function login(req, res) {
 
   await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
-  const token   = signToken(user.id, user.role);
-  const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, avatar_url: user.avatar_url };
-  res.json({ token, user: safeUser });
+  const token = signToken(user.id, user.role);
+  res.json({ token, user: publicUser(user) });
 }
 
 // ── POST /api/auth/register ───────────────────────────────────
@@ -58,13 +140,31 @@ async function register(req, res) {
     return res.status(400).json({ error: 'Email already registered' });
   }
 
+  const allowedDept = normalizeDepartment(department);
+  if (department && !allowedDept) {
+    return res.status(400).json({
+      error: `This platform is only for ${ALLOWED_DEPARTMENTS.join(' and ')} students.`,
+    });
+  }
+
   const hash = await bcrypt.hash(password, 12);
-  const { rows: [user] } = await query(
+  const { rows: [created] } = await query(
     `INSERT INTO users (name, email, password_hash, role, department, roll_number, branch, batch, year_of_study, is_active)
      VALUES ($1,$2,$3,'student',$4,$5,$6,$7,$8,$9)
      RETURNING id, name, email, role, department, avatar_url, roll_number, branch, batch, year_of_study`,
-    [name.trim(), emailLower, hash, department || null, rollNumber || null, branch || department || null, batch || null, yearOfStudy || 1, true]
+    [name.trim(), emailLower, hash, allowedDept || null, rollNumber || null, branch || allowedDept || null, batch || null, yearOfStudy || 1, true]
   );
+
+  let user = created;
+  if (rollNumber && batch && allowedDept) {
+    user = await assignUserToCluster({
+      userId: created.id,
+      rollNumber,
+      batchName: batch,
+      department: allowedDept,
+      yearOfStudy: yearOfStudy || 1,
+    });
+  }
 
   const token = signToken(user.id, user.role);
 
@@ -73,7 +173,7 @@ async function register(req, res) {
 
   res.status(201).json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role, department: user.department, avatar_url: user.avatar_url, roll_number: user.roll_number, branch: user.branch, batch: user.batch, year_of_study: user.year_of_study },
+    user: publicUser(user),
   });
 }
 
@@ -104,7 +204,8 @@ async function googleLogin(req, res) {
     ON CONFLICT (google_id) DO UPDATE SET
       email = EXCLUDED.email, name = EXCLUDED.name,
       avatar_url = EXCLUDED.avatar_url, last_login = NOW()
-    RETURNING id, name, email, role, avatar_url, is_active
+    RETURNING id, name, email, role, avatar_url, is_active,
+              department, branch, roll_number, batch, year_of_study
   `, [googleId, email.toLowerCase(), name, picture]);
 
   if (!user.is_active) return res.status(403).json({ error: 'Account is deactivated' });
@@ -113,7 +214,50 @@ async function googleLogin(req, res) {
   if (isNew) sendWelcomeEmail({ to: email.toLowerCase(), name }).catch(() => {});
 
   const token = signToken(user.id, user.role);
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar_url: user.avatar_url } });
+  res.json({
+    token,
+    user: publicUser(user),
+    needsProfileCompletion: !isStudentProfileComplete(user),
+  });
+}
+
+// ── POST /api/auth/complete-profile ───────────────────────────
+// Required after Google sign-in (and for any student missing cluster fields).
+async function completeProfile(req, res) {
+  const { rollNumber, batch, yearOfStudy, department } = req.body;
+  if (!rollNumber || !batch || !yearOfStudy) {
+    return res.status(400).json({
+      error: 'Enrollment number, class/batch, and year of study are required',
+    });
+  }
+  if (req.user.role !== 'student') {
+    return res.status(400).json({ error: 'Only students complete this profile step' });
+  }
+
+  const year = parseInt(yearOfStudy, 10);
+  if (![1, 2, 3, 4].includes(year)) {
+    return res.status(400).json({ error: 'Year of study must be 1–4' });
+  }
+
+  const requestedDept = department ? String(department).trim() : (req.user.department || null);
+  const allowedDept = requestedDept ? normalizeDepartment(requestedDept) : req.user.department || null;
+  if (requestedDept && !allowedDept) {
+    return res.status(400).json({
+      error: `This platform is only for ${ALLOWED_DEPARTMENTS.join(' and ')} students.`,
+    });
+  }
+
+  const user = await assignUserToCluster({
+    userId: req.user.id,
+    rollNumber: String(rollNumber),
+    batchName: String(batch),
+    department: allowedDept,
+    yearOfStudy: year,
+  });
+
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  res.json({ user: publicUser(user), message: 'Profile completed' });
 }
 
 // ── POST /api/auth/logout ─────────────────────────────────────
@@ -124,7 +268,10 @@ async function logout(req, res) {
 
 // ── GET /api/auth/me ──────────────────────────────────────────
 async function getMe(req, res) {
-  res.json({ user: req.user });
+  res.json({
+    user: publicUser(req.user),
+    needsProfileCompletion: req.user.role === 'student' && !isStudentProfileComplete(req.user),
+  });
 }
 
 // ── POST /api/auth/change-password ────────────────────────────
@@ -211,9 +358,11 @@ module.exports = {
   login,
   register,
   googleLogin,
+  completeProfile,
   logout,
   getMe,
   changePassword,
   forgotPassword,
   resetPassword,
+  isStudentProfileComplete,
 };

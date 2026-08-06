@@ -100,7 +100,7 @@ export default function TimeSinkAnalysis() {
                     formatter={(v, name) => [name === 'x' ? `${v}s` : `${v}%`, name === 'x' ? 'Avg Time' : 'Accuracy']}
                     contentStyle={{ background: 'var(--ct-panel)', border: '1px solid var(--ct-rim)', borderRadius: '8px', fontSize: '12px' }}
                   />
-                  <ReferenceArea x1={thresholdTime} x2={Number.MAX_SAFE_INTEGER} y1={0} y2={thresholdAcc} fill="#FEE2E2" fillOpacity={0.3} />
+                  <ReferenceArea x1={thresholdTime} x2={Number.MAX_SAFE_INTEGER} y1={0} y2={thresholdAcc} fill="var(--ct-alert-light)" fillOpacity={0.3} />
                   <Scatter
                     data={scatterData}
                     fill="var(--ct-accent)"
@@ -110,8 +110,8 @@ export default function TimeSinkAnalysis() {
                       return (
                         <circle
                           cx={cx} cy={cy} r={6}
-                          fill={isSink ? '#EF4444' : 'var(--ct-clarify)'}
-                          stroke={isSink ? '#DC2626' : 'transparent'}
+                          fill={isSink ? 'var(--ct-alert-light)' : 'var(--ct-clarify)'}
+                          stroke={isSink ? 'var(--ct-alert)' : 'transparent'}
                           strokeWidth={isSink ? 2 : 0}
                           opacity={isSink ? 1 : 0.6}
                         />
@@ -121,7 +121,7 @@ export default function TimeSinkAnalysis() {
                   <Legend
                     payload={[
                       { value: 'Normal', type: 'circle', color: 'var(--ct-clarify)' },
-                      { value: 'Time Sink', type: 'circle', color: '#EF4444' },
+                      { value: 'Time Sink', type: 'circle', color: 'var(--ct-alert-light)' },
                     ]}
                   />
                 </ScatterChart>

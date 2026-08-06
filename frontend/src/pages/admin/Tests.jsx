@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testsAPI, batchesAPI } from '../../services/api';
+import { testsAPI, batchesAPI, questionBankAPI } from '../../services/api';
 import { Btn, Badge, Table, ConfirmModal, Spinner, Modal, Input, Select } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -14,6 +14,7 @@ export default function AdminTests() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [deleteId, setDeleteId] = useState(null);
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [batchModalTest, setBatchModalTest] = useState(null);
   const { data, isLoading } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
@@ -25,6 +26,12 @@ export default function AdminTests() {
   const dupMut = useMutation({
     mutationFn: testsAPI.duplicate,
     onSuccess: () => { toast.success('Test duplicated'); qc.invalidateQueries({ queryKey: ['tests'] }); },
+  });
+
+  const bankImportMut = useMutation({
+    mutationFn: (testId) => questionBankAPI.importFromTest(testId),
+    onSuccess: (data) => { toast.success(data.message || `Added ${data.count} question(s) to bank`); qc.invalidateQueries({ queryKey: ['question-bank'] }); },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to add to bank'),
   });
 
   const tests = data?.tests || [];
@@ -105,10 +112,10 @@ export default function AdminTests() {
         <Badge
           color={
             t.status === 'published'
-              ? 'green'
+              ? 'verify'
               : t.status === 'archived'
-              ? 'gray'
-              : 'yellow'
+              ? 'annotation'
+              : 'accent'
           }
         >
           {t.status}
@@ -157,6 +164,12 @@ export default function AdminTests() {
               <span className="hidden sm:inline">Results</span>
             </Btn>
           </Link>
+          <Btn variant="ghost" size="sm" onClick={() => bankImportMut.mutate(t.id)} aria-label="Add to question bank" disabled={bankImportMut.isLoading}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s4.332.477 5.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            <span className="hidden sm:inline">Bank</span>
+          </Btn>
           <Link to={`/admin/tests/${t.id}/edit`}>
             <Btn variant="ghost" size="sm" aria-label="Edit test">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -237,11 +250,7 @@ export default function AdminTests() {
                 <Btn
                   variant="danger"
                   size="sm"
-                  onClick={() => {
-                    if (window.confirm(`Delete ${selectedIds.size} test(s)? This cannot be undone.`)) {
-                      batchDeleteMut.mutate([...selectedIds]);
-                    }
-                  }}
+                  onClick={() => setConfirmBatchDelete(true)}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                     <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -263,6 +272,15 @@ export default function AdminTests() {
         title="Delete Test"
         confirmLabel="Delete"
         message="This will permanently delete the test and all its submissions. Cannot be undone."
+      />
+
+      <ConfirmModal
+        isOpen={confirmBatchDelete}
+        onClose={() => setConfirmBatchDelete(false)}
+        onConfirm={() => batchDeleteMut.mutate([...selectedIds])}
+        title={`Delete ${selectedIds.size} Test${selectedIds.size > 1 ? 's' : ''}`}
+        confirmLabel="Delete"
+        message={`This will permanently delete ${selectedIds.size} selected test(s) and all their submissions. Cannot be undone.`}
       />
 
       <BatchMappingModal test={batchModalTest} onClose={() => setBatchModalTest(null)} />
@@ -338,7 +356,7 @@ function BatchMappingModal({ test, onClose }) {
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
             {batches.map(b => (
               <div key={b.id} className="flex items-center gap-3 panel p-2.5">
-                <input type="checkbox" className="accent-accent w-4 h-4" checked={!!selected[b.id]?.checked} onChange={() => toggle(b.id)} />
+                <input type="checkbox" className="accent-accent w-4 h-4" checked={!!selected[b.id]?.checked} onChange={() => toggle(b.id)} aria-label={`Select batch ${b.name}`} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-ink font-medium truncate">{b.name}</div>
                   <div className="text-2xs text-annotation/60">{b.department} · Year {b.year_of_study}</div>

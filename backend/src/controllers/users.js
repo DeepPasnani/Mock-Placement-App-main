@@ -7,6 +7,7 @@ const {
   sendTestScheduledEmail,
   sendTestResultEmail,
 } = require('../services/email');
+const { normalizeDepartment, ALLOWED_DEPARTMENTS } = require('../config/departments');
 
 // ── GET /api/users ────────────────────────────────────────────
 async function listUsers(req, res) {
@@ -20,8 +21,9 @@ async function listUsers(req, res) {
 
   params.push(limit, offset);
   const { rows } = await query(
-    `SELECT id, name, email, role, branch, roll_number, is_active, avatar_url, last_login, created_at
-     FROM users ${where} ORDER BY created_at DESC LIMIT $${params.length-1} OFFSET $${params.length}`,
+    `SELECT id, name, email, role, branch, department, batch, year_of_study,
+            roll_number, is_active, avatar_url, last_login, created_at
+     FROM users ${where} ORDER BY department, year_of_study, batch, name LIMIT $${params.length-1} OFFSET $${params.length}`,
     params
   );
 
@@ -103,7 +105,8 @@ async function getStats(req, res) {
   // Recent submissions with scores for dashboard
   const { rows: recentSubmissions } = await query(`
     SELECT s.id, s.score, s.max_score, s.submitted_at, s.status,
-      u.name as user_name, t.title as test_title
+      u.name as user_name, t.title as test_title,
+      u.department as user_department, u.batch as user_batch, u.year_of_study as user_year
     FROM submissions s
     JOIN users u ON s.user_id = u.id
     JOIN tests t ON s.test_id = t.id
@@ -146,15 +149,26 @@ async function bulkImport(req, res) {
 
   for (const s of students) {
     if (!s.email) { results.errors.push(`Missing email for ${s.name}`); continue; }
+
+    const dept = normalizeDepartment(s.department || s.branch);
+    if (s.department || s.branch) {
+      if (!dept) {
+        results.errors.push(
+          `${s.email}: Only ${ALLOWED_DEPARTMENTS.join(' and ')} students can be imported`
+        );
+        continue;
+      }
+    }
+
     try {
       const tempPass = Math.random().toString(36).slice(2, 10);
       const hash     = await bcrypt.hash(tempPass, 10);
       const result   = await query(
-        `INSERT INTO users (name, email, password_hash, role, branch, roll_number)
-         VALUES ($1,$2,$3,'student',$4,$5)
+        `INSERT INTO users (name, email, password_hash, role, branch, department, roll_number)
+         VALUES ($1,$2,$3,'student',$4,$5,$6)
          ON CONFLICT (email) DO NOTHING
          RETURNING id`,
-        [s.name, s.email.toLowerCase(), hash, s.branch, s.rollNumber]
+        [s.name, s.email.toLowerCase(), hash, dept || s.branch, dept || null, s.rollNumber]
       );
 
       if (result.rows.length) {

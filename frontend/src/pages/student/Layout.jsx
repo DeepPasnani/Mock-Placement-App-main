@@ -1,14 +1,107 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
 import { useQuery } from '@tanstack/react-query';
 import { gamificationAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Zap, Flame, Menu, X } from 'lucide-react';
+import { Zap, Flame, Menu, X, BarChart3, Trophy, Medal, TrendingUp, CalendarCheck, Video, BookOpen, FileText, MoreHorizontal, LayoutDashboard } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
  * Student Layout — Top nav bar + content
+ * ──────────────────────────────────────────────────────────
+ * One source of truth for navigation: PRIMARY_LINKS render inline
+ * on desktop (Tests–XP) with the rest behind "More", and ALL links
+ * render in the mobile menu. Same array drives both, so desktop
+ * and mobile can never drift.
  * ═══════════════════════════════════════════════════════════ */
+
+const PRIMARY_LINKS = [
+  { to: '/student', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/student/results', label: 'Results', icon: BarChart3 },
+  { to: '/student/achievements', label: 'Achievements', icon: Medal },
+  { to: '/student/progress', label: 'Progress', icon: TrendingUp },
+  { to: '/student/gamification', label: 'XP', icon: Zap },
+  { to: '/student/leaderboard', label: 'Leaderboard', icon: Trophy },
+];
+
+const MORE_LINKS = [
+  { to: '/student/daily-challenge', label: 'Daily Challenge', icon: CalendarCheck },
+  { to: '/student/mock-interview', label: 'Mock Interview', icon: Video },
+  { to: '/student/resources', label: 'Resources', icon: BookOpen },
+];
+
+const ALL_LINKS = [...PRIMARY_LINKS, ...MORE_LINKS];
+
+const desktopLinkClass = ({ isActive }) =>
+  `flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+    isActive
+      ? 'bg-accent/10 text-accent'
+      : 'text-annotation hover:bg-sunken hover:text-ink'
+  }`;
+
+function DesktopLink({ link }) {
+  const Icon = link.icon;
+  return (
+    <NavLink to={link.to} end={link.end} className={desktopLinkClass}>
+      <Icon size={14} />
+      {link.label}
+    </NavLink>
+  );
+}
+
+function MoreMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="true"
+        aria-expanded={open}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-annotation hover:bg-panel hover:text-ink transition-all"
+      >
+        <MoreHorizontal size={14} />
+        More
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-48 bg-panel border border-rim rounded-xl shadow-lg shadow-black/5 overflow-hidden z-30 animate-fade-in">
+          {MORE_LINKS.map(link => {
+            const Icon = link.icon;
+            return (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-all ${
+                    isActive ? 'bg-accent/10 text-accent' : 'text-annotation hover:bg-sunken hover:text-ink'
+                  }`
+                }
+              >
+                <Icon size={15} className="opacity-80" />
+                {link.label}
+              </NavLink>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function StudentLayout() {
   const { user, logout, streak, setStreak } = useStore();
@@ -59,73 +152,16 @@ export default function StudentLayout() {
             </div>
 
             {/* Nav */}
-            <nav className="hidden sm:flex gap-1">
-              <NavLink
-                to="/student"
-                end
-                className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    isActive
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-annotation hover:bg-panel hover:text-ink'
-                  }`
-                }
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                Tests
-              </NavLink>
-              <NavLink
-                to="/student/results"
-                className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    isActive
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-annotation hover:bg-panel hover:text-ink'
-                  }`
-                }
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                </svg>
-                Results
-              </NavLink>
-              <NavLink
-                to="/student/gamification"
-                className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    isActive
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-annotation hover:bg-panel hover:text-ink'
-                  }`
-                }
-              >
-                <Zap size={14} />
-                XP
-              </NavLink>
-              <NavLink
-                to="/student/leaderboard"
-                className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    isActive
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-annotation hover:bg-panel hover:text-ink'
-                  }`
-                }
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                Leaderboard
-              </NavLink>
+            <nav className="hidden lg:flex gap-1 items-center" aria-label="Primary">
+              {PRIMARY_LINKS.map(link => <DesktopLink key={link.to} link={link} />)}
+              <MoreMenu />
             </nav>
           </div>
 
           {/* Streak + User + Sign out */}
           <div className="flex items-center gap-2">
             {streak && streak.current_streak > 0 && (
-              <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-md bg-accent/5 text-accent text-xs font-medium">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent/5 text-accent text-xs font-medium">
                 <Flame size={12} />
                 {streak.current_streak}
               </div>
@@ -143,6 +179,7 @@ export default function StudentLayout() {
             </button>
             <button
               onClick={handleLogout}
+              aria-label="Sign out"
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-annotation hover:bg-panel hover:text-ink transition-all"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -156,34 +193,28 @@ export default function StudentLayout() {
 
       {/* Mobile nav dropdown */}
       {mobileMenuOpen && (
-        <div className="sm:hidden bg-panel border-b border-rim shadow-sm">
-          <nav className="max-w-5xl mx-auto px-4 py-2 flex flex-col gap-1">
-            {[
-              { to: '/student', label: 'Tests', end: true },
-              { to: '/student/results', label: 'Results' },
-              { to: '/student/gamification', label: 'XP & Level' },
-              { to: '/student/leaderboard', label: 'Leaderboard' },
-              { to: '/student/achievements', label: 'Achievements' },
-              { to: '/student/progress', label: 'Progress' },
-              { to: '/student/daily-challenge', label: 'Daily Challenge' },
-              { to: '/student/mock-interview', label: 'Mock Interview' },
-              { to: '/student/resources', label: 'Resources' },
-            ].map(link => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.end}
-                onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  `px-3 py-2 rounded-md text-sm font-medium transition-all ${
-                    isActive ? 'bg-accent/10 text-accent' : 'text-annotation hover:bg-sunken hover:text-ink'
-                  }`
-                }
-              >
-                {link.label}
-              </NavLink>
-            ))}
-          </nav>
+        <div className="sm:hidden">
+          <div className="max-w-5xl mx-auto px-4 pb-4 pt-1">
+            <nav className="bg-panel border border-rim rounded-xl shadow-lg shadow-black/5 overflow-hidden page-enter">
+              <div className="px-4 py-3 border-b border-rim flex items-center justify-between bg-sunken/30">
+                <span className="text-xs font-semibold uppercase tracking-wider text-annotation">
+                  Menu
+                </span>
+                <span className="text-2xs text-annotation/50">{user?.name || 'Student'}</span>
+              </div>
+              <div className="p-2 flex flex-col gap-0.5">
+                {PRIMARY_LINKS.map(link => (
+                  <DropdownLink key={link.to} link={link} onClose={() => setMobileMenuOpen(false)} />
+                ))}
+
+                <div className="my-1.5 h-px bg-sunken" />
+
+                {MORE_LINKS.map(link => (
+                  <DropdownLink key={link.to} link={link} onClose={() => setMobileMenuOpen(false)} />
+                ))}
+              </div>
+            </nav>
+          </div>
         </div>
       )}
 
@@ -193,5 +224,32 @@ export default function StudentLayout() {
       </main>
     </div>
     </>
+  );
+}
+
+function DropdownLink({ link, onClose }) {
+  const Icon = link.icon;
+  return (
+    <NavLink
+      to={link.to}
+      end={link.end}
+      onClick={onClose}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          isActive
+            ? 'bg-accent/10 text-accent'
+            : 'text-annotation hover:bg-sunken hover:text-ink'
+        }`
+      }
+    >
+      <span
+        className={`flex items-center justify-center w-7 h-7 rounded-md shrink-0 ${
+          link.end ? 'bg-accent/10 text-accent' : 'bg-sunken text-annotation'
+        }`}
+      >
+        <Icon size={15} />
+      </span>
+      {link.label}
+    </NavLink>
   );
 }

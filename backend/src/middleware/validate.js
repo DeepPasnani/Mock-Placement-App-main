@@ -28,7 +28,10 @@ const createTestSchema = Joi.object({
   startTime: Joi.date().iso().allow(null),
   endTime: Joi.date().iso().allow(null),
   durationMinutes: Joi.number().integer().min(1).max(600).required(),
-  department: Joi.string().trim().max(200).required(),
+  department: Joi.string().trim().max(200).allow('', null),
+  departments: Joi.array().items(Joi.string()).default([]),
+  years: Joi.array().items(Joi.any()).default([]),
+  batches: Joi.array().items(Joi.string()).default([]),
   settings: Joi.object({
     shuffleQuestions: Joi.boolean(),
     shuffleOptions: Joi.boolean(),

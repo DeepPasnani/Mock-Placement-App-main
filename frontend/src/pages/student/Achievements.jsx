@@ -2,34 +2,21 @@ import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { gamificationAPI } from '../../services/api';
 import { Spinner, Badge } from '../../components/shared/UI';
-import { Award, Lock, CheckCircle, Star } from 'lucide-react';
+import { Award, Lock, CheckCircle, Star, Trophy, Flame, Gem, Puzzle, CalendarDays, Percent, Crown, Sparkles, Rocket } from 'lucide-react';
 import { format } from 'date-fns';
 import gsap from 'gsap';
 
 const achievementIcons = {
-  first_test: '🎯',
-  score_90: '🏆',
-  streak_7: '🔥',
-  streak_30: '💎',
-  three_hard: '🧩',
-  daily_champion: '⭐',
-  xp_1000: '💯',
-  xp_5000: '👑',
-  level_5: '🌟',
-  level_10: '🚀',
-};
-
-const iconColors = {
-  first_test: 'from-blue-400 to-blue-600',
-  score_90: 'from-yellow-400 to-yellow-600',
-  streak_7: 'from-orange-400 to-red-500',
-  streak_30: 'from-purple-400 to-purple-600',
-  three_hard: 'from-green-400 to-green-600',
-  daily_champion: 'from-amber-400 to-amber-600',
-  xp_1000: 'from-emerald-400 to-emerald-600',
-  xp_5000: 'from-pink-400 to-pink-600',
-  level_5: 'from-indigo-400 to-indigo-600',
-  level_10: 'from-red-400 to-red-600',
+  first_test: Star,
+  score_90: Trophy,
+  streak_7: Flame,
+  streak_30: Gem,
+  three_hard: Puzzle,
+  daily_champion: CalendarDays,
+  xp_1000: Percent,
+  xp_5000: Crown,
+  level_5: Sparkles,
+  level_10: Rocket,
 };
 
 export default function Achievements() {
@@ -44,11 +31,11 @@ export default function Achievements() {
       const earnedCards = cardsRef.current.filter((_, i) => data.achievements[i]?.earned);
       if (earnedCards.length) {
         gsap.from(earnedCards, {
-          scale: 0.8,
+          scale: 0.96,
           opacity: 0,
-          duration: 0.5,
-          stagger: 0.08,
-          ease: 'back.out(1.7)',
+          duration: 0.45,
+          stagger: 0.07,
+          ease: 'power2.out',
         });
       }
     }
@@ -77,7 +64,7 @@ export default function Achievements() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {achievements.map((ach, i) => {
           const isEarned = ach.earned;
-          const gradient = iconColors[ach.key] || 'from-gray-400 to-gray-600';
+          const badgeTone = isEarned ? 'bg-accent shadow-sm' : 'bg-sunken';
           return (
             <div
               key={ach.id}
@@ -85,8 +72,11 @@ export default function Achievements() {
               className={`panel p-4 relative overflow-hidden transition-all ${isEarned ? '' : 'opacity-60 grayscale'}`}
             >
               <div className="flex items-start gap-3">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-xl shrink-0 shadow-sm`}>
-                  {achievementIcons[ach.key] || <Award size={20} className="text-white" />}
+                <div className={`w-12 h-12 rounded-xl ${badgeTone} flex items-center justify-center shrink-0 ${isEarned ? 'shadow-sm' : ''}`}>
+                  {(() => {
+                    const Icon = achievementIcons[ach.key] || Award;
+                    return <Icon size={20} className={isEarned ? 'text-panel' : 'text-annotation'} />;
+                  })()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">

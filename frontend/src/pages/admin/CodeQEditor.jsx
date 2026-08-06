@@ -122,8 +122,9 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
             className="text-sm"
           />
           <div>
-            <label className="input-label">Sample Input</label>
+            <label htmlFor="cqe-sample-input" className="input-label">Sample Input</label>
             <textarea
+              id="cqe-sample-input"
               value={q.sampleInput}
               onChange={e => update('sampleInput', e.target.value)}
               rows={4}
@@ -131,8 +132,9 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
             />
           </div>
           <div>
-            <label className="input-label">Sample Output</label>
+            <label htmlFor="cqe-sample-output" className="input-label">Sample Output</label>
             <textarea
+              id="cqe-sample-output"
               value={q.sampleOutput}
               onChange={e => update('sampleOutput', e.target.value)}
               rows={4}
@@ -147,6 +149,15 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
           <Alert type="info" className="mb-3">
             Hidden test cases are used for final grading. Visible ones serve as examples.
           </Alert>
+          <div className="mb-4 text-xs text-annotation bg-panel rounded-lg p-3">
+            <div className="font-semibold text-ink mb-1">How marks are awarded</div>
+            <p>
+              Leave the <span className="font-mono">marks</span> column blank to split this
+              problem's {q.marks || 0} marks equally across all test cases. To award custom
+              marks per case instead, enter a value on each test case (the sum typically
+              matches the problem's total marks).
+            </p>
+          </div>
           <div className="space-y-3">
             {q.testCases.map((tc, i) => (
               <div key={i} className="panel-muted p-3">
@@ -181,7 +192,7 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_88px] gap-2">
                   <textarea
                     value={tc.input}
                     onChange={e => {
@@ -191,6 +202,7 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
                     }}
                     rows={3}
                     placeholder="Input"
+                    aria-label={`Test case ${i + 1} input`}
                     className="textarea-field font-mono text-xs bg-deck text-verify"
                   />
                   <textarea
@@ -202,8 +214,27 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
                     }}
                     rows={3}
                     placeholder="Expected Output"
+                    aria-label={`Test case ${i + 1} expected output`}
                     className="textarea-field font-mono text-xs bg-deck text-verify"
                   />
+                  <div>
+                    <label htmlFor={`cqe-${i}-marks`} className="input-label">Marks (blank = equal share)</label>
+                    <input
+                      id={`cqe-${i}-marks`}
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={tc.marks ?? ''}
+                      onChange={e => {
+                        const t = [...q.testCases];
+                        t[i] = { ...t[i], marks: e.target.value === '' ? '' : Number(e.target.value) };
+                        update('testCases', t);
+                      }}
+                      placeholder="auto"
+                      aria-label={`Test case ${i + 1} marks`}
+                      className="input-field font-mono text-xs py-1.5"
+                    />
+                  </div>
                 </div>
               </div>
             ))}
@@ -215,7 +246,7 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
             onClick={() =>
               update('testCases', [
                 ...q.testCases,
-                { input: '', output: '', isHidden: false },
+                { input: '', output: '', isHidden: false, marks: '' },
               ])
             }
           >

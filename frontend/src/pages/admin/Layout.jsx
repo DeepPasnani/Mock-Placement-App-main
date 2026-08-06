@@ -31,14 +31,19 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [navQuery, setNavQuery] = useState('');
+  const [openGroups, setOpenGroups] = useState(() => new Set(['Overview', 'Engineering', 'Analytics']));
 
-  const NAV = useMemo(() => {
-    const items = [
-      { to: '/admin', label: 'Dashboard', end: true },
-      { to: '/admin/drives', label: 'Drives' },
-      { to: '/admin/tests', label: 'Tests' },
-      { to: '/admin/question-bank', label: 'Question Bank' },
-      { to: '/admin/results', label: 'Results' },
+  const toggleGroup = (id) => {
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const NAV_GROUPS = useMemo(() => {
+    const analytics = [
       { to: '/admin/analytics/questions', label: 'Question Analytics' },
       { to: '/admin/analytics/plagiarism', label: 'Plagiarism' },
       { to: '/admin/analytics/cohort', label: 'Cohort Analytics' },
@@ -47,14 +52,36 @@ export default function AdminLayout() {
       { to: '/admin/analytics/placement-predictions', label: 'Placement Predictions' },
       { to: '/admin/analytics/report-builder', label: 'Report Builder' },
       { to: '/admin/analytics/scheduled-reports', label: 'Scheduled Reports' },
-      { to: '/admin/email', label: 'Send Email' },
+    ];
+    const groups = [
+      { id: 'Overview', label: 'Overview', items: [{ to: '/admin', label: 'Dashboard', end: true }] },
+      { id: 'Engineering', label: 'Engineering', items: [
+        { to: '/admin/drives', label: 'Drives' },
+        { to: '/admin/tests', label: 'Tests' },
+        { to: '/admin/question-bank', label: 'Question Bank' },
+        { to: '/admin/results', label: 'Results' },
+        { to: '/admin/security/alerts', label: 'Security' },
+        { to: '/admin/email', label: 'Send Email' },
+      ]},
+      { id: 'Analytics', label: 'Analytics', items: analytics },
+      { id: 'AI Tools', label: 'AI Tools', items: [
+        { to: '/admin/ai/question-generator', label: 'AI Question Generator' },
+        { to: '/admin/ai/placement-predictions', label: 'AI Placement Predictions' },
+        { to: '/admin/ai/nl-query', label: 'AI NL Query' },
+      ]},
+      { id: 'Admin', label: 'People & System', items: [] },
+    ];
+    // keep existing analytics items in place and sort the users group
+    const governance = [];
+    if (user?.role === 'super_admin') {
+      governance.push({ to: '/admin/admins', label: 'Admins' });
+    }
+    groups[3].items = [
       { to: '/admin/users', label: 'Students' },
+      ...governance,
       { to: '/admin/dev-tools', label: 'Dev Tools' },
     ];
-    if (user?.role === 'super_admin') {
-      items.push({ to: '/admin/admins', label: 'Admins' });
-    }
-    return items;
+    return groups;
   }, [user?.role]);
 
   const handleLogout = async () => {
@@ -63,7 +90,13 @@ export default function AdminLayout() {
     navigate('/login');
   };
 
-  const SidebarContent = () => (
+  const SidebarContent = () => {
+    const q = navQuery.trim().toLowerCase();
+    const filteredGroups = NAV_GROUPS
+      .map(g => ({ ...g, items: g.items.filter(it => !q || it.label.toLowerCase().includes(q)) }))
+      .filter(g => !q || g.items.length > 0);
+
+    return (
     <div className="flex flex-col h-full">
       {/* Brand */}
       <div className="px-4 py-4 border-b border-rim">
@@ -80,30 +113,69 @@ export default function AdminLayout() {
         </div>
       </div>
 
+      {/* Search */}
+      <div className="px-3 py-2.5 border-b border-rim">
+        <div className="relative">
+          <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-annotation/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+          </svg>
+          <input
+            value={navQuery}
+            onChange={e => setNavQuery(e.target.value)}
+            placeholder="Find page…"
+            aria-label="Search navigation"
+            className="input-field pl-8 py-1.5 text-xs"
+          />
+        </div>
+      </div>
+
       {/* Nav */}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-0.5">
-        {NAV.map(({ to, label }) => {
-          const path = NAV_ICONS[label] || '';
+      <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-3">
+        {filteredGroups.map(group => {
+          const isOpen = q ? true : openGroups.has(group.id);
           return (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/admin'}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all
-                 ${
-                   isActive
-                     ? 'bg-accent/10 text-accent'
-                     : 'text-annotation hover:bg-panel hover:text-ink'
-                 }`
-              }
-            >
-              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d={path} />
-              </svg>
-              {label}
-            </NavLink>
+            <div key={group.id}>
+              <button
+                onClick={() => !q && toggleGroup(group.id)}
+                className="flex items-center justify-between w-full px-3 py-1.5 text-2xs font-semibold uppercase tracking-wider text-annotation/70 hover:text-ink transition-colors"
+                aria-expanded={isOpen}
+              >
+                {group.label}
+                {!q && (
+                  <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </button>
+              {isOpen && (
+                <div className="mt-0.5 space-y-0.5">
+                  {group.items.map(({ to, label, end }) => {
+                    const path = NAV_ICONS[label] || '';
+                    return (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        end={end}
+                        onClick={() => setMobileOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                           ${
+                             isActive
+                               ? 'bg-accent/10 text-accent'
+                               : 'text-annotation hover:bg-panel hover:text-ink'
+                           }`
+                        }
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+                        </svg>
+                        {label}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
@@ -146,7 +218,8 @@ export default function AdminLayout() {
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   // ── Keyboard shortcuts ────────────────────────────────────
   useEffect(() => {

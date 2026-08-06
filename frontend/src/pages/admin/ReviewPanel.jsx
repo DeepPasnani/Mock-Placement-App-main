@@ -24,6 +24,17 @@ export default function ReviewPanel({ form, totalQ, totalM, handleSave, saveMut,
         ))}
       </div>
 
+      <div className="panel-muted p-3 text-sm mb-5">
+        <p className="text-2xs text-annotation/60 font-mono uppercase tracking-wider mb-1.5">
+          Target Audience
+        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink">
+          <span><span className="text-annotation/60">Departments:</span> {form.departments?.includes('all') ? 'All departments' : (form.departments?.length ? form.departments.join(', ') : 'All departments')}</span>
+          <span><span className="text-annotation/60">Years:</span> {form.years?.includes('all') || !form.years?.length ? 'All years' : 'Year ' + [...form.years].sort().join(', Year ')}</span>
+          <span><span className="text-annotation/60">Batches:</span> {form.batches?.includes('all') || !form.batches?.length ? 'All batches' : form.batches.join(', ')}</span>
+        </div>
+      </div>
+
       {form.sections.map(s => (
         <div key={s._id || s.id} className="mb-3 panel-muted overflow-hidden">
           <div className="bg-panel px-4 py-2.5 flex items-center justify-between">

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
@@ -6,80 +6,60 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const FEATURES = [
-  {
-    title: 'Test Builder',
-    desc: 'Three-step wizard for configuring multi-section tests with MCQ and coding challenges, each with its own timer and evaluation criteria.',
-    image: 'https://picsum.photos/seed/testbuilder/900/600',
-  },
-  {
-    title: 'Question Bank',
-    desc: 'Build a reusable library of questions once, then pull them into any future test in one click. No more rebuilding from scratch.',
-  },
-  {
-    title: 'Live Code Execution',
-    desc: 'Full Monaco editor with real-time grading against hidden test cases via Judge0. Python, Java, C, C++ with instant feedback.',
-    image: 'https://picsum.photos/seed/codeexec/900/600',
-  },
-  {
-    title: 'Real-Time Proctoring',
-    desc: 'WebSocket heartbeat monitoring, tab-switch detection, and automatic submission on expiry. No extra hardware required.',
-  },
-  {
-    title: 'Results & Analytics',
-    desc: 'Score distributions, percentile rankings, per-question breakdowns, leaderboards, and one-click CSV export in a single dashboard.',
-    image: 'https://picsum.photos/seed/analytics/900/600',
-  },
-];
+/* ── Authored visuals ──────────────────────────────────────────
+ * No stock photos, no white-noise overlays, no gradient washes.
+ * every graphic is drawn from the site's own semantic tokens so the
+ * page reads as one quiet, cohesive system.
+ * ─────────────────────────────────────────────────────────────── */
 
-const GALLERY = [
-  { title: 'Aptitude Testing', desc: 'MCQ sections with adjustable difficulty, negative marking controls, and per-section timed delivery that adapts to your test blueprint.', image: 'https://picsum.photos/seed/aptitude/640/800' },
-  { title: 'Coding Challenges', desc: 'Multi-language code editor with real-time output, hidden test case validation, similarity detection, and memory-limit enforcement.', image: 'https://picsum.photos/seed/codingchallenge/640/800' },
-  { title: 'Auto Evaluation', desc: 'Instant grading engine with statistical normalization, percentile curves, and granular section-by-section performance breakdowns.', image: 'https://picsum.photos/seed/evaluation/640/800' },
-  { title: 'Bulk Operations', desc: 'Upload entire question banks via CSV, invite cohorts with a single link, and export comprehensive results in one click.', image: 'https://picsum.photos/seed/bulkops/640/800' },
-];
-
-const TESTIMONIALS = [
-  { name: 'Dr. Ananya Sharma', role: 'T&P Officer, IIT Hyderabad', quote: 'Cut our placement process from two weeks to under 48 hours. The auto-evaluation engine alone saved hundreds of faculty hours.', image: 'https://picsum.photos/seed/ananya/200/200' },
-  { name: 'Prof. Ravi Menon', role: 'Dean Academics, VIT Chennai', quote: 'Ran a 900-student test simultaneously without a single dropout. The proctoring system flagged six tab-switch attempts in real time.', image: 'https://picsum.photos/seed/ravimenon/200/200' },
-  { name: 'Neha Gupta', role: 'Campus Lead, NIT Trichy', quote: 'Students love the Monaco editor. It mirrors real coding interviews perfectly and the instant feedback keeps them engaged.', image: 'https://picsum.photos/seed/nehagupta/200/200' },
-];
-
-const PARTNERS = ['AWS', 'Docker', 'MongoDB', 'PostgreSQL', 'Redis', 'Kubernetes', 'TensorFlow', 'PyTorch', 'Node.js', 'React', 'TypeScript', 'Go', 'GraphQL', 'Kafka'];
-
-const BENTO_SPANS = [
-  'col-span-3 lg:col-span-2 row-span-1',
-  'col-span-3 lg:col-span-1 row-span-1',
-  'col-span-3 lg:col-span-1 row-span-1',
-  'col-span-3 lg:col-span-2 row-span-1',
-  'col-span-3 lg:col-span-3 row-span-1',
-];
-
-// Reuses the site's semantic tokens (accent/clarify/verify/alert) instead of
-// arbitrary Tailwind swatches, so the feature grid reads as part of the same
-// design system as the rest of the app.
-const BENTO_COLORS = [
-  { dot: 'bg-accent', border: 'border-accent/25', gradient: 'from-accent/10 to-accent-light/5' },
-  { dot: 'bg-clarify', border: 'border-clarify/25', gradient: 'from-clarify/10 to-clarify-light/5' },
-  { dot: 'bg-verify', border: 'border-verify/25', gradient: 'from-verify/10 to-verify-light/5' },
-  { dot: 'bg-alert', border: 'border-alert/25', gradient: 'from-alert/10 to-alert-light/5' },
-  { dot: 'bg-accent-dark', border: 'border-accent/25', gradient: 'from-accent/10 to-clarify/5' },
-];
-
-function GlowOrb({ color, size = 600, top, left, bottom, right, opacity = 0.14 }) {
-  // Soft, low-opacity color wash — multiply blend so it reads as a warm
-  // tint against the site's cream background instead of a dark-mode glow.
+// Small editorial screen mock built purely from tokens.
+function MonacoMockClean() {
   return (
-    <div
-      className="absolute pointer-events-none will-change-transform"
-      style={{
-        width: size, height: size,
-        top, left, bottom, right,
-        background: `radial-gradient(ellipse at center, ${color} ${opacity * 100}%, transparent 70%)`,
-        mixBlendMode: 'multiply',
-        transform: 'translateZ(0)',
-      }}
-    />
+    <div className="rounded-xl border border-rim bg-panel p-5 shadow-raised">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="font-mono text-2xs font-semibold uppercase tracking-wider bg-sunken/60 px-2 py-1 rounded text-ink">main.py</span>
+        <span className="text-2xs text-annotation">js</span>
+        <span className="text-2xs text-annotation">java</span>
+      </div>
+      <div className="space-y-1.5">
+        {[11, 8, 4, 7, 6, 3, 5, 4].map((w, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-2xs font-mono text-annotation/60 w-4 text-right">{i + 1}</span>
+            <div className={`h-1.5 rounded ${i % 2 ? 'bg-accent/40' : 'bg-rim'}`} style={{ width: `${w * 7}%` }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MongoMock() {
+  return (
+    <div className="rounded-xl border border-rim bg-panel p-4 shadow-raised">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="text-2xs font-mono font-semibold uppercase tracking-wider bg-sunken px-2 py-1 rounded text-annotation">MCQ</span>
+        <span className="text-2xs font-mono font-semibold uppercase tracking-wider bg-clarify/10 px-2 py-1 rounded text-clarify">Coding</span>
+        <span className="text-2xs font-mono font-semibold uppercase tracking-wider bg-verify/10 px-2 py-1 rounded text-verify">Auto-graded</span>
+      </div>
+      <div className="space-y-2">
+        {[80, 100, 60, 90].map((w, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div className="h-1.5 w-2 rounded bg-rim/70" />
+            <div className="h-1.5 rounded bg-accent/60" style={{ width: `${w}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 pt-3 border-t border-rim">
+        <div className="flex items-center justify-between">
+          <span className="text-2xs text-annotation">Mean score</span>
+          <span className="text-sm font-display font-bold text-ink">71%</span>
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-2xs text-annotation">Median time</span>
+          <span className="text-xs font-mono text-ink">26m 40s</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -90,7 +70,7 @@ function Nav() {
     const onScroll = () => {
       if (!ticking) {
         requestAnimationFrame(() => {
-          setScrolled(window.scrollY > 40);
+          setScrolled(window.scrollY > 24);
           ticking = false;
         });
         ticking = true;
@@ -101,23 +81,22 @@ function Nav() {
   }, []);
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 will-change-transform ${scrolled ? 'bg-panel/85 backdrop-blur-xl border-b border-rim' : 'bg-transparent'}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-panel/85 backdrop-blur border-b border-rim' : 'bg-transparent'}`}>
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
         <div className="flex items-center justify-between h-16 lg:h-20">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-raised transition-transform duration-500 group-hover:scale-110">
-              <svg className="w-5 h-5 text-panel" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
+              <svg className="w-4 h-4 text-panel" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 7.5A1.5 1.5 0 118.5 9 1.5 1.5 0 017 7.5zM4.5 12a1.5 1.5 0 111.5 1.5A1.5 1.5 0 014.5 12zm7.5 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM12 7.5A1.5 1.5 0 1113.5 9 1.5 1.5 0 0112 7.5z" />
               </svg>
             </div>
             <span className="font-display font-bold text-lg text-ink tracking-tight">CampusTrack</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-annotation hover:text-ink transition-colors duration-300">Features</a>
-            <a href="#capabilities" className="text-sm text-annotation hover:text-ink transition-colors duration-300">Capabilities</a>
-            <a href="#testimonials" className="text-sm text-annotation hover:text-ink transition-colors duration-300">Testimonials</a>
-            <Link to="/login" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-panel text-sm font-semibold hover:bg-accent-dark transition-all duration-300 hover:shadow-raised">
+            <a href="#features" className="text-sm text-annotation hover:text-ink transition-colors">Features</a>
+            <a href="#capabilities" className="text-sm text-annotation hover:text-ink transition-colors">Capabilities</a>
+            <Link to="/login" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-panel text-sm font-semibold hover:bg-accent-dark transition-colors">
               Sign In
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -132,40 +111,71 @@ function Nav() {
 
 function Hero() {
   return (
-    <section className="relative min-h-[90vh] flex items-center overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-deck via-panel to-deck" />
-      <GlowOrb color="rgba(47, 93, 86, 0.5)" size={700} top="-10%" left="-10%" opacity={0.16} />
-      <GlowOrb color="rgba(86, 92, 134, 0.4)" size={500} bottom="-15%" right="0" opacity={0.12} />
-      <div className="absolute inset-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")', backgroundRepeat: 'repeat', backgroundSize: '256px 256px', opacity: 0.03, pointerEvents: 'none' }} />
-
-      <div className="relative w-full max-w-7xl mx-auto px-6 lg:px-16 py-32 lg:py-40">
-        <div className="max-w-2xl xl:max-w-3xl relative z-10">
-          <h1 className="font-display font-black text-[clamp(2.8rem,6vw,5rem)] leading-[1.06] tracking-tight text-ink max-w-5xl">
-            We craft digital environments for{' '}
-            <span className="inline-block w-[1.2em] h-[1em] rounded-full align-middle bg-cover bg-center mx-2 opacity-90 shadow-raised will-change-transform" style={{ backgroundImage: 'url(https://picsum.photos/seed/placement/200/200)' }} />
-            {' '}placement excellence
-          </h1>
-          <p className="text-base lg:text-lg text-annotation max-w-xl mt-6 leading-relaxed">
-            Aptitude tests, live coding challenges, Google OAuth integration, and real-time proctoring — replacing HackerRank, Google Forms, and spreadsheets with one self-hosted system built to handle a thousand students at once.
-          </p>
-          <div className="flex flex-wrap gap-4 mt-10">
-            <Link to="/login" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-accent text-panel text-sm font-bold hover:bg-accent-dark transition-all duration-300 hover:shadow-raised">
-              Get Started
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </Link>
-            <a href="#features" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-rim text-ink text-sm font-semibold hover:bg-panel transition-all duration-300">
-              Explore Features
-            </a>
+    <section className="relative min-h-screen flex items-center pt-24 lg:pt-28">
+      <div className="relative w-full max-w-7xl mx-auto px-6 lg:px-16">
+        <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          <div className="lg:col-span-6">
+            <p className="font-display text-xs font-semibold tracking-[0.2em] uppercase text-accent mb-6">Placement assessment, self-hosted</p>
+            <h1 className="font-display font-bold text-[clamp(2.4rem,5.5vw,4.25rem)] leading-[1.08] tracking-tight text-ink">
+              Run your placement tests without the paper trail.
+            </h1>
+            <p className="text-base lg:text-lg text-annotation max-w-lg mt-6 leading-relaxed">
+              Aptitude tests, live coding challenges, and automated exam-integrity monitoring in one calm, self-hosted system. No third-party forms, no spreadsheets standing in the way.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-9">
+              <Link to="/login" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg bg-accent text-panel text-sm font-bold hover:bg-accent-dark transition-colors">
+                Get Started
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </Link>
+              <a href="#features" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg border border-rim text-ink text-sm font-semibold hover:bg-panel transition-colors">
+                Explore Features
+              </a>
+            </div>
           </div>
-        </div>
-
-        <div className="absolute right-0 bottom-0 w-[55%] lg:w-[48%] pointer-events-none">
-          <div className="relative aspect-[4/3] translate-x-12 lg:translate-x-16 translate-y-12 lg:translate-y-16 rotate-3 lg:rotate-6 rounded-2xl overflow-hidden shadow-modal will-change-transform">
-            <img src="https://picsum.photos/seed/dashboard/1200/900" alt="" className="w-full h-full object-cover grayscale contrast-125 opacity-90" />
-            <div className="absolute inset-0 bg-gradient-to-tl from-ink/50 via-ink/5 to-transparent mix-blend-multiply" />
-            <div className="absolute inset-0 ring-1 ring-rim rounded-2xl" />
+          <div className="lg:col-span-6">
+            <div className="rounded-xl border border-rim bg-panel overflow-hidden shadow-raised">
+              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-rim bg-sunken/40">
+                <span className="w-2 h-2 rounded-full bg-rim" />
+                <span className="w-2 h-2 rounded-full bg-rim" />
+                <span className="w-2 h-2 rounded-full bg-rim" />
+                <span className="ml-2 flex-1 h-4 rounded bg-rim/40 max-w-40" />
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="flex gap-3">
+                  <div className="w-14 rounded-lg bg-sunken p-2 space-y-2 shrink-0 hidden sm:block">
+                    <div className="h-4 rounded bg-accent/12" />
+                    <div className="h-1.5 rounded bg-rim/60" />
+                    <div className="h-1.5 rounded bg-rim/60" />
+                  </div>
+                  <div className="flex-1 space-y-2.5">
+                    <div className="flex items-center justify-between rounded-lg bg-accent/8 px-3 py-2">
+                      <div className="space-y-1.5">
+                        <div className="h-1.5 rounded bg-rim/60 w-24" />
+                        <div className="h-2 rounded bg-accent w-10" />
+                      </div>
+                      <div className="h-6 w-12 rounded bg-accent" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg p-2 space-y-1.5">
+                        <div className="h-1.5 rounded bg-rim/50 w-16" />
+                        <div className="h-2 rounded bg-accent w-8" />
+                      </div>
+                      <div className="rounded-lg p-2 space-y-1.5">
+                        <div className="h-1.5 rounded bg-rim/50 w-16" />
+                        <div className="h-2 rounded bg-accent w-8" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="h-1.5 rounded bg-rim/60" />
+                      <div className="h-1.5 rounded bg-rim/60 w-3/4" />
+                      <div className="h-1.5 rounded bg-rim/60 w-1/2" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -179,113 +189,73 @@ function BentoFeatures() {
   useGSAP(() => {
     const cards = sectionRef.current.querySelectorAll('.bento-card');
     cards.forEach((card, i) => {
-      gsap.fromTo(card, { y: 60, opacity: 0 }, {
-        y: 0, opacity: 1, duration: 0.7, delay: i * 0.1, ease: 'power2.out',
+      gsap.fromTo(card, { y: 40, opacity: 0 }, {
+        y: 0, opacity: 1, duration: 0.6, delay: i * 0.08, ease: 'power2.out',
         scrollTrigger: { trigger: card, start: 'top bottom-=60', toggleActions: 'play none none none' },
       });
     });
   }, { scope: sectionRef });
 
   return (
-    <section ref={sectionRef} id="features" className="relative py-32 lg:py-48 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-t from-deck via-panel to-deck" />
-      <GlowOrb color="rgba(47, 93, 86, 0.4)" size={900} top="50%" left="50%" opacity={0.1} />
-
-      <div className="relative max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="max-w-2xl mb-16 lg:mb-20">
+    <section ref={sectionRef} id="features" className="py-28 lg:py-40">
+      <div className="max-w-7xl mx-auto px-6 lg:px-16">
+        <div className="max-w-2xl mb-16">
           <p className="font-display text-xs font-semibold tracking-[0.2em] uppercase text-accent mb-4">Platform Capabilities</p>
-          <h2 className="font-display font-bold text-3xl lg:text-5xl text-ink leading-[1.1] tracking-tight">
+          <h2 className="font-display font-bold text-3xl lg:text-4xl text-ink leading-[1.1] tracking-tight">
             Everything you need to run placements at scale
           </h2>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 lg:gap-5 grid-flow-dense">
-          {FEATURES.map((f, i) => (
-            <div key={f.title} className={`group relative ${BENTO_SPANS[i]} bento-card will-change-transform`}>
-              <div className={`relative h-full rounded-2xl border ${BENTO_COLORS[i].border} bg-gradient-to-br ${BENTO_COLORS[i].gradient} bg-panel overflow-hidden transition-all duration-500 hover:scale-[1.02]`}>
-                {f.image && (
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500">
-                    <img src={f.image} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-panel via-panel/40 to-transparent" />
-                  </div>
-                )}
-                <div className="relative p-6 lg:p-8 h-full flex flex-col justify-end">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 border ${BENTO_COLORS[i].border} bg-deck/60`}>
-                    <div className={`w-2 h-2 rounded-full ${BENTO_COLORS[i].dot}`} />
-                  </div>
-                  <h3 className="font-display font-bold text-lg text-ink mb-2">{f.title}</h3>
-                  <p className="text-sm text-annotation leading-relaxed max-w-md">{f.desc}</p>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
+          <article className="rounded-xl border border-rim bg-panel p-6 lg:p-7 hover:border-accent/30 transition-colors">
+            <h3 className="font-display font-bold text-lg text-ink mb-2">Test Builder</h3>
+            <p className="text-sm text-annotation">Three-step wizard for multi-section tests with MCQ and coding rounds, each with its own timer and grading rules.</p>
+          </article>
+          <article className="rounded-xl border border-rim bg-panel p-6 lg:p-7 hover:border-accent/30 transition-colors">
+            <h3 className="font-display font-bold text-lg text-ink mb-2">Question Bank</h3>
+            <p className="text-sm text-annotation">Build a reusable library once, then pull questions into any future test. No rebuilding from scratch.</p>
+          </article>
+          <article className="rounded-xl border border-rim bg-panel p-6 lg:p-7 hover:border-accent/30 transition-colors">
+            <h3 className="font-display font-bold text-lg text-ink mb-2">Live Code Execution</h3>
+            <p className="text-sm text-annotation">Monaco editor with offline grading against hidden test cases. Python, Java, C and C++ with instant feedback.</p>
+          </article>
+          <article className="rounded-xl border border-rim bg-panel p-6 lg:p-7 hover:border-accent/30 transition-colors">
+            <h3 className="font-display font-bold text-lg text-ink mb-2">Exam Integrity Monitoring</h3>
+            <p className="text-sm text-annotation">Automated tab-switch and fullscreen-exit monitoring with auto-saved answers, plus invigilator review of flagged sessions. No extra hardware needed.</p>
+          </article>
+          <article className="rounded-xl border border-rim bg-panel p-6 lg:p-7 hover:border-accent/30 transition-colors">
+            <h3 className="font-display font-bold text-lg text-ink mb-2">Results & Analytics</h3>
+            <p className="text-sm text-annotation">Score distributions, percentiles, per-question breakdowns and one-click CSV export on a single dashboard.</p>
+          </article>
+          <article className="rounded-xl border border-rim bg-panel p-6 lg:p-7 hover:border-accent/30 transition-colors">
+            <h3 className="font-display font-bold text-lg text-ink mb-2">Granular Controls</h3>
+            <p className="text-sm text-annotation">Per-section timers, passing thresholds, difficulty levels and optional negative marking, all tuned to your blueprint.</p>
+          </article>
         </div>
       </div>
     </section>
   );
 }
 
-function GSSplitSection() {
-  const sectionRef = useRef(null);
-  const titleRef = useRef(null);
-
-  useGSAP(() => {
-    const ctx = gsap.context(() => {
-      ScrollTrigger.create({
-        trigger: sectionRef.current,
-        start: 'top 80px',
-        end: 'bottom top',
-        pin: titleRef.current,
-        pinSpacing: true,
-        anticipatePin: 1,
-      });
-
-      const items = sectionRef.current.querySelectorAll('.gallery-item');
-      items.forEach((item) => {
-        gsap.fromTo(item, { y: 60, opacity: 0.3 }, {
-          y: 0, opacity: 1, duration: 1.2, ease: 'power2.out',
-          scrollTrigger: {
-            trigger: item,
-            start: 'top bottom-=80',
-            end: 'top center',
-            scrub: 0.6,
-          },
-        });
-      });
-    }, sectionRef);
-
-    return () => ctx.revert();
-  });
-
+function Capabilities() {
   return (
-    <section ref={sectionRef} id="capabilities" className="relative py-32 lg:py-48 overflow-hidden">
-      <div className="absolute inset-0 bg-deck" />
-      <GlowOrb color="rgba(86, 92, 134, 0.4)" size={500} right="-10%" top="20%" opacity={0.12} />
-
-      <div className="relative max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-20">
-          <div ref={titleRef} className="lg:col-span-4 self-start">
+    <section id="capabilities" className="py-20 lg:py-36 bg-panel/60 border-y border-rim">
+      <div className="max-w-7xl mx-auto px-6 lg:px-16">
+        <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          <div className="lg:col-span-5">
             <p className="font-display text-xs font-semibold tracking-[0.2em] uppercase text-clarify mb-4">Deep Capabilities</p>
-            <h2 className="font-display font-bold text-3xl lg:text-5xl text-ink leading-[1.1] tracking-tight">
+            <h2 className="font-display font-bold text-3xl lg:text-4xl text-ink leading-[1.1] tracking-tight">
               Purpose-built for campus recruitment
             </h2>
-            <p className="text-annotation mt-6 leading-relaxed max-w-sm">
-              Every feature is engineered to handle the scale, security, and flexibility demands of college placement drives — from first-year internships to final-year campus hiring.
+            <p className="text-annotation mt-5 leading-relaxed max-w-sm">
+              Every feature is engineered for the scale, security and flexibility of college placement drives, from first-year internships to final-year hiring.
             </p>
           </div>
-
-          <div className="lg:col-span-7 lg:col-start-7 space-y-24 lg:space-y-32">
-            {GALLERY.map((item) => (
-              <div key={item.title} className="gallery-item will-change-transform">
-                <div className="relative aspect-[4/5] rounded-2xl overflow-hidden mb-6 shadow-modal">
-                  <img src={item.image} alt={item.title} className="w-full h-full object-cover grayscale contrast-125 opacity-90 transition-transform duration-700 hover:scale-105" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-ink/50 via-ink/5 to-transparent" />
-                  <div className="absolute inset-0 ring-1 ring-rim rounded-2xl" />
-                </div>
-                <h3 className="font-display font-bold text-xl text-ink mb-2">{item.title}</h3>
-                <p className="text-annotation leading-relaxed max-w-lg">{item.desc}</p>
-              </div>
-            ))}
+          <div className="lg:col-span-7 space-y-8">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <MonacoMockClean />
+              <MongoMock />
+            </div>
           </div>
         </div>
       </div>
@@ -293,56 +263,44 @@ function GSSplitSection() {
   );
 }
 
-function CardStackSection() {
+function WorkflowSection() {
   const sectionRef = useRef(null);
 
   useGSAP(() => {
-    const cards = sectionRef.current.querySelectorAll('.stack-card');
-    cards.forEach((card, i) => {
-      gsap.fromTo(card, { y: 80, opacity: 0.3 }, {
-        y: 0, opacity: 1, duration: 0.8, delay: i * 0.15, ease: 'power2.out',
-        scrollTrigger: {
-          trigger: card,
-          start: 'top bottom-=40',
-          toggleActions: 'play none none none',
-        },
+    const items = sectionRef.current.querySelectorAll('.flow-item');
+    items.forEach((item, i) => {
+      gsap.fromTo(item, { y: 32, opacity: 0 }, {
+        y: 0, opacity: 1, duration: 0.6, delay: i * 0.1, ease: 'power2.out', immediateRender: false,
+        scrollTrigger: { trigger: item, start: 'top bottom-=40', toggleActions: 'play none none none' },
       });
     });
   }, { scope: sectionRef });
 
-  const stackItems = [
-    { number: '01', title: 'Create Tests', desc: 'Build multi-section tests with MCQ and coding sections in a three-step wizard. Set per-section timers, pass criteria, and difficulty levels.' },
-    { number: '02', title: 'Invite Students', desc: 'Generate unique test links or bulk-import cohorts via CSV. Students authenticate with Google OAuth — no manual account creation needed.' },
-    { number: '03', title: 'Monitor Live', desc: 'Watch real-time progress with WebSocket heartbeats. See who is active, who switched tabs, and who submitted — all on one dashboard.' },
-    { number: '04', title: 'Evaluate & Export', desc: 'Instant auto-grading with statistical curves. Export comprehensive reports with one click. Resume crashed tests without losing data.' },
+  const steps = [
+    { n: '01', title: 'Create Tests', desc: 'Multi-section tests with MCQ and coding rounds. Per-section timers, pass criteria and difficulty set up in a few clicks.' },
+    { n: '02', title: 'Invite Students', desc: 'Unique test links or CSV cohort import. Students sign in with Google, so there is no manual account creation.' },
+    { n: '03', title: 'Monitor Live', desc: 'Real-time progress from WebSocket heartbeats. See who is active, who switched tabs, who submitted — all on one screen.' },
+    { n: '04', title: 'Evaluate & Export', desc: 'Instant grading and reports. Resume interrupted sessions without losing work.' },
   ];
 
   return (
-    <section ref={sectionRef} className="relative py-32 lg:py-48 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-deck via-panel to-deck" />
-      <GlowOrb color="rgba(47, 93, 86, 0.4)" size={600} left="20%" top="30%" opacity={0.1} />
-
-      <div className="relative max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="max-w-2xl mb-20">
+    <section ref={sectionRef} className="py-20 lg:py-40">
+      <div className="max-w-7xl mx-auto px-6 lg:px-16">
+        <div className="max-w-2xl mb-16">
           <p className="font-display text-xs font-semibold tracking-[0.2em] uppercase text-accent mb-4">Workflow</p>
-          <h2 className="font-display font-bold text-3xl lg:text-5xl text-ink leading-[1.1] tracking-tight">
-            From creation to results in four steps
+          <h2 className="font-display font-bold text-3xl lg:text-4xl text-ink leading-[1.1] tracking-tight">
+            From creation to results, in four steps
           </h2>
         </div>
-
-        <div className="grid lg:grid-cols-4 gap-4 lg:gap-6">
-          {stackItems.map((item) => (
-            <div key={item.number} className="stack-card relative group will-change-transform">
-              <div className="relative rounded-2xl border border-rim bg-panel/80 backdrop-blur-sm p-8 h-full transition-all duration-500 hover:bg-panel hover:border-accent/25">
-                <span className="font-display font-black text-5xl lg:text-6xl text-ink/[0.06] absolute top-4 right-6 leading-none select-none">{item.number}</span>
-                <div className="relative z-10">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent/20 to-accent-light/10 border border-accent/20 flex items-center justify-center mb-6">
-                    <span className="font-display font-bold text-lg text-accent">{item.number}</span>
-                  </div>
-                  <h3 className="font-display font-bold text-xl text-ink mb-3">{item.title}</h3>
-                  <p className="text-sm text-annotation leading-relaxed">{item.desc}</p>
-                </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          {steps.map((s) => (
+            <div key={s.n} className="flow-item rounded-lg border border-rim bg-panel p-7">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="font-display font-bold text-2xl text-annotation/50">{s.n}</span>
+                <span className="h-px flex-1 bg-rim" />
               </div>
+              <h3 className="font-display font-bold text-lg text-ink mb-2">{s.title}</h3>
+              <p className="text-sm text-annotation leading-relaxed">{s.desc}</p>
             </div>
           ))}
         </div>
@@ -351,115 +309,56 @@ function CardStackSection() {
   );
 }
 
-function MarqueeSection() {
+function TechMarquee() {
   const marqueeRef = useRef(null);
+  const techs = ['React', 'Node.js', 'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Monaco', 'Google OAuth', 'WebSockets', 'CodeBox'];
 
   useGSAP(() => {
     const ctx = gsap.context(() => {
-      gsap.to(marqueeRef.current, {
-        xPercent: -50,
-        duration: 40,
-        ease: 'none',
-        repeat: -1,
-      });
+      gsap.to(marqueeRef.current, { xPercent: -50, duration: 36, ease: 'none', repeat: -1 });
     }, marqueeRef);
     return () => ctx.revert();
   });
 
   return (
-    <section className="relative py-24 lg:py-32 overflow-hidden">
-      <div className="absolute inset-0 bg-deck" />
-      <div className="relative">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 mb-12">
-          <p className="font-display text-xs font-semibold tracking-[0.2em] uppercase text-annotation/70 text-center">Trusted by institutions running on modern infrastructure</p>
-        </div>
-        <div className="overflow-hidden border-y border-rim py-8">
-          <div ref={marqueeRef} className="flex gap-16 items-center will-change-transform" style={{ width: 'fit-content' }}>
-            {[...PARTNERS, ...PARTNERS].map((name, i) => (
-              <span key={`${name}-${i}`} className="font-display font-bold text-lg lg:text-xl text-ink/[0.15] hover:text-ink/40 transition-colors duration-500 whitespace-nowrap tracking-tight select-none">
-                {name}
-              </span>
-            ))}
-          </div>
+    <section className="py-16 lg:py-20 border-y border-rim bg-panel/60">
+      <div className="max-w-7xl mx-auto px-6 lg:px-16 mb-10">
+        <p className="font-display text-xs font-semibold tracking-[0.2em] uppercase text-annotation/70 text-center">
+          Built on modern, self-hostable infrastructure
+        </p>
+      </div>
+      <div className="overflow-hidden border-y border-rim py-6">
+        <div ref={marqueeRef} className="flex gap-12 items-center will-change-transform" style={{ width: 'fit-content' }}>
+          {[...techs, ...techs].map((t, i) => (
+            <span key={`${t}-${i}`} className="font-display font-semibold text-lg lg:text-xl text-ink/40 whitespace-nowrap tracking-tight select-none">
+              {t}
+            </span>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-function TestimonialsSection() {
-  const [active, setActive] = useState(0);
-  const quoteRef = useRef(null);
-  const timelineRef = useRef(null);
-
-  const animateQuote = useCallback(() => {
-    if (timelineRef.current) {
-      timelineRef.current.kill();
-    }
-    const tl = gsap.timeline();
-    tl.fromTo(quoteRef.current, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' });
-    timelineRef.current = tl;
-  }, []);
-
-  useEffect(() => {
-    animateQuote();
-  }, [active, animateQuote]);
-
-  const prev = () => setActive((a) => (a - 1 + TESTIMONIALS.length) % TESTIMONIALS.length);
-  const next = () => setActive((a) => (a + 1) % TESTIMONIALS.length);
-
+function ShowcaseSection() {
+  // Honest, verifiable capabilities — no invented student counts or dates.
+  const facts = [
+    { label: 'Languages', value: '4+', note: 'Python, Java, C, C++ in the bundled editor.' },
+    { label: 'Multi-section', value: 'Any', note: 'Aptitude and coding rounds in one test.' },
+    { label: 'Auto-saving', value: '+30s', note: 'Progress is saved throughout the session.' },
+    { label: 'Export', value: 'CSV', note: 'Comprehensive results in one click.' },
+  ];
   return (
-    <section id="testimonials" className="relative py-32 lg:py-48 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-deck via-panel to-deck" />
-      <GlowOrb color="rgba(86, 92, 134, 0.4)" size={500} bottom="20%" right="30%" opacity={0.1} />
-
-      <div className="relative max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="max-w-2xl mb-16 lg:mb-20">
-          <p className="font-display text-xs font-semibold tracking-[0.2em] uppercase text-clarify mb-4">Testimonials</p>
-          <h2 className="font-display font-bold text-3xl lg:text-5xl text-ink leading-[1.1] tracking-tight">
-            Trusted by placement cells across India
-          </h2>
-        </div>
-
-        <div className="grid lg:grid-cols-5 gap-12 lg:gap-20 items-center">
-          <div className="lg:col-span-2">
-            <div className="flex -space-x-4 mb-8">
-              {TESTIMONIALS.map((t, i) => (
-                <div key={t.name} className={`relative w-16 h-16 rounded-full overflow-hidden ring-2 ring-deck transition-all duration-500 cursor-pointer ${i === active ? 'ring-accent scale-110 z-10' : 'ring-rim hover:z-10'}`}
-                  onClick={() => setActive(i)}>
-                  <img src={t.image} alt={t.name} className="w-full h-full object-cover grayscale contrast-125" />
-                </div>
-              ))}
+    <section className="py-20 lg:py-32">
+      <div className="max-w-7xl mx-auto px-6 lg:px-16">
+        <div className="rounded-xl border border-rim bg-panel p-8 lg:p-12 grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {facts.map((f) => (
+            <div key={f.label}>
+              <div className="font-display font-bold text-3xl lg:text-4xl text-ink">{f.value}</div>
+              <div className="text-sm font-semibold text-ink mt-1.5">{f.label}</div>
+              <div className="text-sm text-annotation mt-1 leading-relaxed">{f.note}</div>
             </div>
-          </div>
-
-          <div className="lg:col-span-3">
-            <div ref={quoteRef} className="space-y-6">
-              <svg className="w-8 h-8 text-accent/25" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151C7.563 6.068 6 8.789 6 11h4v10H0z" />
-              </svg>
-              <blockquote className="font-display text-xl lg:text-2xl text-ink leading-relaxed font-medium">
-                {TESTIMONIALS[active].quote}
-              </blockquote>
-              <div>
-                <p className="font-display font-bold text-ink">{TESTIMONIALS[active].name}</p>
-                <p className="text-sm text-annotation mt-0.5">{TESTIMONIALS[active].role}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-12">
-          <button onClick={prev} className="w-11 h-11 rounded-xl border border-rim flex items-center justify-center text-ink hover:bg-panel transition-all duration-300 group">
-            <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <button onClick={next} className="w-11 h-11 rounded-xl border border-rim flex items-center justify-center text-ink hover:bg-panel transition-all duration-300 group">
-            <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+          ))}
         </div>
       </div>
     </section>
@@ -468,26 +367,23 @@ function TestimonialsSection() {
 
 function CTA() {
   return (
-    <section className="relative py-32 lg:py-48 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-panel via-deck to-panel" />
-      <GlowOrb color="rgba(47, 93, 86, 0.4)" size={800} top="50%" left="50%" opacity={0.12} />
-
-      <div className="relative max-w-4xl mx-auto px-6 lg:px-16 text-center">
-        <h2 className="font-display font-black text-4xl lg:text-6xl text-ink leading-[1.06] tracking-tight max-w-4xl mx-auto">
+    <section className="py-24 lg:py-32">
+      <div className="max-w-4xl mx-auto px-6 lg:px-16 text-center">
+        <h2 className="font-display font-bold text-4xl lg:text-5xl text-ink leading-[1.08] tracking-tight">
           Ready to run your next placement drive?
         </h2>
         <p className="text-lg text-annotation max-w-2xl mx-auto mt-6 leading-relaxed">
-          Sign in with your college account to get started. Students can access their tests immediately, and T&P cells get full administrative controls.
+          Sign in with your college account to get started. Students access tests immediately; T&P cells get full administrative controls.
         </p>
         <div className="flex flex-wrap justify-center gap-4 mt-10">
-          <Link to="/login" className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl bg-accent text-panel text-base font-bold hover:bg-accent-dark transition-all duration-300 hover:shadow-raised hover:scale-[1.02]">
-            Get Started Free
+          <Link to="/login" className="inline-flex items-center gap-2.5 px-8 py-4 rounded-lg bg-accent text-panel text-base font-bold hover:bg-accent-dark transition-colors">
+            Get Started
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
           </Link>
-          <a href="#" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl border border-rim text-ink text-base font-semibold hover:bg-panel transition-all duration-300">
-            Watch Overview
+          <a href="#capabilities" className="inline-flex items-center gap-2 px-8 py-4 rounded-lg border border-rim text-ink text-base font-semibold hover:bg-panel transition-colors">
+            See Capabilities
           </a>
         </div>
       </div>
@@ -497,44 +393,40 @@ function CTA() {
 
 function Footer() {
   return (
-    <footer className="relative border-t border-rim py-16">
-      <div className="absolute inset-0 bg-panel" />
-      <div className="relative max-w-7xl mx-auto px-6 lg:px-16">
+    <footer className="border-t border-rim py-14">
+      <div className="max-w-7xl mx-auto px-6 lg:px-16">
         <div className="grid lg:grid-cols-4 gap-10">
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center">
-                <svg className="w-4 h-4 text-panel" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+              <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-panel" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 7.5A1.5 1.5 0 118.5 9 1.5 1.5 0 017 7.5zM4.5 12h.25m15.75 0h.25M12 17.5a1.5 1.5 0 11-1.5 1.5m3-6a1.5 1.5 0 11-1.5 1.5" />
                 </svg>
               </div>
               <span className="font-display font-bold text-lg text-ink">CampusTrack</span>
             </div>
             <p className="text-sm text-annotation max-w-sm leading-relaxed">
-              Open-source placement assessment platform built for engineering colleges. Self-hosted, secure, and designed for scale.
+              Open-source placement assessment for engineering colleges. Self-hosted, secure and designed for scale.
             </p>
           </div>
           <div>
             <p className="font-display font-semibold text-sm text-ink mb-4">Platform</p>
             <div className="space-y-3">
-              <a href="#features" className="block text-sm text-annotation hover:text-ink transition-colors duration-300">Features</a>
-              <a href="#capabilities" className="block text-sm text-annotation hover:text-ink transition-colors duration-300">Capabilities</a>
-              <a href="#" className="block text-sm text-annotation hover:text-ink transition-colors duration-300">Pricing</a>
-              <a href="#" className="block text-sm text-annotation hover:text-ink transition-colors duration-300">Documentation</a>
+              <a href="#features" className="block text-sm text-annotation hover:text-ink transition-colors">Features</a>
+              <a href="#capabilities" className="block text-sm text-annotation hover:text-ink transition-colors">Capabilities</a>
+              <Link to="/login" className="block text-sm text-annotation hover:text-ink transition-colors">Sign In</Link>
             </div>
           </div>
           <div>
-            <p className="font-display font-semibold text-sm text-ink mb-4">Connect</p>
+            <p className="font-display font-semibold text-sm text-ink mb-4">Get Started</p>
             <div className="space-y-3">
-              <a href="#" className="block text-sm text-annotation hover:text-ink transition-colors duration-300">GitHub</a>
-              <a href="#" className="block text-sm text-annotation hover:text-ink transition-colors duration-300">Documentation</a>
-              <a href="#" className="block text-sm text-annotation hover:text-ink transition-colors duration-300">Support</a>
-              <Link to="/login" className="block text-sm text-accent hover:text-accent-dark transition-colors duration-300 font-medium">Sign In</Link>
+              <Link to="/login" className="block text-sm text-accent hover:text-accent transition-colors font-medium">Student Portal</Link>
+              <Link to="/login" className="block text-sm text-accent hover:text-accent transition-colors font-medium">T&P Admin</Link>
             </div>
           </div>
         </div>
-        <div className="mt-12 pt-8 border-t border-rim text-center">
-          <p className="text-xs text-annotation/70">&copy; {new Date().getFullYear()} CampusTrack. All rights reserved. Open-source under MIT.</p>
+        <div className="mt-12 pt-7 border-t border-rim text-center">
+          <p className="text-xs text-annotation">&copy; {new Date().getFullYear()} CampusTrack. Open-source under MIT.</p>
         </div>
       </div>
     </footer>
@@ -544,7 +436,7 @@ function Footer() {
 export default function Landing() {
   useEffect(() => {
     const prev = document.body.style.backgroundColor;
-    document.body.style.backgroundColor = '#F3EFE2';
+    document.body.style.backgroundColor = 'var(--ct-deck)';
     return () => { document.body.style.backgroundColor = prev; };
   }, []);
 
@@ -553,10 +445,10 @@ export default function Landing() {
       <Nav />
       <Hero />
       <BentoFeatures />
-      <GSSplitSection />
-      <CardStackSection />
-      <MarqueeSection />
-      <TestimonialsSection />
+      <Capabilities />
+      <WorkflowSection />
+      <TechMarquee />
+      <ShowcaseSection />
       <CTA />
       <Footer />
     </main>

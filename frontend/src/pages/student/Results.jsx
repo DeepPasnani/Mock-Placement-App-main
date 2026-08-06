@@ -86,7 +86,7 @@ export default function StudentResults() {
                     <h3 className="font-display font-semibold text-sm text-ink truncate">
                       {sub.test_title}
                     </h3>
-                    <Badge color={passed ? 'green' : 'red'}>
+                    <Badge color={passed ? 'verify' : 'alert'}>
                       {passed ? 'Passed' : 'Failed'}
                     </Badge>
                   </div>

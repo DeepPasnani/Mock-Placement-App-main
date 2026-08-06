@@ -59,7 +59,7 @@ export default function QuestionAnalytics() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-ink mb-1">{q.text}</p>
                   <div className="flex flex-wrap gap-2 text-2xs">
-                    <Badge color={q.flagged ? 'red' : 'green'}>{q.flagged ? 'Flagged' : 'OK'}</Badge>
+                    <Badge color={q.flagged ? 'alert' : 'verify'}>{q.flagged ? 'Flagged' : 'OK'}</Badge>
                     <span className="px-1.5 py-0.5 rounded bg-panel text-annotation/70">{q.genre}</span>
                     <span className="px-1.5 py-0.5 rounded bg-panel text-annotation/70">{q.difficulty}</span>
                     <span className="text-annotation/50">{q.total_attempts} attempts · {q.correct_count} correct</span>

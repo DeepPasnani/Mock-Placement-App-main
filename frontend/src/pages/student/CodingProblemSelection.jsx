@@ -58,6 +58,14 @@ function CodingProblemSelection({ section, selectedProblems, setSelectedProblems
 
   const easyTotal = problems.filter(p => p.difficulty === 'easy').length;
   const hardTotal = problems.filter(p => p.difficulty === 'hard').length;
+  const easyLeft = Math.max(0, 2 - selectedEasy);
+  const hardLeft = Math.max(0, 1 - selectedHard);
+  const totalLeft = Math.max(0, 3 - selectedProblems.length);
+
+  const quotaLeftFor = (difficulty) =>
+    difficulty === 'easy' ? `${easyLeft} easy left`
+    : difficulty === 'hard' ? `${hardLeft} hard left`
+    : `${totalLeft} picks left`;
 
   return (
     <div className="flex-1 flex items-start justify-center p-6 overflow-y-auto">
@@ -86,7 +94,7 @@ function CodingProblemSelection({ section, selectedProblems, setSelectedProblems
               />
             </div>
           </div>
-          <div className="flex gap-3 text-2xs font-mono text-annotation/70">
+          <div className="flex gap-3 text-2xs font-mono text-annotation">
             <span className={selectedEasy >= 2 ? 'text-alert font-bold' : ''}>Easy: {selectedEasy}/{easyTotal > 2 ? 2 : easyTotal}</span>
             <span className={selectedHard >= 1 ? 'text-alert font-bold' : ''}>Hard: {selectedHard}/1</span>
           </div>
@@ -127,7 +135,7 @@ function CodingProblemSelection({ section, selectedProblems, setSelectedProblems
                       <span className="badge-accent text-2xs">Has code</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-annotation/70">
+                  <div className="flex items-center gap-3 text-xs text-annotation">
                     <DifficultyBadge level={p.difficulty} />
                     <span className="font-mono">{p.marks} marks</span>
                     {p.tags && (
@@ -136,8 +144,12 @@ function CodingProblemSelection({ section, selectedProblems, setSelectedProblems
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
-                  {disabled && disabledReason && (
-                    <span className="text-2xs text-annotation/50 italic">{disabledReason}</span>
+                  {selected ? (
+                    <span className="text-xs font-medium text-verify">Selected</span>
+                  ) : disabled && disabledReason ? (
+                    <span className="text-xs text-annotation italic">{disabledReason}</span>
+                  ) : (
+                    <span className="text-xs font-mono text-annotation/70">{quotaLeftFor(p.difficulty)}</span>
                   )}
                 </div>
               </label>
@@ -152,7 +164,7 @@ function CodingProblemSelection({ section, selectedProblems, setSelectedProblems
             ) : selectedProblems.length >= 3 ? (
               <span className="text-verify font-medium">Maximum selected</span>
             ) : (
-              <span className="text-annotation/50">Select at least 1 problem</span>
+              <span className="text-annotation">Select at least 1 problem</span>
             )}
           </div>
           <div className="flex gap-2">

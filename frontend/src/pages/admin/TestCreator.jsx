@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testsAPI } from '../../services/api';
+import { testsAPI, batchesAPI } from '../../services/api';
 import { Btn, Input, Select, Textarea, Tabs, Spinner, HelpTip } from '../../components/shared/UI';
 import toast from 'react-hot-toast';
 import BankPickerModal from './BankPickerModal';
 import AptQEditor from './AptQEditor';
 import CodeQEditor from './CodeQEditor';
 import ReviewPanel from './ReviewPanel';
+import { ALLOWED_DEPARTMENTS as DEPARTMENTS } from '../../lib/departments';
 
 /* ═══════════════════════════════════════════════════════════
  * Admin Test Creator — Assessment builder
@@ -25,6 +26,9 @@ const DEFAULT_TEST = {
   endTime: '',
   durationMinutes: 90,
   department: '',
+  departments: [],
+  years: [],
+  batches: [],
   settings: {
     shuffleQuestions: true,
     shuffleOptions: true,
@@ -37,15 +41,6 @@ const DEFAULT_TEST = {
   },
   sections: [],
 };
-
-const DEPARTMENTS = [
-  'Computer Engineering',
-  'Computer Science and Design',
-  'Aeronautical Engineering',
-  'Electrical Engineering',
-  'Electronics and Communication Engineering',
-  'Civil Engineering',
-];
 
 // The backend returns raw DB columns in snake_case (test_cases, starter_code,
 // input_format, correct_answer, ...) while AptQEditor/CodeQEditor are built
@@ -171,6 +166,13 @@ export default function TestCreator() {
     enabled: !!id,
   });
 
+  const { data: batchesData } = useQuery({
+    queryKey: ['batches'],
+    queryFn: batchesAPI.list,
+    enabled: true,
+  });
+  const allBatches = (batchesData?.batches || []).map(b => b.name);
+
   useEffect(() => {
     if (!editData) return;
     setForm({
@@ -180,6 +182,12 @@ export default function TestCreator() {
       startTime: toLocalDatetimeString(editData.start_time),
       endTime: toLocalDatetimeString(editData.end_time),
       durationMinutes: editData.duration_minutes,
+      department: editData.department || '',
+      departments: Array.isArray(editData.departments)
+        ? editData.departments
+        : (editData.department ? [editData.department] : []),
+      years: Array.isArray(editData.years) ? editData.years.map(String) : [],
+      batches: Array.isArray(editData.batches) ? editData.batches : [],
       settings: editData.settings || DEFAULT_TEST.settings,
       sections: (editData.sections || []).map(s => ({
         ...s,
@@ -308,8 +316,12 @@ export default function TestCreator() {
       setStep(0);
       return;
     }
-    if (!form.department) {
-      toast.error('Department is required');
+    const depts = form.departments || [];
+    if (!depts.length && form.department) {
+      depts.push(form.department);
+    }
+    if (depts.length === 0) {
+      toast.error('At least one target department is required');
       setStep(0);
       return;
     }
@@ -321,7 +333,10 @@ export default function TestCreator() {
       startTime: convertToUTC(form.startTime),
       endTime: convertToUTC(form.endTime),
       durationMinutes: form.durationMinutes,
-      department: form.department,
+      department: depts.includes('all') ? 'all' : depts[0],
+      departments: depts,
+      years: form.years || [],
+      batches: form.batches || [],
       settings: form.settings,
       sections: form.sections.map(s => ({
         id: s.id,
@@ -454,19 +469,136 @@ export default function TestCreator() {
                 disabled={!!form.settings.splitTimers}
                 hint={form.settings.splitTimers ? 'Auto-computed from MCQ + Coding limits below' : undefined}
               />
-              <div>
-                <label className="input-label">Target Department *</label>
-                <select
-                  value={form.department}
-                  onChange={e => upd('department', e.target.value)}
-                  className="select-field"
-                  required
-                >
-                  <option value="">Select Department</option>
+              <div className="col-span-1 md:col-span-3">
+                <label className="input-label">Target Departments/Branches *</label>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-panel border border-rim rounded-xl">
+                  <label className="flex items-center gap-2.5 text-sm font-medium text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={form.departments?.includes('all')}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          upd('departments', ['all']);
+                          upd('department', 'all');
+                        } else {
+                          upd('departments', []);
+                          upd('department', '');
+                        }
+                      }}
+                      className="accent-accent w-4 h-4 rounded cursor-pointer"
+                    />
+                    <span className="font-bold text-accent">All Departments</span>
+                  </label>
                   {DEPARTMENTS.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                    <label key={dept} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.departments?.includes(dept)}
+                        onChange={e => {
+                          let depts = form.departments || [];
+                          if (depts.includes('all')) {
+                            depts = [];
+                          }
+                          if (e.target.checked) {
+                            depts = [...depts, dept];
+                          } else {
+                            depts = depts.filter(d => d !== dept);
+                          }
+                          upd('departments', depts);
+                          upd('department', depts[0] || '');
+                        }}
+                        className="accent-accent w-4 h-4 rounded cursor-pointer"
+                      />
+                      <span>{dept}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
+                <p className="text-2xs text-annotation/60 mt-1.5">
+                  Select "All Departments" to show this test to all students, or choose specific branches.
+                </p>
+              </div>
+            </div>
+
+            {/* Years & Batches targeting */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="input-label">Target Years (optional)</label>
+                <div className="mt-2 p-4 bg-panel border border-rim rounded-xl">
+                  <label className="flex items-center gap-2.5 text-sm font-medium text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={form.years?.includes('all')}
+                      onChange={e => upd('years', e.target.checked ? ['all'] : [])}
+                      className="accent-accent w-4 h-4 rounded cursor-pointer"
+                    />
+                    <span className="font-bold text-accent">All Years</span>
+                  </label>
+                  {[1, 2, 3, 4, 5].map(y => (
+                    <label key={y} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.years?.includes(String(y))}
+                        onChange={e => {
+                          let ys = form.years?.includes('all') ? [] : (form.years || []);
+                          if (e.target.checked) {
+                            ys = [...ys, String(y)];
+                          } else {
+                            ys = ys.filter(v => v !== String(y));
+                          }
+                          upd('years', ys);
+                        }}
+                        className="accent-accent w-4 h-4 rounded cursor-pointer"
+                      />
+                      <span>Year {y}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-2xs text-annotation/60 mt-1.5">
+                  Leave all unchecked (or select "All Years") to include students from every year.
+                </p>
+              </div>
+              <div>
+                <label className="input-label">Target Batches (optional)</label>
+                <div className="mt-2 p-3 bg-panel/60 border border-rim rounded-xl">
+                  {allBatches.length === 0 ? (
+                    <p className="text-xs text-annotation/60 p-2">
+                      No batches defined yet. Add batches in Users → Batches, or leave blank to show the test to every batch.
+                    </p>
+                  ) : (
+                    <>
+                      <label className="flex items-center gap-2.5 text-sm font-medium text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={form.batches?.includes('all')}
+                          onChange={e => upd('batches', e.target.checked ? ['all'] : [])}
+                          className="accent-accent w-4 h-4 rounded cursor-pointer"
+                        />
+                        <span className="font-bold text-accent">All Batches</span>
+                      </label>
+                      <div className="max-h-44 overflow-y-auto">
+                        {allBatches.map(b => (
+                          <label key={b} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={form.batches?.includes(b)}
+                              onChange={e => {
+                                let bl = form.batches?.includes('all') ? [] : (form.batches || []);
+                                if (e.target.checked) {
+                                  bl = [...bl, b];
+                                } else {
+                                  bl = bl.filter(v => v !== b);
+                                }
+                                upd('batches', bl);
+                              }}
+                              className="accent-accent w-4 h-4 rounded cursor-pointer"
+                            />
+                            <span>{b}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 

@@ -19,7 +19,9 @@
   --ct-sunken-strong: rgba(58, 50, 34, 0.09);
   --ct-rim: #DFD4B8;
   --ct-ink: #2A2419;
-  --ct-annotation: #8A8066;
+  /* Annotation: darkened to hold >= 4.5:1 on panel (#FBF9F2) & deck (#F3EFE2).
+     Previously #8A8066 (3.7:1) — failed WCAG for normal text. */
+  --ct-annotation: #6E6444;
   --ct-accent: #2F5D56;
   --ct-accent-light: #4C8078;
   --ct-accent-dark: #1E4038;
@@ -32,6 +34,17 @@
   --ct-clarify: #565C86;
   --ct-clarify-light: #7A80A8;
   --ct-clarify-dark: #3F4566;
+
+  /* Trophy tier (gamification podium) — muted metallics, warm family */
+  --ct-trophy-gold: #A07E2B;
+  --ct-trophy-gold-light: #C49E44;
+  --ct-trophy-gold-dark: #6E541C;
+  --ct-trophy-silver: #8A938B;
+  --ct-trophy-silver-light: #AFB7B0;
+  --ct-trophy-silver-dark: #555C56;
+  --ct-trophy-bronze: #A56E45;
+  --ct-trophy-bronze-light: #C68A5E;
+  --ct-trophy-bronze-dark: #6E4826;
 
   /* Typography */
   --ct-font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -179,8 +192,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Smallest step — matches Tailwind's `2xs` (0.6875rem); keeps 11px as the
+   app-wide floor so no text falls below legibility. Pair with full-opacity
+   `text-annotation` for metadata that carries meaning. */
 .text-2xs {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
 }
 
@@ -220,6 +236,19 @@ body {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Keyboard-verifiable focus for every CTA. Applied to the shared base AND
+   each variant so raw `.btn-*` usages across pages get the same outline. */
+.btn:focus-visible,
+.btn-primary:focus-visible,
+.btn-ghost:focus-visible,
+.btn-verify:focus-visible,
+.btn-alert:focus-visible,
+.btn-clarify:focus-visible,
+.btn-ghost-icon:focus-visible {
+  outline: 2px solid var(--ct-accent);
+  outline-offset: 2px;
 }
 
 .btn-primary {
@@ -335,7 +364,7 @@ body {
 
 .select-field {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238A8066' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236E6444' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--ct-space-md) center;
   padding-right: 2.5rem;
@@ -353,8 +382,13 @@ body {
   border-radius: var(--ct-radius-lg);
   /* No shadow at rest — Flat-At-Rest Rule */
 }
-.panel:hover {
-  box-shadow: var(--ct-shadow-raised);
+/* Interactive affordance only on real interactive panels (links/buttons) —
+   static charts & tables keep the flat-at-rest rim with no hover tint. */
+a.panel:hover,
+button.panel:hover,
+[role="button"].panel:hover,
+.panel--interactive:hover {
+  border-color: rgba(47, 93, 86, 0.22);
 }
 
 .panel-muted {
@@ -379,7 +413,7 @@ body {
 .badge-verify { background: rgba(75,123,63,0.12); color: var(--ct-verify); border-color: rgba(75,123,63,0.25); }
 .badge-alert  { background: rgba(174,67,49,0.12); color: var(--ct-alert); border-color: rgba(174,67,49,0.25); }
 .badge-accent { background: rgba(47,93,86,0.12); color: var(--ct-accent); border-color: rgba(47,93,86,0.25); }
-.badge-annotation { background: rgba(138,128,102,0.12); color: var(--ct-annotation); border-color: rgba(138,128,102,0.25); }
+.badge-annotation { background: rgba(110,100,68,0.12); color: var(--ct-annotation); border-color: rgba(110,100,68,0.25); }
 .badge-clarify { background: rgba(86,92,134,0.12); color: var(--ct-clarify); border-color: rgba(86,92,134,0.25); }
 
 /* ── Progress Bar ─────────────────────────────────────────────── */
@@ -480,6 +514,18 @@ body {
   margin-top: 0.25rem;
 }
 
+/* ── Eyebrow (single annotation hierarchy token) ──────────────── */
+.eyebrow {
+  display: inline-block;
+  font-family: var(--ct-font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+  color: var(--ct-annotation);
+}
+
 /* ── Timer Signature Element ───────────────────────────────────── */
 .timer-box {
   display: inline-flex;
@@ -527,10 +573,59 @@ body {
 .timer-box--urgent::after {
   animation: timerPulse 1s linear infinite;
 }
+/* Final-pressure tier — the loudest registered voice, still calm (no
+   new motion; presence comes from a filled alert pill + white digits). */
+.timer-box--critical {
+  border-color: var(--ct-alert);
+  color: var(--ct-panel);
+  background: var(--ct-alert);
+  box-shadow: 0 0 0 3px rgba(174,67,49,0.18);
+}
+
+/* Verbal pressure tag — "Low" / "Final" only when pressure is on */
+.timer-state {
+  font-family: var(--ct-font-mono);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.timer-state--urgent {
+  border: 1px solid rgba(174,67,49,0.4);
+  color: var(--ct-alert);
+  background: rgba(174,67,49,0.08);
+  padding: 1px 5px;
+  border-radius: var(--ct-radius-sm);
+}
+.timer-state--critical {
+  border: 1px solid rgba(251,249,242,0.5);
+  color: var(--ct-panel);
+  background: rgba(251,249,242,0.16);
+  padding: 1px 5px;
+  border-radius: var(--ct-radius-sm);
+}
 @keyframes timerPulse {
   0% { transform: scaleX(1); opacity: 1; }
   50% { transform: scaleX(1); opacity: 0.5; }
   100% { transform: scaleX(1); opacity: 1; }
+}
+
+/* The countdown progress rail beneath the timer digits. The Timer component
+   scales it (transform, not width) to avoid layout animation. */
+.timer-rail {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  transform-origin: left center;
+  border-radius: 0 0 var(--ct-radius-md) var(--ct-radius-md);
+  transition: transform 1s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-rail { transition: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -610,15 +705,17 @@ body {
 }
 .q-grid-btn--flagged {
   background: rgba(47,93,86,0.12);
-  border-color: rgba(47,93,86,0.3);
+  border-style: dashed;
+  border-color: var(--ct-accent);
   color: var(--ct-accent);
 }
 .q-grid-btn--flagged:hover {
-  border-color: var(--ct-accent);
+  background: rgba(47,93,86,0.18);
 }
 .q-grid-btn--current {
   background: var(--ct-accent);
   border-color: var(--ct-accent);
+  box-shadow: inset 0 0 0 2px var(--ct-panel);
   color: var(--ct-panel);
 }
 
@@ -642,7 +739,7 @@ body {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--ct-shadow-modal);
+  box-shadow: 0 1px 2px rgba(42,36,25,0.06), 0 12px 32px rgba(42,36,25,0.14);
 }
 .modal-header {
   display: flex;
@@ -674,14 +771,6 @@ body {
 select option {
   white-space: nowrap;
   padding: var(--ct-space-xs) var(--ct-space-sm);
-}
-
-/* Ensure select dropdown doesn't have extra whitespace */
-.select-field {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238A8066' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right var(--ct-space-md) center;
-  padding-right: 2.5rem;
 }
 
 .modal-footer {
@@ -758,18 +847,6 @@ select option {
 
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; opacity: 1; transform: none; }
-}
-
-/* ── Grain overlay ──────────────────────────────────────────── */
-.grain-overlay::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0.02;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 256px 256px;
-  pointer-events: none;
 }
 
 .text-wrap-balance {

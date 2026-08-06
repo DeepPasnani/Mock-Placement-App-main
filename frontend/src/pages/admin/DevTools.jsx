@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Alert, Tabs, Btn } from '../../components/shared/UI';
 
 /* ═══════════════════════════════════════════════════════════
- * Dev Tools — quick access to the local pgAdmin and Judge0
- * instances started via docker-compose (see infra/judge0/ and
+ * Dev Tools — quick access to the local pgAdmin and Codebox
+ * instances started via docker-compose (see infra/codebox/ and
  * docker-compose.yml). Visible to both `admin` and `super_admin`
  * — same access level as the rest of /admin.
  *
@@ -21,16 +21,16 @@ const TOOLS = {
     url: import.meta.env.VITE_PGADMIN_URL || 'http://localhost:8467',
     description: 'Browse and query the Postgres database directly.',
   },
-  judge0: {
-    label: 'Judge0',
-    url: import.meta.env.VITE_JUDGE0_URL || 'http://localhost:2358',
+  codebox: {
+    label: 'Codebox',
+    url: import.meta.env.VITE_CODEBOX_URL || 'http://localhost:3000',
     description: 'Self-hosted code execution engine used for running and grading coding submissions.',
   },
 };
 
 export default function DevTools() {
   const [active, setActive] = useState('pgadmin');
-  const [iframeError, setIframeError] = useState({ pgadmin: false, judge0: false });
+  const [iframeError, setIframeError] = useState({ pgadmin: false, codebox: false });
   const tool = TOOLS[active];
 
   return (
@@ -38,12 +38,12 @@ export default function DevTools() {
       <div>
         <h1 className="font-display font-bold text-xl text-ink">Dev Tools</h1>
         <p className="text-sm text-annotation mt-0.5">
-          Quick links to the local pgAdmin and Judge0 instances running via Docker on this machine.
+          Quick links to the local pgAdmin and Codebox instances running via Docker on this machine.
         </p>
       </div>
 
       <Alert type="warning">
-        These point at services running on <strong>your own machine</strong> ({TOOLS.pgadmin.url} and {TOOLS.judge0.url}).
+        These point at services running on <strong>your own machine</strong> ({TOOLS.pgadmin.url} and {TOOLS.codebox.url}).
         They won't load here if the Docker containers aren't running, or if you're viewing CampusTrack from a different
         device than the one hosting them.
       </Alert>
@@ -51,7 +51,7 @@ export default function DevTools() {
       <Tabs
         tabs={[
           { id: 'pgadmin', label: 'pgAdmin' },
-          { id: 'judge0', label: 'Judge0' },
+          { id: 'codebox', label: 'Codebox' },
         ]}
         active={active}
         onChange={setActive}

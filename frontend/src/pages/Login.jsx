@@ -4,23 +4,13 @@ import { useStore } from '../store';
 import { Spinner } from '../components/shared/UI';
 import toast from 'react-hot-toast';
 import { authAPI } from '../services/api';
+import { ALLOWED_DEPARTMENTS as DEPARTMENTS, CLASSES } from '../lib/departments';
 
 /* ═══════════════════════════════════════════════════════════
  * Login Page — Auth gateway
  * Design: Calm, institutional. Left panel shows product
  * positioning, right panel has the form.
  * ═══════════════════════════════════════════════════════════ */
-
-const DEPARTMENTS = [
-  'Computer Engineering',
-  'Computer Science and Design',
-  'Aeronautical Engineering',
-  'Electrical Engineering',
-  'Electronics and Communication Engineering',
-  'Civil Engineering',
-];
-
-const CLASSES = ['CE 1', 'CE 2', 'CE 3', 'CE 4'];
 
 export default function LoginPage() {
   const { googleLogin, login, register, isLoading } = useStore();
@@ -80,7 +70,12 @@ export default function LoginPage() {
   const handleGoogleResponse = async ({ credential }) => {
     setError('');
     try {
-      const { user } = await googleLogin(credential);
+      const { user, needsProfileCompletion } = await googleLogin(credential);
+      if (needsProfileCompletion || user.profileComplete === false) {
+        toast.success('Signed in — please complete your profile.');
+        navigate('/complete-profile', { replace: true });
+        return;
+      }
       toast.success(`Welcome, ${user.name || user.email}!`);
       navigate(from || (user.role === 'admin' ? '/admin' : '/student'), {
         replace: true,
@@ -191,7 +186,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex bg-deck relative overflow-hidden">
       {/* ── Left panel ─────────────────────────────────────── */}
       <div className="hidden lg:flex flex-1 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-clarify/5" />
         <div className="relative z-10 flex flex-col justify-center px-16 py-20 w-full">
           <div className="mb-14">
             <div className="flex items-center gap-3 mb-6">
@@ -214,12 +208,13 @@ export default function LoginPage() {
           </div>
 
           {/* Feature grid (neutral, one accent highlight max) */}
+          <h2 className="text-sm font-semibold text-ink mb-3">Built for placement drives</h2>
           <div className="grid grid-cols-2 gap-4 max-w-lg">
             {[
               { label: 'Code Execution', desc: 'Python, Java, C, C++', icon: 'M14.7 6.3a1 1 0 00-1.4 0L10 9.6 7.7 7.3a1 1 0 00-1.4 1.4l3 3a1 1 0 001.4 0l4-4a1 1 0 000-1.4z', highlight: true },
-              { label: 'Auto Proctoring', desc: 'AI-powered monitoring', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', highlight: false },
+              { label: 'Exam Integrity', desc: 'Automated tab-switch and fullscreen monitoring with auto-save', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', highlight: false },
               { label: 'Instant Results', desc: 'Real-time scoring', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', highlight: false },
-              { label: 'Scale Ready', desc: '1000+ concurrent users', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', highlight: false },
+              { label: 'Scale Ready', desc: 'Built for full batch placement drives', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', highlight: false },
             ].map(({ label, desc, icon, highlight }) => (
               <div key={label} className="panel p-3.5">
                 <svg className={`w-4 h-4 mb-2 ${highlight ? 'text-accent' : 'text-annotation'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -243,7 +238,7 @@ export default function LoginPage() {
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
               </svg>
             </div>
-            <h1 className="font-display text-xl font-bold text-ink">CampusTrack</h1>
+            <div className="font-display text-xl font-bold text-ink">CampusTrack</div>
             <p className="text-xs text-annotation/60 mt-0.5">Placement Assessment Portal</p>
           </div>
 
@@ -281,10 +276,12 @@ export default function LoginPage() {
                 {!otpSent ? (
                   <form onSubmit={handleForgotSubmit} className="space-y-4">
                     <div>
-                      <label className="input-label">Email Address</label>
+                      <label className="input-label" htmlFor="forgot-email">Email Address</label>
                       <input
+                        id="forgot-email"
                         type="email"
                         name="email"
+                        autoComplete="email"
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="you@institution.edu"
@@ -304,10 +301,12 @@ export default function LoginPage() {
                 ) : (
                   <form onSubmit={handleResetSubmit} className="space-y-4">
                     <div>
-                      <label className="input-label">6-Digit OTP</label>
+                      <label className="input-label" htmlFor="otp-code">6-Digit OTP</label>
                       <input
+                        id="otp-code"
                         type="text"
                         name="otp"
+                        autoComplete="one-time-code"
                         value={formData.otp}
                         onChange={handleChange}
                         placeholder="Enter OTP"
@@ -317,11 +316,13 @@ export default function LoginPage() {
                       />
                     </div>
                     <div>
-                      <label className="input-label">New Password</label>
+                      <label className="input-label" htmlFor="new-pass">New Password</label>
                       <div className="relative">
                         <input
+                          id="new-pass"
                           type={showPassword ? 'text' : 'password'}
                           name="newPassword"
+                          autoComplete="new-password"
                           value={formData.newPassword}
                           onChange={handleChange}
                           placeholder="Min 8 characters"
@@ -330,6 +331,7 @@ export default function LoginPage() {
                         />
                         <button
                           type="button"
+                          aria-label={showPassword ? 'Hide new password' : 'Show new password'}
                           onClick={() => setShowPassword(p => !p)}
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-annotation hover:text-ink"
                         >
@@ -344,10 +346,12 @@ export default function LoginPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="input-label">Confirm New Password</label>
+                      <label className="input-label" htmlFor="confirm-pass">Confirm New Password</label>
                       <input
+                        id="confirm-pass"
                         type={showPassword ? 'text' : 'password'}
                         name="confirmPassword"
+                        autoComplete="new-password"
                         value={formData.confirmPassword}
                         onChange={handleChange}
                         placeholder="Repeat new password"
@@ -411,10 +415,12 @@ export default function LoginPage() {
                 <form onSubmit={handleSubmit} className="space-y-3.5">
                   {mode === 'register' && (
                     <div>
-                      <label className="input-label">Full Name</label>
+                      <label className="input-label" htmlFor="full-name">Full Name</label>
                       <input
+                        id="full-name"
                         type="text"
                         name="name"
+                        autoComplete="name"
                         value={formData.name}
                         onChange={handleChange}
                         placeholder="Enter your full name"
@@ -424,10 +430,12 @@ export default function LoginPage() {
                     </div>
                   )}
                   <div>
-                    <label className="input-label">Email Address</label>
+                    <label className="input-label" htmlFor="email-addr">Email Address</label>
                     <input
+                      id="email-addr"
                       type="email"
                       name="email"
+                      autoComplete="email"
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="you@institution.edu"
@@ -437,8 +445,9 @@ export default function LoginPage() {
                   </div>
                   {mode === 'register' && (
                     <div>
-                      <label className="input-label">Department</label>
+                      <label className="input-label" htmlFor="dept">Department</label>
                       <select
+                        id="dept"
                         name="department"
                         value={formData.department}
                         onChange={handleChange}
@@ -455,8 +464,9 @@ export default function LoginPage() {
                   {mode === 'register' && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="input-label">Enrollment No.</label>
+                        <label className="input-label" htmlFor="roll-no">Enrollment No.</label>
                         <input
+                          id="roll-no"
                           type="text"
                           name="rollNumber"
                           value={formData.rollNumber}
@@ -467,8 +477,9 @@ export default function LoginPage() {
                         />
                       </div>
                       <div>
-                        <label className="input-label">Class</label>
+                        <label className="input-label" htmlFor="class">Class</label>
                         <select
+                          id="class"
                           name="batch"
                           value={formData.batch}
                           onChange={handleChange}
@@ -485,8 +496,9 @@ export default function LoginPage() {
                   )}
                   {mode === 'register' && (
                     <div>
-                      <label className="input-label">Year of Study</label>
+                      <label className="input-label" htmlFor="year-of-study">Year of Study</label>
                       <select
+                        id="year-of-study"
                         name="yearOfStudy"
                         value={formData.yearOfStudy}
                         onChange={handleChange}
@@ -503,12 +515,12 @@ export default function LoginPage() {
                   )}
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="input-label mb-0">Password</label>
+                      <label className="input-label mb-0" htmlFor="password">Password</label>
                       {mode === 'login' && (
                         <button
                           type="button"
                           onClick={() => { setMode('forgot'); setError(''); }}
-                          className="text-2xs text-clarify hover:underline"
+                          className="text-xs text-clarify hover:underline px-1.5 py-1 -m-1.5"
                         >
                           Forgot?
                         </button>
@@ -516,8 +528,10 @@ export default function LoginPage() {
                     </div>
                     <div className="relative">
                       <input
+                        id="password"
                         type={showPassword ? 'text' : 'password'}
                         name="password"
+                        autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                         value={formData.password}
                         onChange={handleChange}
                         placeholder={
@@ -530,6 +544,7 @@ export default function LoginPage() {
                       />
                       <button
                         type="button"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
                         onClick={() => setShowPassword(p => !p)}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-annotation hover:text-ink"
                       >
@@ -566,7 +581,7 @@ export default function LoginPage() {
 
                 <div className="mt-5 pt-4 border-t border-rim">
                   <p className="text-center text-2xs text-annotation/50">
-                    Protected by enterprise-grade security.
+                    Role-based access control, encrypted sessions, and tamper-evident exam records.
                     <br />
                     Only authorized institutional accounts.
                   </p>

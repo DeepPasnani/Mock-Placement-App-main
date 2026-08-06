@@ -24,6 +24,7 @@ const securityCtrl = require('../controllers/security');
 router.post('/auth/login',            authLimiter, authCtrl.login);
 router.post('/auth/register',         authLimiter, authCtrl.register);
 router.post('/auth/google',           authLimiter, authCtrl.googleLogin);
+router.post('/auth/complete-profile', authenticate, authCtrl.completeProfile);
 router.post('/auth/logout',           authenticate, authCtrl.logout);
 router.get ('/auth/me',               authenticate, authCtrl.getMe);
 router.post('/auth/change-password',  authenticate, authCtrl.changePassword);
@@ -43,7 +44,8 @@ router.put   ('/tests/:id/schedule',      authenticate, requireAdmin, testCtrl.s
 router.post('/submissions/start',          authenticate, subCtrl.startTest);
 router.post('/submissions/save',           authenticate, subCtrl.saveAnswers);
 router.post('/submissions/submit',         authenticate, validate(submitTestSchema), subCtrl.submitTest);
-router.post('/submissions/run-code',       authenticate, codeLimiter, subCtrl.runCode);
+router.post('/submissions/run-code',            authenticate, codeLimiter, subCtrl.runCode);
+router.get ('/submissions/run-code/result/:id', authenticate, subCtrl.getRunCodeResult);
 // NOTE: these four were previously missing — submitFingerprint, verifyFingerprint,
 // logFullscreenViolation, and getTimeBombStatus all already existed fully
 // implemented in controllers/submissions.js (schema columns/tables already in
@@ -111,8 +113,9 @@ router.get   ('/question-bank',           authenticate, requireAdmin, bankCtrl.l
 router.post  ('/question-bank',           authenticate, requireAdmin, bankCtrl.createBank);
 router.post  ('/question-bank/import',    authenticate, requireAdmin, bankCtrl.bulkImportBank);
 router.delete('/question-bank/:id',       authenticate, requireAdmin, bankCtrl.deleteBank);
-router.post('/question-bank/import-csv',  authenticate, requireAdmin, bankCtrl.importCsv);
-router.post('/question-bank/import-json', authenticate, requireAdmin, bankCtrl.importJson);
+router.post('/question-bank/import-csv',    authenticate, requireAdmin, bankCtrl.importCsv);
+router.post('/question-bank/import-json',   authenticate, requireAdmin, bankCtrl.importJson);
+router.post('/question-bank/from-test/:testId', authenticate, requireAdmin, bankCtrl.importFromTest);
 
 // ── Drives ────────────────────────────────────────────────
 const driveCtrl = require('../controllers/drives');

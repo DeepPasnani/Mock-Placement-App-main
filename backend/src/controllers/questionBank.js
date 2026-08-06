@@ -242,4 +242,85 @@ async function importJson(req, res) {
   });
 }
 
-module.exports = { listBank, createBank, bulkImportBank, importCsv, importJson, deleteBank };
+// ── POST /api/question-bank/from-test/:testId ────────────────
+async function importFromTest(req, res) {
+  const { testId } = req.params;
+  const { questionIds } = req.body;
+
+  const { rows: [test] } = await query('SELECT id, title FROM tests WHERE id = $1', [testId]);
+  if (!test) return res.status(404).json({ error: 'Test not found' });
+
+  const { rows: sections } = await query('SELECT id, type FROM sections WHERE test_id = $1 ORDER BY order_index', [testId]);
+
+  const inserted = [];
+  const errors = [];
+
+  for (const section of sections) {
+    if (section.type === 'aptitude') {
+      const { rows: questions } = await query(
+        'SELECT * FROM questions WHERE section_id = $1 ORDER BY order_index',
+        [section.id]
+      );
+      for (const q of questions) {
+        if (questionIds && !questionIds.includes(q.id)) continue;
+        const data = {
+          text: q.text,
+          options: q.options,
+          correctAnswer: q.correct_answer,
+          explanation: q.explanation || '',
+        };
+        try {
+          const { rows: [bankQ] } = await query(
+            `INSERT INTO bank_questions (type, data, genre, difficulty, marks, created_by)
+             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+            ['mcq', JSON.stringify(data), q.genre || 'general', q.difficulty || 'medium', q.marks || 2, req.user.id]
+          );
+          inserted.push(bankQ);
+        } catch (err) {
+          errors.push({ id: q.id, message: err.message });
+        }
+      }
+    } else if (section.type === 'coding') {
+      const { rows: problems } = await query(
+        'SELECT * FROM coding_problems WHERE section_id = $1 ORDER BY order_index',
+        [section.id]
+      );
+      for (const p of problems) {
+        if (questionIds && !questionIds.includes(p.id)) continue;
+        const data = {
+          title: p.title,
+          description: p.description,
+          inputFormat: p.input_format || '',
+          outputFormat: p.output_format || '',
+          constraints: p.constraints || '',
+          sampleInput: p.sample_input || '',
+          sampleOutput: p.sample_output || '',
+          explanation: p.explanation || '',
+          testCases: p.test_cases || [],
+          starterCode: p.starter_code || {},
+          timeLimit: p.time_limit_seconds || 2,
+          memoryLimit: p.memory_limit_mb || 256,
+        };
+        try {
+          const { rows: [bankQ] } = await query(
+            `INSERT INTO bank_questions (type, data, difficulty, marks, created_by)
+             VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+            ['coding', JSON.stringify(data), p.difficulty || 'medium', p.marks || 10, req.user.id]
+          );
+          inserted.push(bankQ);
+        } catch (err) {
+          errors.push({ id: p.id, message: err.message });
+        }
+      }
+    }
+  }
+
+  res.status(201).json({
+    message: `Added ${inserted.length} question(s) from "${test.title}" to the bank`,
+    count: inserted.length,
+    questions: inserted,
+    errors: errors.length ? errors : undefined,
+  });
+}
+
+module.exports = { listBank, createBank, bulkImportBank, importCsv, importJson, deleteBank, importFromTest };

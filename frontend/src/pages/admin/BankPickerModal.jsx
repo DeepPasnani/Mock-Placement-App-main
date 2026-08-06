@@ -29,7 +29,7 @@ export default function BankPickerModal({ open, onClose, type, onPick }) {
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm text-ink line-clamp-2">{type === 'mcq' ? q.data?.text : q.data?.title}</span>
-                <Badge color={q.difficulty === 'hard' ? 'red' : q.difficulty === 'easy' ? 'green' : 'yellow'}>{q.difficulty}</Badge>
+                <Badge color={q.difficulty === 'hard' ? 'alert' : q.difficulty === 'easy' ? 'verify' : 'accent'}>{q.difficulty}</Badge>
               </div>
               <div className="text-xs text-annotation/60 mt-1">{q.marks} marks{q.genre ? ` · ${q.genre}` : ''}</div>
             </button>

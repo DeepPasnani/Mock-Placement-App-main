@@ -1,4 +1,66 @@
 services:
+  # ─────────────────────────────────────────────────────────────
+  # Codebox (code execution engine) — included by default.
+  # Services: codebox-api, codebox-worker, codebox-redis.
+  # ─────────────────────────────────────────────────────────────
+
+  codebox-redis:
+    image: redis:7-alpine
+    container_name: pp_codebox_redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - codebox_redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  codebox-api:
+    build:
+      context: ./infra/codebox
+      dockerfile: docker/api/Dockerfile
+    container_name: pp_codebox_api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://codebox-redis:6379
+      AUTH_TOKEN: ${CODEBOX_AUTH_TOKEN:-dev-token}
+      EXECUTOR_TYPE: docker
+      PORT: 3000
+      BODY_LIMIT: 50mb
+      RATE_LIMIT_MAX_REQUESTS: 10000
+      RATE_LIMIT_WINDOW_MS: 60000
+    depends_on:
+      codebox-redis:
+        condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  codebox-worker:
+    build:
+      context: ./infra/codebox
+      dockerfile: docker/worker/Dockerfile
+    container_name: pp_codebox_worker
+    command: node src/queue/worker.js
+    privileged: true
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://codebox-redis:6379
+      EXECUTOR_TYPE: docker
+      WORKER_CONCURRENCY: 4
+      DEFAULT_CPU_TIME_LIMIT: 5
+      DEFAULT_MEMORY_LIMIT: 256000
+      MAX_MEMORY_LIMIT: 512000
+      CONTAINER_POOL_ENABLED: ${CONTAINER_POOL_ENABLED:-false}
+      MAX_OUTPUT_SIZE: ${MAX_OUTPUT_SIZE:-1048576}
+    depends_on:
+      codebox-redis:
+        condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: pp_postgres
@@ -61,6 +123,14 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-CampusTrack <noreply@campustrack.local>}
+      CODEBOX_API_URL: http://codebox-api:3000
+      # Must match codebox-api's AUTH_TOKEN default above (both derive from
+      # the same CODEBOX_AUTH_TOKEN root .env var) — otherwise the backend
+      # sends no X-Auth-Token header while codebox-api's authMiddleware
+      # requires one, and every /submissions call (Run Code, coding-test
+      # grading) gets a 401.
+      CODEBOX_AUTH_TOKEN: ${CODEBOX_AUTH_TOKEN:-dev-token}
+      CODE_EXECUTION_PROVIDER: codebox
     ports:
       - "5000:5000"
     depends_on:
@@ -70,6 +140,8 @@ services:
         condition: service_healthy
       backend-init:
         condition: service_completed_successfully
+      codebox-api:
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', r => { let d=''; r.on('data',c=>d+=c); r.on('end',()=>process.exit(JSON.parse(d).status==='ok'?0:1)) }).on('error',()=>process.exit(1))"]
       interval: 30s
@@ -133,3 +205,4 @@ volumes:
   postgres_data:
   redis_data:
   pgadmin_data:
+  codebox_redis_data:

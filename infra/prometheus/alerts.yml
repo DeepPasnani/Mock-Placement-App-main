@@ -48,10 +48,10 @@ groups:
           description: "Redis instance {{ $labels.instance }} is unreachable"
 
       - alert: QueueDepthHigh
-        expr: judge0_queue_depth > 50
+        expr: codebox_queue_depth > 50
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Judge0 queue depth high"
+          summary: "Codebox queue depth high"
           description: "Code execution queue has {{ $value }} pending submissions"

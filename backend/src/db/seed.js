@@ -4,11 +4,7 @@ const { query } = require('./index');
 
 const DEPARTMENTS = [
   'Computer Engineering',
-  'Computer Science and Design',
-  'Aeronautical Engineering',
-  'Electrical Engineering',
-  'Electronics and Communication Engineering',
-  'Civil Engineering'
+  'Computer Science and Design'
 ];
 
 async function seed() {

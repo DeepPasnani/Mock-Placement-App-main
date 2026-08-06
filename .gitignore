@@ -1,1 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+frontend/dist/
+backend/reports/
+
+# AI tooling scratch
+.impeccable/
+
+# Environment secrets
 .env
+!.env.example
+
+# pgAdmin export
+pgadmin-servers.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
