@@ -311,7 +311,7 @@ function WorkflowSection() {
 
 function TechMarquee() {
   const marqueeRef = useRef(null);
-  const techs = ['React', 'Node.js', 'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Monaco', 'Google OAuth', 'WebSockets', 'CodeBox'];
+  const techs = ['React', 'Node.js', 'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Monaco', 'Google OAuth', 'WebSockets', 'Piston'];
 
   useGSAP(() => {
     const ctx = gsap.context(() => {

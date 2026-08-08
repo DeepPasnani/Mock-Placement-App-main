@@ -381,7 +381,7 @@ export default function TestInterface() {
 
   const handleRunAllTests = async () => {
     const q = section?.questions[currentQ];
-    if (!q || q.type !== 'coding') return;
+    if (!q) return;
     const code = codeSolutions[q.id]?.[activeLang] || q.starter_code?.[activeLang] || '';
     if (!code.trim()) { toast.error('Write some code first.'); return; }
     setTestLoading(true);

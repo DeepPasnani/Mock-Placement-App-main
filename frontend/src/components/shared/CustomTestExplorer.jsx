@@ -181,7 +181,7 @@ export default function CustomTestExplorer({ code, language, problemId }) {
             <span className={`text-2xs font-mono font-bold ${result.matchesExpected === true ? 'text-verify' : result.matchesExpected === false ? 'text-alert' : 'text-annotation'}`}>
               {result.matchesExpected === true ? '✓ Match' : result.matchesExpected === false ? '✗ Mismatch' : ''}
             </span>
-            <span className="text-2xs text-annotation/60 font-mono">{result.time}s / {Math.round(result.memory / 1024) || 0}MB</span>
+            <span className="text-2xs text-annotation/60 font-mono">{result.time != null ? `${result.time}s` : '—'} / {result.memory ? `${Math.round(result.memory / 1024)}MB` : '—'}</span>
             <div className="flex-1" />
             <input
               value={testName}

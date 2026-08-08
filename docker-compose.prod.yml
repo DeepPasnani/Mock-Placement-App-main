@@ -31,12 +31,26 @@ services:
       SMTP_USER: ${SMTP_USER:?SMTP_USER must be set in your root .env for production}
       SMTP_PASS: ${SMTP_PASS:?SMTP_PASS must be set in your root .env for production}
       EMAIL_FROM: ${EMAIL_FROM:-CampusTrack <noreply@your-domain.com>}
-      CODEBOX_API_URL: ${CODEBOX_API_URL:-http://codebox-api:3000}
-      CODEBOX_AUTH_TOKEN: ${CODEBOX_AUTH_TOKEN:-}
-      CODE_EXECUTION_PROVIDER: codebox
+      PISTON_API_URL: ${PISTON_API_URL:-http://piston-lb:2000/api/v2}
+      CODE_EXECUTION_PROVIDER: piston
       # Image uploads are stored as bytea rows in Postgres (images table) —
       # no Cloudinary/S3 and no shared disk/volume needed
 
   postgres:
     environment:
       POSTGRES_PASSWORD: change_this_to_strong_password
+
+  # Prod headroom: 3 × 120 = 360 concurrent job slots across the pool,
+  # comfortably above the ~200 simultaneous users this platform targets.
+  piston1: &piston-prod-limits
+    environment:
+      PISTON_MAX_CONCURRENT_JOBS: ${PISTON_MAX_CONCURRENT_JOBS:-120}
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2g
+  piston2:
+    <<: *piston-prod-limits
+  piston3:
+    <<: *piston-prod-limits

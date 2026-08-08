@@ -39,13 +39,13 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 }
     },
     {
-      "title": "Queue Depth",
+      "title": "Piston Availability",
       "type": "graph",
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "codebox_queue_depth",
-          "legendFormat": "queue depth"
+          "expr": "probe_success{job=\"piston-lb\"}",
+          "legendFormat": "piston-lb up"
         }
       ],
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 }

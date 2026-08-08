@@ -47,11 +47,15 @@ groups:
           summary: "Redis is down"
           description: "Redis instance {{ $labels.instance }} is unreachable"
 
-      - alert: QueueDepthHigh
-        expr: codebox_queue_depth > 50
-        for: 5m
+      # Piston has no built-in Prometheus exporter, so we alert on the up/down
+      # probe scraped from piston-lb (see infra/prometheus/prometheus.yml —
+      # add a blackbox/http probe against http://piston-lb:2000/healthz if
+      # not already present) instead of an internal queue-depth metric.
+      - alert: PistonUnreachable
+        expr: probe_success{job="piston-lb"} == 0
+        for: 2m
         labels:
-          severity: warning
+          severity: critical
         annotations:
-          summary: "Codebox queue depth high"
-          description: "Code execution queue has {{ $value }} pending submissions"
+          summary: "Piston code execution engine unreachable"
+          description: "piston-lb health probe has been failing for 2+ minutes — Run Code and coding-test grading are down"

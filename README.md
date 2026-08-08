@@ -33,7 +33,7 @@ Build multi-section aptitude + coding tests, invite students in bulk, watch subm
 
 - **Test Builder** — three-step wizard for multi-section tests mixing MCQ (aptitude) and coding sections, each with its own timer, difficulty mix, and pass criteria.
 - **Question Bank** — build a reusable library of questions once and pull them into any future test.
-- **Live Code Execution** — full Monaco editor with grading against hidden test cases via [Codebox](https://github.com/chaicode/codebox); supports Python, JavaScript, Java, C, C++, Go, Ruby, Rust, Kotlin, and SQL.
+- **Live Code Execution** — full Monaco editor with grading against hidden test cases via [Piston](https://github.com/engineer-man/piston), self-hosted and load-balanced across 3 replicas; supports Python, JavaScript, Java, C, C++, Go, Ruby, Rust, Kotlin, and SQL.
 - **Real-Time Proctoring** — WebSocket heartbeat monitoring, tab-switch detection, fullscreen enforcement, keystroke/plagiarism signals, and automatic submission on expiry.
 - **Results & Analytics** — score distributions, percentile rankings, per-question breakdowns, cohort/placement-probability analytics, scheduled reports, and CSV/PDF export.
 - **Gamification** — XP, levels, streaks, achievements, a leaderboard, and a daily challenge to keep students practicing between tests.
@@ -46,7 +46,7 @@ Build multi-section aptitude + coding tests, invite students in bulk, watch subm
 |---|---|
 | Frontend | React 18, Vite, React Router, TanStack Query, Zustand, Tailwind CSS, Monaco Editor |
 | Backend | Node.js, Express, PostgreSQL (`pg`), Redis, JWT auth, Helmet, Pino |
-| Code execution | [Codebox](https://github.com/chaicode/codebox) (self-hosted) |
+| Code execution | [Piston](https://github.com/engineer-man/piston) (self-hosted, 3 replicas + nginx LB) |
 | Infra | Docker Compose, Nginx (frontend reverse proxy) |
 
 ## Architecture
@@ -60,7 +60,7 @@ Build multi-section aptitude + coding tests, invite students in bulk, watch subm
                           ┌────────────┼────────────┐
                           ▼            ▼             ▼
                      ┌────────┐  ┌──────────┐  ┌───────────┐
-                     │ Redis                        │  │  Codebox  │  │  SMTP /   │
+                     │ Redis                        │  │  Piston   │  │  SMTP /   │
                      │(cache) │  │ (grading) │  │  Google   │
                      └────────┘  └──────────┘  └───────────┘
 ```
@@ -103,7 +103,7 @@ This starts Postgres, Redis, the backend API, the frontend (served via Nginx on 
 - Backend API: http://localhost:5000/api
 - pgAdmin: http://localhost:5050
 
-To also run code execution locally, see [`infra/codebox/README.md`](infra/codebox/README.md).
+To also run code execution locally, see [`infra/piston/README.md`](infra/piston/README.md) — after first startup you need to run the one-time package install script.
 
 To verify your SMTP setup independently of the app (useful after editing
 the root `.env`), run: `docker compose exec backend node scripts/test-smtp.js you@example.com` — it checks the credentials and sends a real test
@@ -148,7 +148,7 @@ All backend configuration lives in `backend/.env` when running manually (Option 
 | `JWT_SECRET`, `REFRESH_TOKEN_SECRET` | ✅ | Generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | ✅ (for student login) | From Google Cloud Console |
 | `REDIS_URL` | Recommended | Falls back gracefully if unset |
-| `CODEBOX_API_URL` / `CODE_EXECUTION_PROVIDER` | Recommended | Self-hosted Codebox |
+| `PISTON_API_URL` / `CODE_EXECUTION_PROVIDER` | Recommended | Self-hosted Piston |
 | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | Optional | For email notifications, incl. password-reset OTPs. Under Docker, set these in the **root** `.env`, not `backend/.env`. Verify with `node scripts/test-smtp.js you@example.com` (or `docker compose exec backend node scripts/test-smtp.js you@example.com`) |
 | `VITE_API_URL` (frontend) | Depends on topology | Use a relative `/api` when frontend+backend share an origin (e.g. behind the provided Nginx config); use the full backend URL (`https://api.yourdomain.com/api`) when they're hosted separately |
 
@@ -163,7 +163,7 @@ All backend configuration lives in `backend/.env` when running manually (Option 
 │   │   ├── controllers/   # Route handlers (business logic)
 │   │   ├── routes/        # Express route registration
 │   │   ├── middleware/    # auth, rate limiting, validation, tenancy
-│   │   ├── services/      # codebox, email, scheduler, redis, etc.
+│   │   ├── services/      # piston, email, scheduler, redis, etc.
 │   │   └── db/            # migrate.js (schema) + seed.js
 │   └── Dockerfile
 ├── frontend/
@@ -174,7 +174,7 @@ All backend configuration lives in `backend/.env` when running manually (Option 
 │   │   └── services/api.js    # Axios client + all API method definitions
 │   ├── nginx.conf
 │   └── Dockerfile
-├── infra/codebox/          # Self-hosted Codebox docker-compose + config
+├── infra/piston/           # Self-hosted Piston docker-compose + config
 ├── scripts/                # Maintenance / one-off scripts
 ├── tests/                  # Automated test suites
 ├── docker-compose.yml
@@ -227,7 +227,7 @@ Always take a fresh dump immediately before cutting over, and verify row counts 
 - **Password-reset OTP / other emails never arrive** — the API always replies with a generic success message ("If that email exists...") even when sending silently failed, to avoid leaking which emails are registered — so check the *actual* delivery path instead of the UI response. Run `node scripts/test-smtp.js you@example.com` (from `backend/`, or `docker compose exec backend node scripts/test-smtp.js you@example.com` under Docker) to verify credentials and send a real test message. Under Docker, remember SMTP vars come from the **root** `.env`, not `backend/.env` (see Environment Variables above) — the single most common cause of this.
 - **Images not showing up** — make sure the migration ran (`images` table must exist) and that `VITE_API_URL` is correct for your deployment topology (see [Environment Variables](#environment-variables)).
 - **"Not found" errors on an admin page** — usually means the frontend and backend versions are out of sync (an older frontend build calling a route that doesn't exist yet, or vice versa); rebuild/redeploy both together.
-- **Code submissions time out or fail** — make sure Codebox is reachable from the backend container; see `infra/codebox/README.md`.
+- **Code submissions time out or fail** — make sure the piston1/2/3 + piston-lb containers are up and the language packages have been installed (`./infra/piston/scripts/install-packages.sh`); see `infra/piston/README.md`.
 - **A newly created admin can't see a colleague's tests** — confirm both accounts have `role = 'admin'` or `'super_admin'` in the `users` table; only the `student` role is scoped to published tests in their department.
 
 ## License

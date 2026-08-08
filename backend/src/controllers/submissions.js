@@ -489,7 +489,7 @@ async function submitAndPushRunCodeResult(id, entry) {
     return;
   }
 
-  pendingRunCodeResults.set(id, { userId: entry.userId, result: null, codeboxToken: token });
+  pendingRunCodeResults.set(id, { userId: entry.userId, result: null, execToken: token });
 
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 1000));

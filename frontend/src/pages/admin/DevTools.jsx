@@ -2,35 +2,41 @@ import { useState } from 'react';
 import { Alert, Tabs, Btn } from '../../components/shared/UI';
 
 /* ═══════════════════════════════════════════════════════════
- * Dev Tools — quick access to the local pgAdmin and Codebox
- * instances started via docker-compose (see infra/codebox/ and
+ * Dev Tools — quick access to the local pgAdmin and Piston
+ * instances started via docker-compose (see infra/piston/ and
  * docker-compose.yml). Visible to both `admin` and `super_admin`
  * — same access level as the rest of /admin.
  *
- * Both tools run as separate services on their own ports, so we
- * embed them in an iframe for convenience, but always show an
- * "Open in new tab" escape hatch since some tools (pgAdmin in
- * particular) may refuse to render in an iframe depending on how
- * it's configured, and browsers give no reliable way to detect
- * that from the parent page.
+ * pgAdmin has a real web UI, so it's embedded in an iframe. Piston
+ * is a REST API with no UI of its own, so its tab instead shows
+ * its /api/v2/runtimes endpoint (JSON list of installed language
+ * runtimes) — the quickest way to confirm it's up and which
+ * languages are installed. Always show an "Open in new tab" escape
+ * hatch since pgAdmin in particular may refuse to render in an
+ * iframe depending on how it's configured, and browsers give no
+ * reliable way to detect that from the parent page.
  * ═══════════════════════════════════════════════════════════ */
+
+const PISTON_BASE = import.meta.env.VITE_PISTON_URL || 'http://localhost:2000';
 
 const TOOLS = {
   pgadmin: {
     label: 'pgAdmin',
     url: import.meta.env.VITE_PGADMIN_URL || 'http://localhost:8467',
     description: 'Browse and query the Postgres database directly.',
+    embeddable: true,
   },
-  codebox: {
-    label: 'Codebox',
-    url: import.meta.env.VITE_CODEBOX_URL || 'http://localhost:3000',
-    description: 'Self-hosted code execution engine used for running and grading coding submissions.',
+  piston: {
+    label: 'Piston',
+    url: `${PISTON_BASE}/api/v2/runtimes`,
+    description: 'Self-hosted code execution engine used for running and grading coding submissions. Shows installed language runtimes.',
+    embeddable: true,
   },
 };
 
 export default function DevTools() {
   const [active, setActive] = useState('pgadmin');
-  const [iframeError, setIframeError] = useState({ pgadmin: false, codebox: false });
+  const [iframeError, setIframeError] = useState({ pgadmin: false, piston: false });
   const tool = TOOLS[active];
 
   return (
@@ -38,12 +44,12 @@ export default function DevTools() {
       <div>
         <h1 className="font-display font-bold text-xl text-ink">Dev Tools</h1>
         <p className="text-sm text-annotation mt-0.5">
-          Quick links to the local pgAdmin and Codebox instances running via Docker on this machine.
+          Quick links to the local pgAdmin and Piston instances running via Docker on this machine.
         </p>
       </div>
 
       <Alert type="warning">
-        These point at services running on <strong>your own machine</strong> ({TOOLS.pgadmin.url} and {TOOLS.codebox.url}).
+        These point at services running on <strong>your own machine</strong> ({TOOLS.pgadmin.url} and {TOOLS.piston.url}).
         They won't load here if the Docker containers aren't running, or if you're viewing CampusTrack from a different
         device than the one hosting them.
       </Alert>
@@ -51,7 +57,7 @@ export default function DevTools() {
       <Tabs
         tabs={[
           { id: 'pgadmin', label: 'pgAdmin' },
-          { id: 'codebox', label: 'Codebox' },
+          { id: 'piston', label: 'Piston' },
         ]}
         active={active}
         onChange={setActive}

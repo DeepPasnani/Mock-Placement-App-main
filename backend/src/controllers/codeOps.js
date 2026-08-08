@@ -1,7 +1,7 @@
 const { query } = require('../db');
 const { analyzeCode } = require('../services/codeAnalysis');
 const { runCode: runnerRunCode } = require('../services/runner');
-const { outputsMatch } = require('../services/codebox');
+const { outputsMatch } = require('../services/piston');
 const logger = require('../services/logger');
 
 // POST /api/code/lint
