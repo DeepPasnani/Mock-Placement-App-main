@@ -233,7 +233,7 @@ async function sendTestReminderEmail({ to, name, test }) {
 }
 
 // ── 7. Weekly digest ─────────────────────────────────────────
-async function sendWeeklyDigestEmail({ to, name, submissions, upcomingTests, unreadCount, achievements }) {
+async function sendWeeklyDigestEmail({ to, name, submissions, upcomingTests, unreadCount }) {
   let submissionsHtml = '';
   if (submissions && submissions.length > 0) {
     submissionsHtml = submissions.map(s => {
@@ -250,11 +250,6 @@ async function sendWeeklyDigestEmail({ to, name, submissions, upcomingTests, unr
       });
       return `<div class="info-row"><span class="info-label">${t.title}</span><span class="info-value">${date}</span></div>`;
     }).join('');
-  }
-
-  let achievementsHtml = '';
-  if (achievements && achievements.length > 0) {
-    achievementsHtml = achievements.map(a => `<span class="badge badge-green">${a.name}</span>`).join(' ');
   }
 
   await sendEmail({
@@ -275,8 +270,6 @@ async function sendWeeklyDigestEmail({ to, name, submissions, upcomingTests, unr
       <div class="info-box">
         <div class="info-row"><span class="info-label">Unread Notifications</span><span class="info-value">${unreadCount}</span></div>
       </div>
-
-      ${achievementsHtml ? `<h3 style="font-size:15px;margin:20px 0 10px;">🏆 Achievements Earned</h3><p>${achievementsHtml}</p>` : ''}
 
       <p style="margin-top:24px;font-size:12px;color:#94a3b8;">
         <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/student/notifications/preferences" style="color:#1a6cf5;">Unsubscribe from weekly digests</a>

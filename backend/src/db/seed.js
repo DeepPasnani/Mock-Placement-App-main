@@ -1,11 +1,21 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const { query } = require('./index');
+const { ALLOWED_BATCHES } = require('../config/classes');
 
 const DEPARTMENTS = [
   'Computer Engineering',
-  'Computer Science and Design'
+  'Computer Science and Design',
+  'Aeronautical Engineering',
+  'Information Technology',
+  'Civil Engineering',
+  'Electronics and Communication Engineering',
+  'Electrical Engineering',
+  'Mechanical Engineering',
 ];
+
+// Each department gets exactly 4 class clusters (Batch 1-4).
+const BATCHES = ALLOWED_BATCHES;
 
 async function seed() {
   console.log('Seeding database...');
@@ -35,18 +45,22 @@ async function seed() {
       is_active = true;
   `, [adminHash]);
 
-  // Create sample batches for Computer Engineering
+  // Create 4 class batches for every department
+  const values = [];
+  const params = [];
+  for (const dept of DEPARTMENTS) {
+    for (const batch of BATCHES) {
+      params.push(batch, dept, 3);
+      values.push(`($${params.length - 2}, $${params.length - 1}, $${params.length})`);
+    }
+  }
   const batcheRows = await query(`
     INSERT INTO batches (name, department, year_of_study)
-    VALUES
-      ('CE Batch 1', 'Computer Engineering', 3),
-      ('CE Batch 2', 'Computer Engineering', 3),
-      ('CE Batch 3', 'Computer Engineering', 3),
-      ('CE Batch 4', 'Computer Engineering', 3)
+    VALUES ${values.join(', ')}
     ON CONFLICT (name, department) DO NOTHING
     RETURNING id, name
-  `);
-  console.log(`   Created ${batcheRows.rows.length} sample batches`);
+  `, params);
+  console.log(`   Created ${batcheRows.rows.length} sample batches (${BATCHES.length} per department)`);
 
   console.log('✅ Seed complete.');
   console.log('   Super Admin email: superadmin@college.edu');

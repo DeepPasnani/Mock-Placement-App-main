@@ -18,12 +18,14 @@ scrape_configs:
             values: ['pp_backend*']
     relabel_configs:
       - source_labels: ['__meta_docker_container_name']
-        regex: 'pp_backend_(.+)'
+        regex: 'pp_backend(?:_(.+))?'
         target_label: 'instance'
       - source_labels: ['__meta_docker_container_name']
         target_label: 'container'
       - source_labels: ['__meta_docker_container_log_stream']
         target_label: 'log_stream'
+      - target_label: 'job'
+        replacement: 'campustrack-backend'
     pipeline_stages:
       - json:
           expressions:
@@ -33,24 +35,27 @@ scrape_configs:
             correlation_id: correlation_id
             duration_ms: duration_ms
             db_query_ms: db_query_ms
-            method: method
-            path: path
-            status: status
+            method: req.method
+            path: req.url
+            status: res.statusCode
       - labels:
           level:
           instance:
           container:
 
-  - job_name: campustrack-nginx
+  # The frontend Nginx container is named pp_frontend (not pp_nginx*).
+  - job_name: campustrack-frontend
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
         filters:
           - name: name
-            values: ['pp_nginx*']
+            values: ['pp_frontend*']
     relabel_configs:
       - source_labels: ['__meta_docker_container_name']
         target_label: 'container'
+      - target_label: 'job'
+        replacement: 'campustrack-frontend'
 
   - job_name: campustrack-postgres
     docker_sd_configs:
@@ -62,3 +67,5 @@ scrape_configs:
     relabel_configs:
       - source_labels: ['__meta_docker_container_name']
         target_label: 'container'
+      - target_label: 'job'
+        replacement: 'campustrack-postgres'

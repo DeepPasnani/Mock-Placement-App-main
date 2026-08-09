@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { usersAPI, testsAPI, submissionsAPI } from '../../services/api';
 import { Badge, Spinner } from '../../components/shared/UI';
+import { ALLOWED_DEPARTMENTS as DEPT_ORDER } from '../../lib/departments';
 import { formatDistanceToNow } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
   }));
 
   // ── Cluster breakdown: department → year → batch ──────────
-  const deptOrder = ['Computer Engineering', 'Computer Science and Design'];
+  const deptOrder = DEPT_ORDER;
   const clusterMap = {};
   scoredSubs.forEach(sb => {
     const dept  = sb.user_department || sb.department || 'Unknown';

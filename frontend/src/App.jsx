@@ -39,13 +39,9 @@ const TestInterface = lazy(() => import('./pages/student/TestInterface'));
 const ResultDetail = lazy(() => import('./pages/student/ResultDetail'));
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
 
-const Gamification = lazy(() => import('./pages/student/Gamification'));
+const Profile = lazy(() => import('./pages/Profile'));
+
 const Leaderboard = lazy(() => import('./pages/student/Leaderboard'));
-const Achievements = lazy(() => import('./pages/student/Achievements'));
-const Progress = lazy(() => import('./pages/student/Progress'));
-const DailyChallenge = lazy(() => import('./pages/student/DailyChallenge'));
-const MockInterview = lazy(() => import('./pages/student/MockInterview'));
-const Resources = lazy(() => import('./pages/student/Resources'));
 
 function SuspenseFallback() {
   return (
@@ -150,6 +146,7 @@ export default function App() {
         <Route path="ai/placement-predictions" element={<ErrorBoundary><AiPlacementPredictions /></ErrorBoundary>} />
         <Route path="ai/nl-query" element={<ErrorBoundary><AiNlQuery /></ErrorBoundary>} />
         <Route path="dev-tools" element={<ErrorBoundary><DevTools /></ErrorBoundary>} />
+        <Route path="profile" element={<ErrorBoundary><Profile /></ErrorBoundary>} />
       </Route>
 
       {/* Student routes */}
@@ -158,13 +155,8 @@ export default function App() {
         <Route path="tests" element={<ErrorBoundary><StudentTests /></ErrorBoundary>} />
         <Route path="results" element={<ErrorBoundary><StudentResults /></ErrorBoundary>} />
         <Route path="results/:submissionId" element={<ErrorBoundary><ResultDetail /></ErrorBoundary>} />
-        <Route path="gamification" element={<ErrorBoundary><Gamification /></ErrorBoundary>} />
         <Route path="leaderboard" element={<ErrorBoundary><Leaderboard /></ErrorBoundary>} />
-        <Route path="achievements" element={<ErrorBoundary><Achievements /></ErrorBoundary>} />
-        <Route path="progress" element={<ErrorBoundary><Progress /></ErrorBoundary>} />
-        <Route path="daily-challenge" element={<ErrorBoundary><DailyChallenge /></ErrorBoundary>} />
-        <Route path="mock-interview" element={<ErrorBoundary><MockInterview /></ErrorBoundary>} />
-        <Route path="resources" element={<ErrorBoundary><Resources /></ErrorBoundary>} />
+        <Route path="profile" element={<ErrorBoundary><Profile /></ErrorBoundary>} />
       </Route>
 
       {/* Test taking - full screen, no layout */}

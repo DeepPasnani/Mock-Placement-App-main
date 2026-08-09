@@ -1,5 +1,6 @@
 const { query } = require('../db');
 const { cacheDelPattern } = require('../db/redis');
+const { ALLOWED_BATCHES, ALLOWED_YEARS, isAllowedBatch, isAllowedYear } = require('../config/classes');
 
 // ── GET /api/batches ─────────────────────────────────────────
 async function listBatches(req, res) {
@@ -15,13 +16,23 @@ async function createBatch(req, res) {
   if (!name || !department) {
     return res.status(400).json({ error: 'Name and department required' });
   }
+  if (!isAllowedBatch(name)) {
+    return res.status(400).json({
+      error: `Only these class clusters are allowed: ${ALLOWED_BATCHES.join(', ')}`,
+    });
+  }
+  if (yearOfStudy !== undefined && yearOfStudy !== null && !isAllowedYear(yearOfStudy)) {
+    return res.status(400).json({
+      error: `Year of study must be ${ALLOWED_YEARS.join('–')}`,
+    });
+  }
 
   const { rows: [batch] } = await query(
     `INSERT INTO batches (name, department, year_of_study)
      VALUES ($1,$2,$3) ON CONFLICT (name, department) DO UPDATE SET
        year_of_study = EXCLUDED.year_of_study
      RETURNING *`,
-    [name, department, yearOfStudy || 1]
+    [name.trim(), department, yearOfStudy || 1]
   );
 
   res.status(201).json({ batch });

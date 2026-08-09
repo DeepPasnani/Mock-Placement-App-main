@@ -5,7 +5,7 @@ global:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
+        - targets: ['alertmanager:9093']
 
 rule_files:
   - "alerts.yml"
@@ -20,7 +20,6 @@ scrape_configs:
     static_configs:
       - targets:
           - 'backend:5000'
-          - 'backend:5001'
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
@@ -38,3 +37,22 @@ scrape_configs:
   - job_name: 'node'
     static_configs:
       - targets: ['node-exporter:9100']
+
+  # Piston has no built-in Prometheus exporter, so we probe its nginx load
+  # balancer's /healthz endpoint with blackbox-exporter. probe_success for
+  # this job backs both the PistonUnreachable alert and the Grafana
+  # "Piston Availability" panel.
+  - job_name: 'piston-lb'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://piston-lb:2000/healthz
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

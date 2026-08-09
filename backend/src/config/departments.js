@@ -4,6 +4,12 @@
 const ALLOWED_DEPARTMENTS = [
   'Computer Engineering',
   'Computer Science and Design',
+  'Aeronautical Engineering',
+  'Information Technology',
+  'Civil Engineering',
+  'Electronics and Communication Engineering',
+  'Electrical Engineering',
+  'Mechanical Engineering',
 ];
 
 const ALLOWED_SET = new Set(ALLOWED_DEPARTMENTS);
@@ -21,6 +27,28 @@ const ALIASES = {
   'cs design': 'Computer Science and Design',
   'computerscienceanddesign': 'Computer Science and Design',
   'computer science and design': 'Computer Science and Design',
+  'aeronautical': 'Aeronautical Engineering',
+  'aero': 'Aeronautical Engineering',
+  'aeronauticalengineering': 'Aeronautical Engineering',
+  'aeronautical engineering': 'Aeronautical Engineering',
+  'it': 'Information Technology',
+  'informationtechnology': 'Information Technology',
+  'information technology': 'Information Technology',
+  'civil': 'Civil Engineering',
+  'civilengineering': 'Civil Engineering',
+  'civil engineering': 'Civil Engineering',
+  'ece': 'Electronics and Communication Engineering',
+  'electronicsandcommunicationengineering': 'Electronics and Communication Engineering',
+  'electronics and communication engineering': 'Electronics and Communication Engineering',
+  'electronics': 'Electronics and Communication Engineering',
+  'eee': 'Electrical Engineering',
+  'electricalengineering': 'Electrical Engineering',
+  'electrical engineering': 'Electrical Engineering',
+  'electrical': 'Electrical Engineering',
+  'me': 'Mechanical Engineering',
+  'mechanicalengineering': 'Mechanical Engineering',
+  'mechanical engineering': 'Mechanical Engineering',
+  'mechanical': 'Mechanical Engineering',
 };
 
 function normalizeDepartment(value) {

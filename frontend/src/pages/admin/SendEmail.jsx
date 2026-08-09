@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { emailAPI, usersAPI, batchesAPI } from '../../services/api';
 import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
+import { ALLOWED_DEPARTMENTS as DEPARTMENTS } from '../../lib/departments';
 import toast from 'react-hot-toast';
 
 const TEMPLATES = {
@@ -11,8 +12,6 @@ const TEMPLATES = {
   testResults: { label: 'Test Results', subject: 'Your Results', body: '<p>Hi {name},</p><p>Your results are now available. Log in to view.</p>' },
   passwordReset: { label: 'Password Reset', subject: 'Password Reset OTP', body: '<p>Hi {name},</p><p>Use the OTP provided to reset your password.</p>' },
 };
-
-const DEPARTMENTS = ['CSE', 'IT', 'ECE', 'EEE', 'ME', 'CE', 'AI', 'CSIT'];
 
 export default function SendEmail() {
   const [subject, setSubject] = useState('');

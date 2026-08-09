@@ -281,7 +281,7 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_users_batch ON users(batch);
 
     -- ═══════════════════════════════════════════════════════════
-    -- GAMIFICATION SYSTEM
+    -- LEADERBOARD (student XP backing data)
     -- ═══════════════════════════════════════════════════════════
 
     -- Student XP & Leveling
@@ -303,124 +303,6 @@ async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_xp_transactions_user ON xp_transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_xp_transactions_created ON xp_transactions(created_at);
-
-    -- Achievement Badges
-    CREATE TABLE IF NOT EXISTS achievement_definitions (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      key VARCHAR(100) UNIQUE NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      description TEXT,
-      icon_url TEXT,
-      criteria JSONB DEFAULT '{}',
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS student_achievements (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      achievement_id UUID NOT NULL REFERENCES achievement_definitions(id) ON DELETE CASCADE,
-      earned_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(user_id, achievement_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_student_achievements_user ON student_achievements(user_id);
-
-    -- Streak Tracking
-    CREATE TABLE IF NOT EXISTS streaks (
-      user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      current_streak INTEGER DEFAULT 0,
-      longest_streak INTEGER DEFAULT 0,
-      last_activity_date DATE
-    );
-
-    -- Daily Challenges
-    CREATE TABLE IF NOT EXISTS daily_challenges (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      date DATE UNIQUE NOT NULL,
-      question_id UUID,
-      type VARCHAR(20) NOT NULL CHECK (type IN ('mcq', 'coding')),
-      xp_reward INTEGER DEFAULT 20,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS daily_challenge_submissions (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      challenge_id UUID NOT NULL REFERENCES daily_challenges(id) ON DELETE CASCADE,
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      answer JSONB,
-      correct BOOLEAN DEFAULT false,
-      submitted_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(challenge_id, user_id)
-    );
-
-    -- Study Resources
-    CREATE TABLE IF NOT EXISTS study_resources (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      title VARCHAR(500) NOT NULL,
-      description TEXT,
-      type VARCHAR(20) NOT NULL CHECK (type IN ('note', 'video', 'practice')),
-      genre VARCHAR(50),
-      url TEXT,
-      completed_count INTEGER DEFAULT 0,
-      created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS resource_completions (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      resource_id UUID NOT NULL REFERENCES study_resources(id) ON DELETE CASCADE,
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      completed_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(resource_id, user_id)
-    );
-
-    -- Mock Interview Sessions
-    CREATE TABLE IF NOT EXISTS mock_interview_sessions (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      difficulty VARCHAR(10) NOT NULL DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
-      status VARCHAR(20) DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed')),
-      mcq_score NUMERIC(8,2) DEFAULT 0,
-      coding_score NUMERIC(8,2) DEFAULT 0,
-      total_score NUMERIC(8,2) DEFAULT 0,
-      max_score NUMERIC(8,2) DEFAULT 0,
-      section_feedback JSONB DEFAULT '[]',
-      started_at TIMESTAMPTZ DEFAULT NOW(),
-      completed_at TIMESTAMPTZ
-    );
-
-    CREATE TABLE IF NOT EXISTS mock_interview_answers (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      session_id UUID NOT NULL REFERENCES mock_interview_sessions(id) ON DELETE CASCADE,
-      question_id UUID,
-      type VARCHAR(10) NOT NULL CHECK (type IN ('mcq', 'coding')),
-      question_data JSONB,
-      answer TEXT,
-      correct BOOLEAN DEFAULT false,
-      marks INTEGER DEFAULT 0,
-      max_marks INTEGER DEFAULT 0,
-      time_taken_seconds INTEGER DEFAULT 0
-    );
-
-    -- Gamification indexes
-    CREATE INDEX IF NOT EXISTS idx_xp_transactions_created_at ON xp_transactions(created_at);
-    CREATE INDEX IF NOT EXISTS idx_daily_challenges_date ON daily_challenges(date);
-    CREATE INDEX IF NOT EXISTS idx_study_resources_type ON study_resources(type);
-    CREATE INDEX IF NOT EXISTS idx_study_resources_genre ON study_resources(genre);
-    CREATE INDEX IF NOT EXISTS idx_mock_interview_sessions_user ON mock_interview_sessions(user_id);
-
-    -- Seed default achievements
-    INSERT INTO achievement_definitions (key, name, description, criteria) VALUES
-      ('first_test', 'First Steps', 'Complete your first test', '{"type": "test_count", "count": 1}'),
-      ('score_90', 'Top Performer', 'Score 90% or above in any test', '{"type": "score_threshold", "threshold": 90}'),
-      ('streak_7', 'Consistent', 'Maintain a 7-day streak', '{"type": "streak", "days": 7}'),
-      ('streak_30', 'Dedicated', 'Maintain a 30-day streak', '{"type": "streak", "days": 30}'),
-      ('three_hard', 'Problem Solver', 'Solve 3 hard coding problems', '{"type": "hard_problems", "count": 3}'),
-      ('daily_champion', 'Daily Champion', 'Complete a daily challenge', '{"type": "daily_challenge", "count": 1}'),
-      ('xp_1000', 'Century Club', 'Earn 1000 XP', '{"type": "xp_total", "xp": 1000}'),
-      ('xp_5000', 'XP Master', 'Earn 5000 XP', '{"type": "xp_total", "xp": 5000}'),
-      ('level_5', 'Rising Star', 'Reach Level 5', '{"type": "level", "level": 5}'),
-      ('level_10', 'Veteran', 'Reach Level 10', '{"type": "level", "level": 10}')
-    ON CONFLICT (key) DO NOTHING;
 
     -- ═══════════════════════════════════════════════════════════
     -- COMMUNICATION & NOTIFICATIONS
@@ -1064,14 +946,6 @@ async function migrate() {
     created_at TIMESTAMPTZ DEFAULT NOW()
   );
 
-  -- Interview video meeting info (add to existing if needed)
-  DO $$ BEGIN
-    ALTER TABLE mock_interview_sessions ADD COLUMN IF NOT EXISTS meeting_url TEXT;
-    ALTER TABLE mock_interview_sessions ADD COLUMN IF NOT EXISTS meeting_password VARCHAR(100);
-    ALTER TABLE mock_interview_sessions ADD COLUMN IF NOT EXISTS meeting_provider VARCHAR(10);
-  EXCEPTION WHEN duplicate_column THEN NULL;
-  END $$;
-
   -- ═══════════════════════════════════════════════════════════
   -- STUDENT EXPERIENCE & SELF-SERVICE FEATURES
   -- ═══════════════════════════════════════════════════════════
@@ -1145,16 +1019,24 @@ async function migrate() {
 
   -- ═══════════════════════════════════════════════════════════
   -- DEPARTMENT RESTRICTION
-  -- The platform is restricted to Computer Engineering and
-  -- Computer Science and Design only. Existing student accounts
-  -- that belong to any other department are deactivated so they
-  -- can no longer sign in or sit tests.
+  -- The platform is restricted to the eligible departments below.
+  -- Existing student accounts that belong to any other department
+  -- are deactivated so they can no longer sign in or sit tests.
   -- ═══════════════════════════════════════════════════════════
   UPDATE users
      SET is_active = false,
          updated_at = NOW()
    WHERE role = 'student'
-     AND COALESCE(department, '') NOT IN ('Computer Engineering', 'Computer Science and Design');
+     AND COALESCE(department, '') NOT IN (
+       'Computer Engineering',
+       'Computer Science and Design',
+       'Aeronautical Engineering',
+       'Information Technology',
+       'Civil Engineering',
+       'Electronics and Communication Engineering',
+       'Electrical Engineering',
+       'Mechanical Engineering'
+     );
   `);
 
   console.log('✅ Migrations complete.');

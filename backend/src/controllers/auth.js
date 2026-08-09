@@ -5,6 +5,7 @@ const { OAuth2Client } = require('google-auth-library');
 const { query }        = require('../db');
 const { cacheSet, cacheDel, cacheGet } = require('../db/redis');
 const { normalizeDepartment, ALLOWED_DEPARTMENTS } = require('../config/departments');
+const { ALLOWED_YEARS, isAllowedYear } = require('../config/classes');
 const {
   sendWelcomeEmail,
   sendPasswordResetEmail,
@@ -195,23 +196,59 @@ async function googleLogin(req, res) {
   }
 
   const { sub: googleId, email, name, picture } = payload;
+  const emailLower = email.toLowerCase();
 
-  const isNew = !(await query('SELECT id FROM users WHERE google_id=$1', [googleId])).rows.length;
+  // Existing account? Match by google_id first, then by the verified Google
+  // email — so a student who already registered with a password can link
+  // their Google account instead of tripping the UNIQUE email constraint.
+  const { rows: existingRows } = await query(
+    `SELECT id, name, email, role, avatar_url, is_active, google_id,
+            department, branch, roll_number, batch, year_of_study
+     FROM users
+     WHERE google_id = $1 OR email = $2
+     ORDER BY (google_id = $1) DESC
+     LIMIT 1`,
+    [googleId, emailLower]
+  );
 
-  const { rows: [user] } = await query(`
-    INSERT INTO users (google_id, email, name, avatar_url, role)
-    VALUES ($1,$2,$3,$4,'student')
-    ON CONFLICT (google_id) DO UPDATE SET
-      email = EXCLUDED.email, name = EXCLUDED.name,
-      avatar_url = EXCLUDED.avatar_url, last_login = NOW()
-    RETURNING id, name, email, role, avatar_url, is_active,
-              department, branch, roll_number, batch, year_of_study
-  `, [googleId, email.toLowerCase(), name, picture]);
+  let isNew = false;
+  let user = existingRows[0];
+
+  if (user) {
+    if (user.google_id === googleId) {
+      // Returning Google user — refresh their profile info
+      ({ rows: [user] } = await query(
+        `UPDATE users SET email = $1, name = $2, avatar_url = $3, last_login = NOW()
+         WHERE id = $4
+         RETURNING id, name, email, role, avatar_url, is_active, google_id,
+                   department, branch, roll_number, batch, year_of_study`,
+        [emailLower, name, picture, user.id]
+      ));
+    } else {
+      // Email already registered with a password — link this Google account
+      ({ rows: [user] } = await query(
+        `UPDATE users SET google_id = $1, avatar_url = $2, last_login = NOW()
+         WHERE id = $3
+         RETURNING id, name, email, role, avatar_url, is_active, google_id,
+                   department, branch, roll_number, batch, year_of_study`,
+        [googleId, picture, user.id]
+      ));
+    }
+  } else {
+    isNew = true;
+    ({ rows: [user] } = await query(
+      `INSERT INTO users (google_id, email, name, avatar_url, role)
+       VALUES ($1,$2,$3,$4,'student')
+       RETURNING id, name, email, role, avatar_url, is_active, google_id,
+                 department, branch, roll_number, batch, year_of_study`,
+      [googleId, emailLower, name, picture]
+    ));
+  }
 
   if (!user.is_active) return res.status(403).json({ error: 'Account is deactivated' });
 
   // Send welcome email only on first login
-  if (isNew) sendWelcomeEmail({ to: email.toLowerCase(), name }).catch(() => {});
+  if (isNew) sendWelcomeEmail({ to: emailLower, name }).catch(() => {});
 
   const token = signToken(user.id, user.role);
   res.json({
@@ -235,8 +272,8 @@ async function completeProfile(req, res) {
   }
 
   const year = parseInt(yearOfStudy, 10);
-  if (![1, 2, 3, 4].includes(year)) {
-    return res.status(400).json({ error: 'Year of study must be 1–4' });
+  if (!isAllowedYear(year)) {
+    return res.status(400).json({ error: `Year of study must be ${ALLOWED_YEARS.join('–')}` });
   }
 
   const requestedDept = department ? String(department).trim() : (req.user.department || null);

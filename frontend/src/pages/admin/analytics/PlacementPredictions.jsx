@@ -78,7 +78,7 @@ export default function PlacementPredictions() {
         </div>
         <div>
           <label htmlFor="pp-dept" className="text-2xs text-annotation/60 mb-1.5">Department</label>
-          <input value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. CSE" className="input-field max-w-28 text-xs" id="pp-dept" />
+          <input value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. Computer Engineering" className="input-field max-w-56 text-xs" id="pp-dept" />
         </div>
         <div>
           <label htmlFor="pp-minprob" className="text-2xs text-annotation/60 mb-1.5">Min Probability</label>

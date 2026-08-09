@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testsAPI, batchesAPI } from '../../services/api';
+import { testsAPI } from '../../services/api';
 import { Btn, Input, Select, Textarea, Tabs, Spinner, HelpTip } from '../../components/shared/UI';
 import toast from 'react-hot-toast';
 import BankPickerModal from './BankPickerModal';
@@ -9,6 +9,7 @@ import AptQEditor from './AptQEditor';
 import CodeQEditor from './CodeQEditor';
 import ReviewPanel from './ReviewPanel';
 import { ALLOWED_DEPARTMENTS as DEPARTMENTS } from '../../lib/departments';
+import { useClassOptions } from '../../hooks/useClassOptions';
 
 /* ═══════════════════════════════════════════════════════════
  * Admin Test Creator — Assessment builder
@@ -138,6 +139,7 @@ export default function TestCreator() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { years: targetYears, batches: targetBatches } = useClassOptions();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(DEFAULT_TEST);
   const [activeSection, setActiveSection] = useState(0);
@@ -165,13 +167,6 @@ export default function TestCreator() {
     queryFn: () => testsAPI.get(id),
     enabled: !!id,
   });
-
-  const { data: batchesData } = useQuery({
-    queryKey: ['batches'],
-    queryFn: batchesAPI.list,
-    enabled: true,
-  });
-  const allBatches = (batchesData?.batches || []).map(b => b.name);
 
   useEffect(() => {
     if (!editData) return;
@@ -533,7 +528,7 @@ export default function TestCreator() {
                     />
                     <span className="font-bold text-accent">All Years</span>
                   </label>
-                  {[1, 2, 3, 4, 5].map(y => (
+                  {targetYears.map(y => (
                     <label key={y} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
                       <input
                         type="checkbox"
@@ -559,46 +554,39 @@ export default function TestCreator() {
               </div>
               <div>
                 <label className="input-label">Target Batches (optional)</label>
-                <div className="mt-2 p-3 bg-panel/60 border border-rim rounded-xl">
-                  {allBatches.length === 0 ? (
-                    <p className="text-xs text-annotation/60 p-2">
-                      No batches defined yet. Add batches in Users → Batches, or leave blank to show the test to every batch.
-                    </p>
-                  ) : (
-                    <>
-                      <label className="flex items-center gap-2.5 text-sm font-medium text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={form.batches?.includes('all')}
-                          onChange={e => upd('batches', e.target.checked ? ['all'] : [])}
-                          className="accent-accent w-4 h-4 rounded cursor-pointer"
-                        />
-                        <span className="font-bold text-accent">All Batches</span>
-                      </label>
-                      <div className="max-h-44 overflow-y-auto">
-                        {allBatches.map(b => (
-                          <label key={b} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={form.batches?.includes(b)}
-                              onChange={e => {
-                                let bl = form.batches?.includes('all') ? [] : (form.batches || []);
-                                if (e.target.checked) {
-                                  bl = [...bl, b];
-                                } else {
-                                  bl = bl.filter(v => v !== b);
-                                }
-                                upd('batches', bl);
-                              }}
-                              className="accent-accent w-4 h-4 rounded cursor-pointer"
-                            />
-                            <span>{b}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                <div className="mt-2 p-4 bg-panel border border-rim rounded-xl">
+                  <label className="flex items-center gap-2.5 text-sm font-medium text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={form.batches?.includes('all')}
+                      onChange={e => upd('batches', e.target.checked ? ['all'] : [])}
+                      className="accent-accent w-4 h-4 rounded cursor-pointer"
+                    />
+                    <span className="font-bold text-accent">All Batches</span>
+                  </label>
+                  {targetBatches.map(b => (
+                    <label key={b} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.batches?.includes(b)}
+                        onChange={e => {
+                          let bl = form.batches?.includes('all') ? [] : (form.batches || []);
+                          if (e.target.checked) {
+                            bl = [...bl, b];
+                          } else {
+                            bl = bl.filter(v => v !== b);
+                          }
+                          upd('batches', bl);
+                        }}
+                        className="accent-accent w-4 h-4 rounded cursor-pointer"
+                      />
+                      <span>{b}</span>
+                    </label>
+                  ))}
                 </div>
+                <p className="text-2xs text-annotation/60 mt-1.5">
+                  Leave all unchecked (or select "All Batches") to include students from every batch.
+                </p>
               </div>
             </div>
 
@@ -706,12 +694,12 @@ export default function TestCreator() {
                     <Input
                       label={
                         <span className="flex items-center gap-1.5">
-                          Allowed Branches <HelpTip text="Comma-separated branch codes. Leave blank for all branches. Example: CSE, IT, ECE" />
+                          Allowed Branches <HelpTip text="Comma-separated branch names. Leave blank for all branches. Example: Computer Engineering, Information Technology" />
                         </span>
                       }
                       value={form.settings.allowedBranches}
                       onChange={e => updSettings('allowedBranches', e.target.value)}
-                      placeholder="CSE, IT, ECE"
+                      placeholder="Computer Engineering, Information Technology"
                     />
                   </div>
                   <div className="flex gap-5 flex-wrap">

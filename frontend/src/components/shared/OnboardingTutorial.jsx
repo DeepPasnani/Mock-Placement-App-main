@@ -21,7 +21,7 @@ const STEPS = [
   },
   {
     title: 'Stay sharp',
-    body: 'Keep an eye on your weak topics and XP progress. Consistent practice is what moves your leaderboard rank.',
+    body: 'Keep an eye on your weak topics and practice consistently to climb the leaderboard.',
   },
 ];
 

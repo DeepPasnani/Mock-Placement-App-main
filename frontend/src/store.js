@@ -83,14 +83,6 @@ export const useStore = create(
       sidebarOpen: true,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
-      // Gamification state
-      streak: null,
-      xpStats: null,
-      setStreak: (streak) => set({ streak }),
-      setXpStats: (xpStats) => set({ xpStats }),
-      checkedInToday: false,
-      setCheckedInToday: (v) => set({ checkedInToday: v }),
-
       // Accessibility & preferences
       preferences: {
         onboardingCompleted: false,
@@ -105,8 +97,8 @@ export const useStore = create(
     {
       name: 'pp-store',
       partialize: (s) => ({
-        user: s.user, token: s.token, streak: s.streak, xpStats: s.xpStats,
-        checkedInToday: s.checkedInToday, preferences: s.preferences,
+        user: s.user, token: s.token,
+        preferences: s.preferences,
       }),
     }
   )

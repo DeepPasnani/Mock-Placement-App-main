@@ -2,7 +2,6 @@ const { query } = require('../db');
 const logger = require('./logger');
 const { sendTestScheduledEmail, sendTestResultEmail, sendWeeklyDigestEmail, sendTestReminderEmail } = require('./email');
 const { createNotification } = require('../controllers/notifications');
-const { startDailyChallengeCheck } = require('../controllers/gamification');
 
 let intervalHandle = null;
 
@@ -45,7 +44,6 @@ async function publishScheduledTests() {
 async function runScheduledTasks() {
   try {
     await publishScheduledTests();
-    await startDailyChallengeCheck();
     await sendDriveReminders();
     await sendResultAnnouncements();
     await sendTestStartReminders();
@@ -324,21 +322,12 @@ async function checkWeeklyDigest() {
         [student.id]
       );
 
-      // Get achievements earned this week
-      const { rows: achievements } = await query(`
-        SELECT ad.name, ad.icon_url, sa.earned_at
-        FROM student_achievements sa
-        JOIN achievement_definitions ad ON ad.id = sa.achievement_id
-        WHERE sa.user_id = $1 AND sa.earned_at > $2
-      `, [student.id, lastWeek]);
-
       await sendWeeklyDigestEmail({
         to: student.email,
         name: student.name,
         submissions,
         upcomingTests,
         unreadCount: unread.count,
-        achievements,
       }).catch(() => {});
       sent++;
     } catch {

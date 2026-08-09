@@ -1,36 +1,24 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
-import { useQuery } from '@tanstack/react-query';
-import { gamificationAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Zap, Flame, Menu, X, BarChart3, Trophy, Medal, TrendingUp, CalendarCheck, Video, BookOpen, FileText, MoreHorizontal, LayoutDashboard } from 'lucide-react';
+import { Menu, X, BarChart3, Trophy, LayoutDashboard, FileText, User } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
  * Student Layout — Top nav bar + content
  * ──────────────────────────────────────────────────────────
  * One source of truth for navigation: PRIMARY_LINKS render inline
- * on desktop (Tests–XP) with the rest behind "More", and ALL links
- * render in the mobile menu. Same array drives both, so desktop
- * and mobile can never drift.
+ * on desktop, and ALL links render in the mobile menu. Same
+ * array drives both, so desktop and mobile can never drift.
  * ═══════════════════════════════════════════════════════════ */
 
 const PRIMARY_LINKS = [
   { to: '/student', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/student/tests', label: 'My Tests', icon: FileText },
   { to: '/student/results', label: 'Results', icon: BarChart3 },
-  { to: '/student/achievements', label: 'Achievements', icon: Medal },
-  { to: '/student/progress', label: 'Progress', icon: TrendingUp },
-  { to: '/student/gamification', label: 'XP', icon: Zap },
   { to: '/student/leaderboard', label: 'Leaderboard', icon: Trophy },
+  { to: '/student/profile', label: 'Profile', icon: User },
 ];
-
-const MORE_LINKS = [
-  { to: '/student/daily-challenge', label: 'Daily Challenge', icon: CalendarCheck },
-  { to: '/student/mock-interview', label: 'Mock Interview', icon: Video },
-  { to: '/student/resources', label: 'Resources', icon: BookOpen },
-];
-
-const ALL_LINKS = [...PRIMARY_LINKS, ...MORE_LINKS];
 
 const desktopLinkClass = ({ isActive }) =>
   `flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
@@ -49,74 +37,10 @@ function DesktopLink({ link }) {
   );
 }
 
-function MoreMenu() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="true"
-        aria-expanded={open}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-annotation hover:bg-panel hover:text-ink transition-all"
-      >
-        <MoreHorizontal size={14} />
-        More
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-panel border border-rim rounded-xl shadow-lg shadow-black/5 overflow-hidden z-30 animate-fade-in">
-          {MORE_LINKS.map(link => {
-            const Icon = link.icon;
-            return (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-all ${
-                    isActive ? 'bg-accent/10 text-accent' : 'text-annotation hover:bg-sunken hover:text-ink'
-                  }`
-                }
-              >
-                <Icon size={15} className="opacity-80" />
-                {link.label}
-              </NavLink>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function StudentLayout() {
-  const { user, logout, streak, setStreak } = useStore();
+  const { user, logout } = useStore();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useQuery({
-    queryKey: ['streak-data'],
-    queryFn: async () => {
-      const data = await gamificationAPI.getStreak();
-      setStreak(data.streak);
-      return data;
-    },
-    refetchInterval: 60000,
-  });
 
   const handleLogout = async () => {
     await logout();
@@ -154,18 +78,11 @@ export default function StudentLayout() {
             {/* Nav */}
             <nav className="hidden lg:flex gap-1 items-center" aria-label="Primary">
               {PRIMARY_LINKS.map(link => <DesktopLink key={link.to} link={link} />)}
-              <MoreMenu />
             </nav>
           </div>
 
-          {/* Streak + User + Sign out */}
+          {/* User + Sign out */}
           <div className="flex items-center gap-2">
-            {streak && streak.current_streak > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent/5 text-accent text-xs font-medium">
-                <Flame size={12} />
-                {streak.current_streak}
-              </div>
-            )}
             <div className="text-right hidden sm:block">
               <div className="text-xs font-medium text-ink">{user?.name || 'Student'}</div>
               <div className="text-2xs text-annotation/60">{user?.email}</div>
@@ -204,12 +121,6 @@ export default function StudentLayout() {
               </div>
               <div className="p-2 flex flex-col gap-0.5">
                 {PRIMARY_LINKS.map(link => (
-                  <DropdownLink key={link.to} link={link} onClose={() => setMobileMenuOpen(false)} />
-                ))}
-
-                <div className="my-1.5 h-px bg-sunken" />
-
-                {MORE_LINKS.map(link => (
                   <DropdownLink key={link.to} link={link} onClose={() => setMobileMenuOpen(false)} />
                 ))}
               </div>

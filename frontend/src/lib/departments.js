@@ -3,9 +3,15 @@
 export const ALLOWED_DEPARTMENTS = [
   'Computer Engineering',
   'Computer Science and Design',
+  'Aeronautical Engineering',
+  'Information Technology',
+  'Civil Engineering',
+  'Electronics and Communication Engineering',
+  'Electrical Engineering',
+  'Mechanical Engineering',
 ];
 
-// Single source of truth for class/label assignments. Import this
-// everywhere classes are offered so Login, CompleteProfile and the
+// Single source of truth for class/batch labels. Import this
+// everywhere batches are offered so Login, CompleteProfile and the
 // docs never drift apart.
-export const CLASSES = ['CE 1', 'CE 2', 'CE 3', 'CE 4'];
+export const CLASSES = ['Batch 1', 'Batch 2', 'Batch 3', 'Batch 4'];

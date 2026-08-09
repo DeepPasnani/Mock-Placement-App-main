@@ -2,9 +2,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { testsAPI, batchesAPI, questionBankAPI } from '../../services/api';
-import { Btn, Badge, Table, ConfirmModal, Spinner, Modal, Input, Select } from '../../components/shared/UI';
+import { Btn, Badge, Table, ConfirmModal, Spinner, Modal, Select } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { ALLOWED_DEPARTMENTS as DEPARTMENTS, CLASSES } from '../../lib/departments';
 
 /* ═══════════════════════════════════════════════════════════
  * Admin Tests — Test management list
@@ -375,9 +376,15 @@ function BatchMappingModal({ test, onClose }) {
         <div className="border-t border-rim pt-3">
           <label className="input-label">Add a new batch</label>
           <div className="flex gap-2">
-            <Input placeholder="Batch name, e.g. CE Batch 2" value={newBatchName} onChange={e => setNewBatchName(e.target.value)} className="flex-1" />
-            <Input placeholder="Department" value={newBatchDept} onChange={e => setNewBatchDept(e.target.value)} className="flex-1" />
-            <Btn variant="ghost" onClick={() => newBatchName.trim() && newBatchDept.trim() && createBatchMut.mutate({ name: newBatchName.trim(), department: newBatchDept.trim() })} disabled={createBatchMut.isLoading}>
+            <Select value={newBatchName} onChange={e => setNewBatchName(e.target.value)} className="flex-1 text-xs">
+              <option value="">Select batch</option>
+              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+            </Select>
+            <Select value={newBatchDept} onChange={e => setNewBatchDept(e.target.value)} className="flex-1 text-xs">
+              <option value="">Select department</option>
+              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+            </Select>
+            <Btn variant="ghost" onClick={() => newBatchName && newBatchDept && createBatchMut.mutate({ name: newBatchName, department: newBatchDept })} disabled={createBatchMut.isLoading}>
               Add
             </Btn>
           </div>

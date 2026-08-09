@@ -64,6 +64,11 @@ api.interceptors.response.use(
   }
 );
 
+// ── Class metadata (years / batches / departments) ─────────────
+export const metaAPI = {
+  options: () => api.get('/meta/options').then(r => r.data),
+};
+
 // ── Auth ──────────────────────────────────────────────────────
 export const authAPI = {
   login:           (data)       => api.post('/auth/login', data).then(r => r.data),
@@ -170,28 +175,10 @@ export const emailAPI = {
   send: (data) => api.post('/email/send', data).then(r => r.data),
 };
 
-// ── Gamification ────────────────────────────────────────────
+// ── Leaderboard ────────────────────────────────────────────
 export const gamificationAPI = {
-  awardXp:             (data) => api.post('/gamification/award-xp', data).then(r => r.data),
-  getMyStats:          ()     => api.get('/gamification/my-stats').then(r => r.data),
-  getLeaderboard:      (params) => api.get('/gamification/leaderboard', { params }).then(r => r.data),
-  getLevels:           ()     => api.get('/gamification/levels').then(r => r.data),
-  getAchievements:     ()     => api.get('/gamification/achievements').then(r => r.data),
-  getAchievementWall:  (userId) => api.get(`/gamification/achievements/wall/${userId}`).then(r => r.data),
-  checkin:             ()     => api.post('/gamification/checkin').then(r => r.data),
-  getStreak:           ()     => api.get('/gamification/streak').then(r => r.data),
-  getHeatmap:          (params) => api.get('/gamification/heatmap', { params }).then(r => r.data),
-  getDailyChallenge:   ()     => api.get('/gamification/daily-challenge').then(r => r.data),
-  submitDailyChallenge: (data) => api.post('/gamification/daily-challenge/submit', data).then(r => r.data),
-  listResources:       (params) => api.get('/gamification/resources', { params }).then(r => r.data),
-  createResource:      (data) => api.post('/gamification/resources', data).then(r => r.data),
-  updateResource:      (id, data) => api.put(`/gamification/resources/${id}`, data).then(r => r.data),
-  deleteResource:      (id) => api.delete(`/gamification/resources/${id}`).then(r => r.data),
-  completeResource:    (id) => api.post(`/gamification/resources/${id}/complete`).then(r => r.data),
-  getResourceStats:    ()  => api.get('/gamification/resources/stats').then(r => r.data),
-  startMockInterview:  (data) => api.post('/gamification/mock-interview/start', data).then(r => r.data),
-  submitMockAnswer:    (data) => api.post('/gamification/mock-interview/answer', data).then(r => r.data),
-  completeMockInterview: (data) => api.post('/gamification/mock-interview/complete', data).then(r => r.data),
+  getLeaderboard: (params) => api.get('/gamification/leaderboard', { params }).then(r => r.data),
+  listLeaderboardTests: () => api.get('/gamification/leaderboard-tests').then(r => r.data),
 };
 
 // ── Proctoring ─────────────────────────────────────────────────

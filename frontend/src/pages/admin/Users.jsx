@@ -5,8 +5,7 @@ import { usersAPI } from '../../services/api';
 import { Btn, Table, Badge, Modal, Input, Alert, ConfirmModal, Spinner } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-
-const DEPT_ORDER = ['Computer Engineering', 'Computer Science and Design'];
+import { ALLOWED_DEPARTMENTS as DEPT_ORDER } from '../../lib/departments';
 
 const ordinal = (n) => {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -395,9 +394,9 @@ export default function AdminUsers() {
         <p className="text-xs text-annotation/70 mb-3 font-mono bg-deck p-2 rounded border border-rim">
           email,batch,year_of_study
           <br />
-          alice@college.edu,CS-A,3
+          alice@college.edu,Batch 1,3
           <br />
-          bob@college.edu,IT-B,2
+          bob@college.edu,Batch 2,2
         </p>
         <textarea
           value={batchCsvText}

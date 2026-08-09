@@ -138,28 +138,10 @@ router.post('/email/send', authenticate, requireAdmin, emailLimiter, validate(se
 // button on a scheduled test 404'd.
 router.post('/email/test-reminder/:testId', authenticate, requireAdmin, emailLimiter, emailCtrl.sendTestReminder);
 
-// ── Gamification ──────────────────────────────────────────
+// ── Leaderboard ──────────────────────────────────────────
 const gamifyCtrl = require('../controllers/gamification');
-router.post('/gamification/award-xp',               authenticate, requireAdmin, gamifyCtrl.awardXpHandler);
-router.get ('/gamification/my-stats',               authenticate, gamifyCtrl.getMyStats);
-router.get ('/gamification/leaderboard',            authenticate, gamifyCtrl.getLeaderboard);
-router.get ('/gamification/levels',                 authenticate, gamifyCtrl.getLevels);
-router.get ('/gamification/achievements',           authenticate, gamifyCtrl.getAchievements);
-router.get ('/gamification/achievements/wall/:userId', authenticate, gamifyCtrl.getAchievementWall);
-router.post('/gamification/checkin',                authenticate, gamifyCtrl.checkin);
-router.get ('/gamification/streak',                 authenticate, gamifyCtrl.getStreak);
-router.get ('/gamification/heatmap',                authenticate, gamifyCtrl.getHeatmap);
-router.get ('/gamification/daily-challenge',        authenticate, gamifyCtrl.getDailyChallenge);
-router.post('/gamification/daily-challenge/submit', authenticate, gamifyCtrl.submitDailyChallenge);
-router.get   ('/gamification/resources',            authenticate, gamifyCtrl.listStudyResources);
-router.post  ('/gamification/resources',            authenticate, requireAdmin, gamifyCtrl.createStudyResource);
-router.put   ('/gamification/resources/:id',        authenticate, requireAdmin, gamifyCtrl.updateStudyResource);
-router.delete('/gamification/resources/:id',        authenticate, requireAdmin, gamifyCtrl.deleteStudyResource);
-router.post  ('/gamification/resources/:id/complete', authenticate, gamifyCtrl.completeStudyResource);
-router.get   ('/gamification/resources/stats',      authenticate, gamifyCtrl.getResourceStats);
-router.post('/gamification/mock-interview/start',    authenticate, gamifyCtrl.startMockInterview);
-router.post('/gamification/mock-interview/answer',   authenticate, gamifyCtrl.submitMockInterviewAnswer);
-router.post('/gamification/mock-interview/complete', authenticate, gamifyCtrl.completeMockInterview);
+router.get ('/gamification/leaderboard',        authenticate, gamifyCtrl.getLeaderboard);
+router.get ('/gamification/leaderboard-tests',  authenticate, gamifyCtrl.listLeaderboardTests);
 
 // ── Analytics & Reporting ──────────────────────────────────
 // NOTE: this whole block was previously missing — the controller functions
@@ -325,6 +307,13 @@ router.post ('/admin/sessions/:id/revoke',   authenticate, requireAdmin, session
 
 // ── Health check ──────────────────────────────────────────────
 router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// ── Class metadata (years / batches / departments) ─────────────
+// Deliberately unauthenticated: the public Login/register form fetches
+// these options before the student has a token. Only non-sensitive
+// static lists are returned.
+const metaCtrl = require('../controllers/meta');
+router.get('/meta/options', metaCtrl.getOptions);
 
 // ═══════════════════════════════════════════════════════════════
 // The following five blocks (code ops, notifications, test messages,

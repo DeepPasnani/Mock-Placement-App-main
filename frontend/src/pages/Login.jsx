@@ -4,7 +4,8 @@ import { useStore } from '../store';
 import { Spinner } from '../components/shared/UI';
 import toast from 'react-hot-toast';
 import { authAPI } from '../services/api';
-import { ALLOWED_DEPARTMENTS as DEPARTMENTS, CLASSES } from '../lib/departments';
+import { ALLOWED_DEPARTMENTS as DEPARTMENTS } from '../lib/departments';
+import { useClassOptions } from '../hooks/useClassOptions';
 
 /* ═══════════════════════════════════════════════════════════
  * Login Page — Auth gateway
@@ -12,11 +13,21 @@ import { ALLOWED_DEPARTMENTS as DEPARTMENTS, CLASSES } from '../lib/departments'
  * positioning, right panel has the form.
  * ═══════════════════════════════════════════════════════════ */
 
+const ORDINALS = ['th', 'st', 'nd', 'rd'];
+
+function yearLabel(y) {
+  const n = Number(y);
+  if (!Number.isFinite(n)) return String(y);
+  const s = ORDINALS[(n % 100 >= 11 && n % 100 <= 13) ? 0 : (n % 10) < 4 ? n % 10 : 0];
+  return `${n}${s} Year`;
+}
+
 export default function LoginPage() {
   const { googleLogin, login, register, isLoading } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const googleBtnRef = useRef(null);
+  const { years, batches } = useClassOptions();
 
   const [mode, setMode] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -487,7 +498,7 @@ export default function LoginPage() {
                           required={mode === 'register'}
                         >
                           <option value="">Select class</option>
-                          {CLASSES.map(c => (
+                          {batches.map(c => (
                             <option key={c} value={c}>{c}</option>
                           ))}
                         </select>
@@ -506,10 +517,9 @@ export default function LoginPage() {
                         required={mode === 'register'}
                       >
                         <option value="">Select year</option>
-                        <option value="1">1st Year</option>
-                        <option value="2">2nd Year</option>
-                        <option value="3">3rd Year</option>
-                        <option value="4">4th Year</option>
+                        {years.map(y => (
+                          <option key={y} value={String(y)}>{yearLabel(y)}</option>
+                        ))}
                       </select>
                     </div>
                   )}

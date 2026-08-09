@@ -36,7 +36,7 @@ Build multi-section aptitude + coding tests, invite students in bulk, watch subm
 - **Live Code Execution** — full Monaco editor with grading against hidden test cases via [Piston](https://github.com/engineer-man/piston), self-hosted and load-balanced across 3 replicas; supports Python, JavaScript, Java, C, C++, Go, Ruby, Rust, Kotlin, and SQL.
 - **Real-Time Proctoring** — WebSocket heartbeat monitoring, tab-switch detection, fullscreen enforcement, keystroke/plagiarism signals, and automatic submission on expiry.
 - **Results & Analytics** — score distributions, percentile rankings, per-question breakdowns, cohort/placement-probability analytics, scheduled reports, and CSV/PDF export.
-- **Gamification** — XP, levels, streaks, achievements, a leaderboard, and a daily challenge to keep students practicing between tests.
+- **Leaderboard** — students are ranked across their cohort by performance.
 - **Multi-admin support** — every admin account sees and can manage the full shared pool of tests, batches, and question banks (not just their own).
 - **Google OAuth login** for students, email/password for staff, with optional SSO (SAML/LDAP), LMS, and ATS integrations for larger deployments.
 
@@ -169,7 +169,7 @@ All backend configuration lives in `backend/.env` when running manually (Option 
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/admin/       # Admin dashboard, test builder, analytics
-│   │   ├── pages/student/     # Student dashboard, test-taking, gamification
+│   │   ├── pages/student/     # Student dashboard, test-taking, leaderboard
 │   │   ├── components/shared/ # Reusable UI (editor, cards, tables, etc.)
 │   │   └── services/api.js    # Axios client + all API method definitions
 │   ├── nginx.conf

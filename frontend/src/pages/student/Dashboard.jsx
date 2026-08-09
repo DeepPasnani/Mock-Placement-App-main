@@ -12,17 +12,13 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const testsQ = useQuery({ queryKey: ['student-tests'], queryFn: testsAPI.list });
   const subsQ = useQuery({ queryKey: ['my-subs'], queryFn: submissionsAPI.getMy });
-  const xpQ = useQuery({ queryKey: ['my-xp'], queryFn: gamificationAPI.getMyStats });
-  const streakQ = useQuery({ queryKey: ['my-streak'], queryFn: gamificationAPI.getStreak });
   const lbQ = useQuery({ queryKey: ['leaderboard'], queryFn: () => gamificationAPI.getLeaderboard({ limit: 100 }) });
 
   const testsData = testsQ.data;
   const subsData = subsQ.data;
-  const xpData = xpQ.data;
-  const streakData = streakQ.data;
   const lbData = lbQ.data;
   const loadingTests = testsQ.isLoading;
-  const boardsLoading = testsQ.isLoading || subsQ.isLoading || xpQ.isLoading || streakQ.isLoading || lbQ.isLoading;
+  const boardsLoading = testsQ.isLoading || subsQ.isLoading || lbQ.isLoading;
   const testsError = testsQ.isError;
   const testsRetry = testsQ.refetch;
 
@@ -47,8 +43,8 @@ export default function StudentDashboard() {
   const heroInProgress = heroTest ? statusOf(heroTest).inProgress : false;
   const heroQuestionCount = (heroTest?.sections || []).reduce((n, s) => n + (s.questions?.length || 0), 0);
 
-  // Single signed-in stats rail: XP / Rank / Streak.
-  const statRank = (lbData?.leaderboard || []).findIndex(e => e.user_id === user?.id) + 1;
+  // Single signed-in stats rail: Leaderboard rank.
+  const statRank = (lbData?.leaderboard || []).findIndex(e => e.id === user?.id) + 1;
   const statCount = (lbData?.leaderboard || []).length;
 
   const sectionCount = (heroTest?.sections || []).length;
@@ -126,14 +122,11 @@ export default function StudentDashboard() {
         <div className="panel p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-ink">No test ready right now</p>
-            <p className="text-xs text-annotation mt-0.5">Sharpen your edge with a daily check-in or a practice interview instead.</p>
+            <p className="text-xs text-annotation mt-0.5">Keep preparing — new tests will appear here as soon as they’re published.</p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
-            <Link to="/student/daily-challenge" className="btn-ghost">
-              Daily Challenge
-            </Link>
-            <Link to="/student/mock-interview" className="btn-primary">
-              Mock Interview
+            <Link to="/student/tests" className="btn-ghost">
+              View all tests
             </Link>
           </div>
         </div>
@@ -142,7 +135,7 @@ export default function StudentDashboard() {
       {/* ── Stats rail (the one signed-in data summary) ─────── */}
       {boardsLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[0, 1, 2].map(i => (
+          {[0].map(i => (
             <div key={i} className="panel p-4 animate-pulse">
               <div className="h-3 w-24 bg-sunken rounded-md mb-3" />
               <div className="h-8 w-16 bg-sunken rounded-md" />
@@ -151,9 +144,7 @@ export default function StudentDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard label="Experience Points" value={`${xpData?.xp?.current ?? 0}`} sub={`Level ${xpData?.xp?.level ?? 1}`} color="green" />
           <StatCard label="Leaderboard Rank" value={`#${statRank || '-'}`} sub={`of ${statCount} students`} color="purple" />
-          <StatCard label="Current Streak" value={`${streakData?.current_streak || 0} days`} sub={`Best: ${streakData?.longest_streak || 0}`} color="yellow" />
         </div>
       )}
 

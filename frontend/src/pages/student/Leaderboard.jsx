@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { gamificationAPI, batchesAPI } from '../../services/api';
-import { Btn, Badge, Spinner, Tabs } from '../../components/shared/UI';
+import { Badge, Spinner } from '../../components/shared/UI';
 import { useStore } from '../../store';
-import { Trophy, Medal, Award, User, ChevronRight } from 'lucide-react';
+import { Trophy, Medal, Award, User, Users } from 'lucide-react';
 
 const rankIcons = {
   1: { icon: Trophy, color: 'text-trophy-gold', tint: 'bg-trophy-gold/10', label: 'Gold' },
@@ -13,24 +13,47 @@ const rankIcons = {
 
 export default function Leaderboard() {
   const { user } = useStore();
-  const [tab, setTab] = useState('alltime');
+  const [testId, setTestId] = useState('');
   const [batchFilter, setBatchFilter] = useState('');
 
-  const { data: lbData, isLoading } = useQuery({
-    queryKey: ['leaderboard', tab, batchFilter],
-    queryFn: () => gamificationAPI.getLeaderboard({ type: tab, batch: batchFilter || undefined }),
+  const { data: testsData, isLoading: testsLoading } = useQuery({
+    queryKey: ['leaderboard-tests'],
+    queryFn: gamificationAPI.listLeaderboardTests,
+  });
+  const tests = testsData?.tests || [];
+  const activeTestId = testId || tests[0]?.id || '';
+  const activeTest = tests.find(t => t.id === activeTestId);
+
+  const { data: lbData, isLoading: lbLoading } = useQuery({
+    queryKey: ['leaderboard', activeTestId, batchFilter],
+    queryFn: () => gamificationAPI.getLeaderboard({ testId: activeTestId || undefined, batch: batchFilter || undefined }),
+    enabled: !!activeTestId,
   });
 
+  // Only the batches inside the student's own department + year are shown,
+  // so they can drill into their class without ever seeing other scopes.
   const { data: batchesData } = useQuery({
     queryKey: ['batches'],
     queryFn: batchesAPI.list,
   });
+  const myDept = user?.branch || user?.department;
+  const myYear = user?.year_of_study;
+  const myBatches = (batchesData?.batches || []).filter(b =>
+    (!myDept || b.department === myDept) &&
+    (!myYear || String(b.year_of_study) === String(myYear))
+  );
 
   const leaderboard = lbData?.leaderboard || [];
   const myRank = lbData?.myRank;
-  const batches = batchesData?.batches || [];
+  const maxScore = lbData?.maxScore;
 
-  if (isLoading) {
+  const scoreLabel = (entry) => {
+    const label = `${Number(entry.score ?? 0).toLocaleString()} / ${Number(entry.max_score ?? 0).toLocaleString()}`;
+    const pct = entry.max_score > 0 ? Math.round((entry.score / entry.max_score) * 100) : 0;
+    return { label, pct };
+  };
+
+  if (testsLoading || lbLoading) {
     return (
       <div className="flex justify-center py-24">
         <Spinner size={28} className="text-accent" />
@@ -43,30 +66,45 @@ export default function Leaderboard() {
       <div className="section-header">
         <div>
           <h1 className="text-display">Leaderboard</h1>
-          <p className="section-subtitle">Top performers across all students</p>
+          <p className="section-subtitle">
+            {activeTest ? `Ranked by marks scored in ${activeTest.title}` : 'Top performers by marks scored'}
+          </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Tabs
-          tabs={[
-            { id: 'alltime', label: 'All Time' },
-            { id: 'weekly', label: 'This Week' },
-            { id: 'test', label: 'Last Test' },
-          ]}
-          active={tab}
-          onChange={setTab}
-        />
         <select
-          value={batchFilter}
-          onChange={e => setBatchFilter(e.target.value)}
-          className="select-field text-xs ml-auto"
+          value={activeTestId}
+          onChange={e => setTestId(e.target.value)}
+          className="select-field text-xs"
+          aria-label="Choose test"
         >
-          <option value="">All Batches</option>
-          {batches.map(b => (
-            <option key={b.id} value={b.name}>{b.name}</option>
+          {tests.map(t => (
+            <option key={t.id} value={t.id}>{t.title}</option>
           ))}
         </select>
+        <div className="flex items-center gap-2 ml-auto">
+          {myBatches.length > 0 && (
+            <select
+              value={batchFilter}
+              onChange={e => setBatchFilter(e.target.value)}
+              className="select-field text-xs"
+              aria-label="Filter by batch"
+            >
+              <option value="">All Batches</option>
+              {myBatches.map(b => (
+                <option key={b.id} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center gap-2 rounded-lg bg-sunken/60 border border-rim/50 px-3 py-1.5 text-2xs text-annotation/70">
+            <Users size={14} className="text-accent" />
+            <span>
+              {user?.branch || 'Your department'}{user?.year_of_study ? ` • Year ${user.year_of_study}` : ''}
+              <span className="ml-1 font-medium text-ink">only</span>
+            </span>
+          </div>
+        </div>
       </div>
 
       {myRank && (
@@ -76,11 +114,11 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {leaderboard.length === 0 ? (
+      {!activeTestId || leaderboard.length === 0 ? (
         <div className="empty-state py-16">
           <Trophy size={40} className="empty-state-icon" />
           <h3 className="empty-state-title">No rankings yet</h3>
-          <p className="empty-state-desc">Start taking tests to appear on the leaderboard</p>
+          <p className="empty-state-desc">This test has no submitted papers yet — results will appear here once students finish.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -88,6 +126,7 @@ export default function Leaderboard() {
             const rank = idx + 1;
             const RankIcon = rankIcons[rank]?.icon;
             const rankInfo = rankIcons[rank];
+            const { label, pct } = scoreLabel(entry);
             return (
               <div
                 key={entry.id}
@@ -110,8 +149,8 @@ export default function Leaderboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-ink">{entry.xp_points?.toLocaleString()}</div>
-                  <div className="text-2xs text-annotation/60">Level {entry.level}</div>
+                  <div className="text-sm font-bold text-ink">{label} <span className="text-2xs text-annotation/60 font-normal">marks</span></div>
+                  {maxScore > 0 && <div className="text-2xs text-annotation/60">{pct}%</div>}
                 </div>
               </div>
             );
@@ -121,6 +160,7 @@ export default function Leaderboard() {
             <div className="border-t border-rim/50 pt-2 mt-4">
               {leaderboard.slice(3).map((entry, idx) => {
                 const rank = idx + 4;
+                const { label } = scoreLabel(entry);
                 return (
                   <div
                     key={entry.id}
@@ -136,8 +176,8 @@ export default function Leaderboard() {
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-bold text-ink">{entry.xp_points?.toLocaleString()}</span>
-                      <span className="text-2xs text-annotation/60 ml-1">Lv.{entry.level}</span>
+                      <span className="text-xs font-bold text-ink">{label}</span>
+                      <span className="text-2xs text-annotation/60 ml-1">marks</span>
                     </div>
                   </div>
                 );

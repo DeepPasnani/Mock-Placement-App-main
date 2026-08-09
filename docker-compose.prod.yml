@@ -1,23 +1,30 @@
 services:
   frontend:
+    build:
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: wss://your-domain.com/ws
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-your_google_client_id}
+        VITE_APP_NAME: CampusTrack
+        VITE_COLLEGE_NAME: Your College Name
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /etc/ssl:/etc/ssl:ro
-    environment:
-      VITE_API_URL: /api
-      VITE_WS_URL: wss://your-domain.com/ws
-      VITE_GOOGLE_CLIENT_ID: your_google_client_id
-      VITE_APP_NAME: CampusTrack
-      VITE_COLLEGE_NAME: Your College Name
 
   backend:
     environment:
       FRONTEND_URL: ${FRONTEND_URL:-https://your-domain.com}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # AI features (optional). Set OPENAI_API_KEY in your root .env to enable
+      # AI question generation, coding hints, auto-tagging, feedback, and NL
+      # analytics. Any OpenAI-compatible endpoint works (see aiService.js).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       # These pull from a `.env` file at the project root (see .env.example).
       # Previously these were literal placeholder strings ("your-smtp-host",
       # etc.) baked directly into this file — if you deployed without
