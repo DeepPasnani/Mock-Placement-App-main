@@ -1,5 +1,10 @@
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const RedisRateLimitStore = require('./redisRateLimitStore');
+
+// One store instance per limiter (each gets its own key prefix) — see
+// redisRateLimitStore.js for why this exists: without it, these limits
+// are only correct with exactly one backend replica running.
 
 // ── Key by authenticated user, not just IP ──────────────────────
 // Root cause of the "too many requests" errors students hit mid-exam:
@@ -45,6 +50,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: userOrIpKey,
+  store: new RedisRateLimitStore('api'),
   message: { error: 'Too many requests, please try again later.' },
 });
 
@@ -83,6 +89,7 @@ const authLimiter = rateLimit({
   validate: { keyGeneratorIpFallback: false },
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisRateLimitStore('auth'),
   message: { error: 'Too many login attempts, please wait 15 minutes.' },
 });
 
@@ -98,6 +105,7 @@ const codeLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 30,
   keyGenerator: userOrIpKey,
+  store: new RedisRateLimitStore('code'),
   message: { error: 'Code submission rate limit exceeded. Please wait a few seconds and try again.' },
 });
 
@@ -106,6 +114,7 @@ const bulkImportLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10,
   keyGenerator: userOrIpKey,
+  store: new RedisRateLimitStore('bulk-import'),
   message: { error: 'Bulk import rate limit exceeded. Maximum 10 imports per hour.' },
 });
 
@@ -114,6 +123,7 @@ const emailLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
   keyGenerator: userOrIpKey,
+  store: new RedisRateLimitStore('email'),
   message: { error: 'Email rate limit exceeded. Maximum 5 sends per hour.' },
 });
 

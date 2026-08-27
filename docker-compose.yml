@@ -91,7 +91,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pp_backend
     environment:
       NODE_ENV: production
       PORT: 5000

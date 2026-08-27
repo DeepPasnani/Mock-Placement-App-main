@@ -1,0 +1,65 @@
+# Overlay: puts infra/nginx/nginx.conf in front of a horizontally-scaled
+# backend and the built frontend, instead of the frontend's own built-in
+# nginx (frontend/nginx.conf, used by the plain docker-compose.yml /
+# docker-compose.prod.yml setup).
+#
+# Usage:
+#   docker compose \
+#     -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.lb.yml \
+#     up -d --build --scale backend=3
+#
+# Requires real TLS certs on the host at /etc/letsencrypt (see README/
+# docker-compose.prod.yml) and infra/nginx/nginx.conf's `server_name
+# your-domain.com;` updated to your real domain.
+
+services:
+  backend:
+    # No longer published directly — only the nginx LB talks to it now.
+    ports: []
+
+  frontend:
+    # frontend/nginx.conf is unused in this topology; the LB serves the
+    # built static files itself and terminates TLS. Don't publish 80/443
+    # from this container too, or it'll collide with the nginx service below.
+    ports: []
+
+  # One-shot job: builds the frontend up to its `builder` stage (before the
+  # nginx packaging step) and copies the compiled `dist/` into a shared
+  # volume that the nginx service serves from.
+  frontend-dist:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_APP_NAME: "CampusTrack"
+        VITE_API_URL: "/api"
+        VITE_WS_URL: "wss://your-domain.com/ws"
+        VITE_COLLEGE_NAME: "Your College"
+    container_name: pp_frontend_dist
+    command: ["sh", "-c", "rm -rf /out/* && cp -r /app/dist/. /out/"]
+    volumes:
+      - frontend_dist:/out
+    restart: "no"
+
+  nginx:
+    image: nginx:alpine
+    container_name: pp_nginx_lb
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - frontend_dist:/usr/share/nginx/html:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/ssl:/etc/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend-dist:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  frontend_dist:

@@ -85,6 +85,8 @@ export function Textarea({ label, hint, className = '', ...props }) {
 export function Modal({ isOpen, onClose, title, children, width = 'max-w-lg', footer }) {
   const contentRef = useRef(null);
   const lastActive = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
 useEffect(() => {
     if (!isOpen) return;
@@ -97,7 +99,7 @@ useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -127,7 +129,7 @@ useEffect(() => {
         lastActive.current.focus();
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
   return (

@@ -10,6 +10,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Everything below is wrapped in Tailwind's `components` layer. This is
+   what makes utility classes (pl-8, pr-10, py-1.5, max-w-40, ...) reliably
+   override these base styles when combined on the same element — e.g.
+   `className="input-field pl-8"` — instead of losing to them by plain
+   CSS source order (which is what caused search/eye icons to overlap
+   input text, and compact `py-1` selects to render at full height and
+   overflow their row). See: https://tailwindcss.com/docs/adding-custom-styles#using-css-and-layer */
+@layer components {
+
 /* ── CSS Custom Properties (Design Tokens) ────────────────────── */
 :root {
   /* Colors */
@@ -854,3 +863,4 @@ select option {
 }
 
 /* Monaco Editor uses its built-in "light" theme — no overrides needed. */
+}
