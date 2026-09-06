@@ -4,13 +4,13 @@ const logger = require('../services/logger');
 // ── 1. Cohort Performance Analytics ───────────────────────────
 
 async function getCohortAnalytics(req, res) {
-  const { batch_id, year_of_study, department, test_id } = req.query;
+  const { class_id, year_of_study, department, test_id } = req.query;
 
   let conditions = ["s.status='submitted'"];
   const params = [];
 
   if (test_id) { params.push(test_id); conditions.push(`s.test_id=$${params.length}`); }
-  if (batch_id) { params.push(batch_id); conditions.push(`b.id=$${params.length}`); }
+  if (class_id) { params.push(class_id); conditions.push(`c.id=$${params.length}`); }
   if (year_of_study) { params.push(parseInt(year_of_study)); conditions.push(`COALESCE(s.year_snapshot, u.year_of_study)=$${params.length}`); }
   if (department) { params.push(department); conditions.push(`u.department=$${params.length}`); }
 
@@ -18,7 +18,7 @@ async function getCohortAnalytics(req, res) {
 
   const { rows: genreData } = await query(`
     SELECT
-      COALESCE(s.batch_snapshot, u.batch) as cohort_label,
+      COALESCE(s.class_snapshot, u.class_name) as cohort_label,
       q.genre,
       COUNT(DISTINCT q.id) as total_q,
       AVG(CASE WHEN (s.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1.0 ELSE 0.0 END) as accuracy
@@ -27,8 +27,8 @@ async function getCohortAnalytics(req, res) {
     JOIN tests t ON s.test_id = t.id
     JOIN sections sec ON sec.test_id = t.id
     JOIN questions q ON q.section_id = sec.id
-    LEFT JOIN student_batches sb ON sb.user_id = u.id
-    LEFT JOIN batches b ON b.id = sb.batch_id
+    LEFT JOIN student_classes sc ON sc.user_id = u.id
+    LEFT JOIN classes c ON c.id = sc.class_id
     WHERE ${where}
     GROUP BY cohort_label, q.genre
     ORDER BY cohort_label, q.genre
@@ -36,13 +36,13 @@ async function getCohortAnalytics(req, res) {
 
   const { rows: percentileData } = await query(`
     SELECT
-      COALESCE(s.batch_snapshot, u.batch) as cohort_label,
+      COALESCE(s.class_snapshot, u.class_name) as cohort_label,
       s.score, s.max_score,
-      PERCENT_RANK() OVER (PARTITION BY COALESCE(s.batch_snapshot, u.batch) ORDER BY (s.score / NULLIF(s.max_score, 0)) DESC) as percentile
+      PERCENT_RANK() OVER (PARTITION BY COALESCE(s.class_snapshot, u.class_name) ORDER BY (s.score / NULLIF(s.max_score, 0)) DESC) as percentile
     FROM submissions s
     JOIN users u ON s.user_id = u.id
-    LEFT JOIN student_batches sb ON sb.user_id = u.id
-    LEFT JOIN batches b ON b.id = sb.batch_id
+    LEFT JOIN student_classes sc ON sc.user_id = u.id
+    LEFT JOIN classes c ON c.id = sc.class_id
     WHERE ${where} AND s.max_score > 0
   `, params);
 
@@ -87,13 +87,13 @@ async function getCohortAnalytics(req, res) {
 }
 
 async function getCohortRadar(req, res) {
-  const { batch_id, year_of_study, department, test_id } = req.query;
+  const { class_id, year_of_study, department, test_id } = req.query;
 
   let conditions = ["s.status='submitted'"];
   const params = [];
 
   if (test_id) { params.push(test_id); conditions.push(`s.test_id=$${params.length}`); }
-  if (batch_id) { params.push(batch_id); conditions.push(`b.id=$${params.length}`); }
+  if (class_id) { params.push(class_id); conditions.push(`c.id=$${params.length}`); }
   if (year_of_study) { params.push(parseInt(year_of_study)); conditions.push(`COALESCE(s.year_snapshot, u.year_of_study)=$${params.length}`); }
   if (department) { params.push(department); conditions.push(`u.department=$${params.length}`); }
 
@@ -101,7 +101,7 @@ async function getCohortRadar(req, res) {
 
   const { rows } = await query(`
     SELECT
-      COALESCE(s.batch_snapshot, u.batch) as cohort_label,
+      COALESCE(s.class_snapshot, u.class_name) as cohort_label,
       q.genre,
       AVG(CASE WHEN (s.answers->>q.id::text)::text = (q.correct_answer#>>'{}') THEN 1.0 ELSE 0.0 END) as accuracy
     FROM submissions s
@@ -109,8 +109,8 @@ async function getCohortRadar(req, res) {
     JOIN tests t ON s.test_id = t.id
     JOIN sections sec ON sec.test_id = t.id
     JOIN questions q ON q.section_id = sec.id
-    LEFT JOIN student_batches sb ON sb.user_id = u.id
-    LEFT JOIN batches b ON b.id = sb.batch_id
+    LEFT JOIN student_classes sc ON sc.user_id = u.id
+    LEFT JOIN classes c ON c.id = sc.class_id
     WHERE ${where}
     GROUP BY cohort_label, q.genre
     ORDER BY cohort_label, q.genre
@@ -132,13 +132,13 @@ async function getCohortRadar(req, res) {
 }
 
 async function getCohortDistribution(req, res) {
-  const { batch_id, year_of_study, department, test_id } = req.query;
+  const { class_id, year_of_study, department, test_id } = req.query;
 
   let conditions = ["s.status='submitted' AND s.max_score > 0"];
   const params = [];
 
   if (test_id) { params.push(test_id); conditions.push(`s.test_id=$${params.length}`); }
-  if (batch_id) { params.push(batch_id); conditions.push(`b.id=$${params.length}`); }
+  if (class_id) { params.push(class_id); conditions.push(`c.id=$${params.length}`); }
   if (year_of_study) { params.push(parseInt(year_of_study)); conditions.push(`COALESCE(s.year_snapshot, u.year_of_study)=$${params.length}`); }
   if (department) { params.push(department); conditions.push(`u.department=$${params.length}`); }
 
@@ -146,12 +146,12 @@ async function getCohortDistribution(req, res) {
 
   const { rows } = await query(`
     SELECT
-      COALESCE(s.batch_snapshot, u.batch) as cohort_label,
+      COALESCE(s.class_snapshot, u.class_name) as cohort_label,
       (s.score / NULLIF(s.max_score, 0)) * 100 as pct
     FROM submissions s
     JOIN users u ON s.user_id = u.id
-    LEFT JOIN student_batches sb ON sb.user_id = u.id
-    LEFT JOIN batches b ON b.id = sb.batch_id
+    LEFT JOIN student_classes sc ON sc.user_id = u.id
+    LEFT JOIN classes c ON c.id = sc.class_id
     WHERE ${where}
   `, params);
 
@@ -389,30 +389,30 @@ async function getTimeSinkAnalysis(req, res) {
 
 // ── 5. Predictive Placement Probability ───────────────────────
 
-async function getPlacementProbabilityBatch(req, res) {
-  const { batch_id, department, min_test_count } = req.query;
+async function getPlacementProbabilityByClass(req, res) {
+  const { class_id, department, min_test_count } = req.query;
   const minTests = parseInt(min_test_count) || 3;
 
   let conditions = ["u.role='student'"];
   const params = [];
 
-  if (batch_id) { params.push(batch_id); conditions.push(`b.id=$${params.length}`); }
+  if (class_id) { params.push(class_id); conditions.push(`c.id=$${params.length}`); }
   if (department) { params.push(department); conditions.push(`u.department=$${params.length}`); }
 
   const where = conditions.join(' AND ');
 
   const { rows: students } = await query(`
     SELECT u.id, u.name, u.email, u.branch, u.roll_number,
-           COALESCE(u.batch, 'Unknown') as batch_label,
+           COALESCE(u.class_name, 'Unknown') as class_label,
            COUNT(s.id) FILTER (WHERE s.status IN ('submitted', 'auto_submitted')) as test_count,
            AVG(CASE WHEN s.max_score > 0 THEN (s.score / s.max_score) * 100 END) as avg_score,
            AVG(CASE WHEN s.max_score > 0 AND (s.score / s.max_score) * 100 >= 40 THEN 1 ELSE 0 END) as pass_rate
     FROM users u
     LEFT JOIN submissions s ON s.user_id = u.id
-    LEFT JOIN student_batches sb ON sb.user_id = u.id
-    LEFT JOIN batches b ON b.id = sb.batch_id
+    LEFT JOIN student_classes sc ON sc.user_id = u.id
+    LEFT JOIN classes c ON c.id = sc.class_id
     WHERE ${where}
-    GROUP BY u.id, u.name, u.email, u.branch, u.roll_number, u.batch
+    GROUP BY u.id, u.name, u.email, u.branch, u.roll_number, u.class_name
     HAVING COUNT(s.id) FILTER (WHERE s.status IN ('submitted', 'auto_submitted')) >= $${params.length + 1}
   `, [...params, minTests]);
 
@@ -440,7 +440,7 @@ async function getPlacementProbabilityBatch(req, res) {
 
     return {
       user_id: s.id, name: s.name, email: s.email, branch: s.branch,
-      roll_number: s.roll_number, batch: s.batch_label,
+      roll_number: s.roll_number, class: s.class_label,
       avg_score: Math.round(avgScore), pass_rate: Math.round(passRate * 100),
       test_count: testCount,
       probability, confidence, recommendation,
@@ -471,7 +471,7 @@ async function getPlacementProbabilityStudent(req, res) {
   const { userId } = req.params;
 
   const { rows: [student] } = await query(`
-    SELECT u.id, u.name, u.email, u.branch, u.roll_number, u.batch
+    SELECT u.id, u.name, u.email, u.branch, u.roll_number, u.class_name
     FROM users u WHERE u.id=$1 AND u.role='student'
   `, [userId]);
 
@@ -564,7 +564,7 @@ async function reportBuilder(req, res) {
   const params = [];
 
   if (filters) {
-    if (filters.batch_id) { params.push(filters.batch_id); conditions.push(`b.id=$${params.length}`); }
+    if (filters.class_id) { params.push(filters.class_id); conditions.push(`c.id=$${params.length}`); }
     if (filters.department) { params.push(filters.department); conditions.push(`u.department=$${params.length}`); }
     if (filters.year_of_study) { params.push(parseInt(filters.year_of_study)); conditions.push(`COALESCE(s.year_snapshot, u.year_of_study)=$${params.length}`); }
     if (filters.test_id) { params.push(filters.test_id); conditions.push(`s.test_id=$${params.length}`); }
@@ -579,7 +579,7 @@ async function reportBuilder(req, res) {
 
   const where = conditions.join(' AND ');
 
-  const groupColumn = groupBy === 'batch' ? "COALESCE(s.batch_snapshot, u.batch)"
+  const groupColumn = groupBy === 'class' ? "COALESCE(s.class_snapshot, u.class_name)"
     : groupBy === 'department' ? "u.department"
     : groupBy === 'year' ? "COALESCE(s.year_snapshot::text, u.year_of_study::text)"
     : "'Overall'";
@@ -600,8 +600,8 @@ async function reportBuilder(req, res) {
       JOIN tests t ON s.test_id = t.id
       JOIN sections sec ON sec.test_id = t.id
       JOIN questions q ON q.section_id = sec.id
-      LEFT JOIN student_batches sb ON sb.user_id = u.id
-      LEFT JOIN batches b ON b.id = sb.batch_id
+      LEFT JOIN student_classes sc ON sc.user_id = u.id
+      LEFT JOIN classes c ON c.id = sc.class_id
       WHERE ${where}
       GROUP BY group_label, q.genre
       ORDER BY group_label, q.genre
@@ -617,8 +617,8 @@ async function reportBuilder(req, res) {
     FROM submissions s
     JOIN users u ON s.user_id = u.id
     JOIN tests t ON s.test_id = t.id
-    LEFT JOIN student_batches sb ON sb.user_id = u.id
-    LEFT JOIN batches b ON b.id = sb.batch_id
+    LEFT JOIN student_classes sc ON sc.user_id = u.id
+    LEFT JOIN classes c ON c.id = sc.class_id
     WHERE ${where}
     ${groupClause}
     ORDER BY group_label
@@ -821,7 +821,7 @@ async function getNLSummary(req, res) {
   }
 
   if (comparisonData.change !== undefined) {
-    summary += ` Compared to the previous test, this batch scored ${comparisonData.change_direction} by ${Math.abs(comparisonData.change)} percentage points.`;
+    summary += ` Compared to the previous test, this class scored ${comparisonData.change_direction} by ${Math.abs(comparisonData.change)} percentage points.`;
   }
 
   const highlights = [
@@ -855,7 +855,7 @@ module.exports = {
   getStudentGrowth,
   getQuestionMetrics,
   getTimeSinkAnalysis,
-  getPlacementProbabilityBatch, getPlacementProbabilityStudent,
+  getPlacementProbabilityByClass, getPlacementProbabilityStudent,
   reportBuilder,
   createScheduledReport, listScheduledReports, updateScheduledReport, deleteScheduledReport,
   createThresholdAlert, listThresholdAlerts, updateThresholdAlert, deleteThresholdAlert,

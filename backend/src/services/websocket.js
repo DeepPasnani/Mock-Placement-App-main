@@ -1,6 +1,7 @@
 const { WebSocketServer } = require('ws');
 const url = require('url');
 const jwt = require('jsonwebtoken');
+const { query } = require('../db');
 const { trackActiveUser, getActiveUserCount, setActiveSession } = require('../db/redis');
 
 let wss;
@@ -19,13 +20,28 @@ function setupWebSocket(server) {
       return;
     }
 
-    let user;
+    let decoded;
     try {
-      user = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch {
       ws.close(4001, 'Invalid token');
       return;
     }
+
+    // Re-derive identity/role from the database rather than trusting the
+    // token's own claims — a JWT's `role` can be stale (changed since
+    // issue) or, for the /auth/2fa/validate token specifically, was until
+    // recently hardcoded to 'admin' regardless of the account's real role.
+    // Same pattern middleware/auth.js already uses for REST requests.
+    const { rows: [dbUser] } = await query(
+      'SELECT id, name, email, role, is_active FROM users WHERE id=$1',
+      [decoded.userId]
+    );
+    if (!dbUser || !dbUser.is_active) {
+      ws.close(4001, 'Invalid token');
+      return;
+    }
+    const user = dbUser;
 
     ws.userId = user.id;
     ws.userRole = user.role;

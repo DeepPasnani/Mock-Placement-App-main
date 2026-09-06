@@ -12,10 +12,6 @@ const LANGUAGE_MAP = {
   java:       { language: 'java',    version: '15.0.2' },
   cpp:        { language: 'c++',     version: '10.2.0' },
   c:          { language: 'c',       version: '10.2.0' },
-  go:         { language: 'go',      version: '1.16.2' },
-  ruby:       { language: 'ruby',    version: '3.0.1' },
-  rust:       { language: 'rust',    version: '1.68.2' },
-  kotlin:     { language: 'kotlin',  version: '1.8.20' },
   sql:        { language: 'sqlite3', version: '3.36.0' },
 };
 

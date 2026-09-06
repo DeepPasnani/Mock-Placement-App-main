@@ -2,8 +2,15 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Btn, Spinner } from '../../components/shared/UI';
 import Editor from '@monaco-editor/react';
 import CustomTestExplorer from '../../components/shared/CustomTestExplorer';
+import ImgWithFallback from '../../components/shared/ImgWithFallback';
 import { codeOpsAPI } from '../../services/api';
 import toast from 'react-hot-toast';
+
+// If the CDN-hosted Monaco bundle hasn't finished mounting within this
+// window (blocked/slow network, e.g. campus wifi filtering jsdelivr), stop
+// showing an indefinite spinner and offer a fallback so a student is never
+// simply unable to write code.
+const MONACO_LOAD_TIMEOUT = 12000;
 
 const LANG_MAP = {
   python: 'python',
@@ -11,10 +18,6 @@ const LANG_MAP = {
   java: 'java',
   cpp: 'cpp',
   c: 'c',
-  go: 'go',
-  rust: 'rust',
-  ruby: 'ruby',
-  kotlin: 'kotlin',
   sql: 'sql',
 };
 
@@ -24,10 +27,6 @@ const SNIPPETS = {
   java: 'public class Main {\n  public static void main(String[] args) {\n    // Write your code here\n  }\n}',
   cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n  // Write your code here\n  return 0;\n}',
   c: '#include <stdio.h>\n\nint main() {\n  // Write your code here\n  return 0;\n}',
-  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n  // Write your code here\n  fmt.Println("Hello")\n}',
-  rust: 'fn main() {\n  // Write your code here\n  println!("Hello");\n}',
-  ruby: 'def solve\n  # Write your code here\nend\n\nsolve',
-  kotlin: 'fun main() {\n  // Write your code here\n  println("Hello")\n}',
   sql: '-- Write your SQL query here\nSELECT *\nFROM table_name;\n',
 };
 
@@ -51,12 +50,38 @@ function CodingQuestion({
   const snapshotTimerRef = useRef(null);
   const [lints, setLints] = useState([]);
 
+  // Monaco is fetched from a CDN at runtime (see lib/monaco.js) — on a
+  // network that blocks/throttles it, @monaco-editor/react just sits on
+  // its loading spinner forever with no error surfaced. Time it out and
+  // offer a retry, or a plain-textarea fallback so writing code is never
+  // entirely blocked.
+  const [monacoReady, setMonacoReady] = useState(false);
+  const [monacoTimedOut, setMonacoTimedOut] = useState(false);
+  const [useFallbackEditor, setUseFallbackEditor] = useState(false);
+  const [editorAttempt, setEditorAttempt] = useState(0);
+  const monacoTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (useFallbackEditor) return undefined;
+    setMonacoReady(false);
+    setMonacoTimedOut(false);
+    monacoTimerRef.current = setTimeout(() => setMonacoTimedOut(true), MONACO_LOAD_TIMEOUT);
+    return () => clearTimeout(monacoTimerRef.current);
+  }, [editorAttempt, useFallbackEditor]);
+
+  const retryEditor = useCallback(() => {
+    setEditorAttempt(a => a + 1);
+  }, []);
+
   const handleChange = useCallback((value) => {
     setCode(q.id, activeLang, value);
   }, [q.id, activeLang, setCode]);
 
   const handleEditorMount = useCallback((editor) => {
     editorRef.current = editor;
+    clearTimeout(monacoTimerRef.current);
+    setMonacoReady(true);
+    setMonacoTimedOut(false);
   }, []);
 
   const saveSnapshot = useCallback((type) => {
@@ -170,23 +195,30 @@ function CodingQuestion({
         <div className="lg:w-[44%] xl:w-[40%] lg:shrink-0 lg:max-h-[calc(100vh-12.5rem)] lg:overflow-y-auto lg:sticky lg:top-0 lg:pr-1 motion-safe:lg:max-h-[calc(100vh-12.5rem)]">
           <div className="panel p-4 mb-4">
             <h3 className="font-display font-bold text-base text-ink mb-2">{q.title || `Problem ${qi + 1}`}</h3>
+            {q.image_url && (
+              <ImgWithFallback
+                src={q.image_url}
+                alt={`${q.title || 'Problem'} illustration`}
+                className="max-w-full rounded-lg border border-rim mb-3"
+              />
+            )}
             <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink mb-3">{q.description}</p>
             {q.input_format && (
               <div className="space-y-1 text-xs">
                 <p className="font-mono text-annotation font-semibold">Input Format</p>
-                <p className="font-mono text-ink bg-deck p-2 rounded">{q.input_format}</p>
+                <p className="font-mono text-ink bg-deck p-2 rounded whitespace-pre-wrap">{q.input_format}</p>
               </div>
             )}
             {q.output_format && (
               <div className="space-y-1 text-xs mt-2">
                 <p className="font-mono text-annotation font-semibold">Output Format</p>
-                <p className="font-mono text-ink bg-deck p-2 rounded">{q.output_format}</p>
+                <p className="font-mono text-ink bg-deck p-2 rounded whitespace-pre-wrap">{q.output_format}</p>
               </div>
             )}
             {q.constraints && (
               <div className="space-y-1 text-xs mt-2">
                 <p className="font-mono text-annotation font-semibold">Constraints</p>
-                <p className="font-mono text-ink bg-deck p-2 rounded">{q.constraints}</p>
+                <p className="font-mono text-ink bg-deck p-2 rounded whitespace-pre-wrap">{q.constraints}</p>
               </div>
             )}
             {q.sample_input && q.sample_output && (
@@ -268,15 +300,50 @@ function CodingQuestion({
 
           {/* Monaco Editor */}
           <div className="flex flex-col h-[65vh] min-h-[420px]">
-            <Editor
-              height="100%"
-              language={LANG_MAP[activeLang] || 'text'}
-              theme="light"
-              value={code}
-              onChange={handleChange}
-              onMount={handleEditorMount}
-              options={getMonacoOptions()}
-            />
+            {useFallbackEditor ? (
+              <div className="flex flex-col h-full">
+                <div className="text-2xs text-annotation bg-sunken border border-rim rounded-t-lg px-2.5 py-1.5 flex items-center justify-between">
+                  <span>Plain text editor (no syntax highlighting) — your code still saves normally.</span>
+                  <button
+                    type="button"
+                    onClick={() => { setUseFallbackEditor(false); retryEditor(); }}
+                    className="text-accent hover:underline shrink-0 ml-2"
+                  >
+                    Try code editor again
+                  </button>
+                </div>
+                <textarea
+                  value={code}
+                  onChange={(e) => handleChange(e.target.value)}
+                  spellCheck={false}
+                  className="flex-1 w-full font-mono text-xs p-3 bg-deck border border-t-0 border-rim rounded-b-lg resize-none focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+            ) : (
+              <>
+                <Editor
+                  key={editorAttempt}
+                  height="100%"
+                  language={LANG_MAP[activeLang] || 'text'}
+                  theme="light"
+                  value={code}
+                  onChange={handleChange}
+                  onMount={handleEditorMount}
+                  options={getMonacoOptions()}
+                />
+                {monacoTimedOut && !monacoReady && (
+                  <div className="mt-2 panel p-3 border border-alert/30 bg-alert/5 flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-xs text-ink">
+                      Code editor is taking a long time to load — this can happen on a slow or restricted network.
+                    </span>
+                    <div className="flex gap-2 shrink-0">
+                      <Btn variant="ghost" size="sm" onClick={retryEditor}>Retry</Btn>
+                      <Btn variant="ghost" size="sm" onClick={() => setUseFallbackEditor(true)}>Use plain text editor</Btn>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Lint warnings */}
             {lints.length > 0 && (
@@ -389,9 +456,15 @@ function CodingQuestion({
                     {testResults.map((tr, i) => (
                       <tr key={i} className="border-b border-rim/50 transition-colors hover:bg-sunken">
                         <td className="py-1.5 pr-2 text-annotation">{i + 1}</td>
-                        <td className="py-1.5 pr-2 text-ink max-w-24 truncate font-medium">{tr.input}</td>
-                        <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.expected}</td>
-                        <td className="py-1.5 pr-2 text-ink max-w-24 truncate">{tr.actual}</td>
+                        <td className="py-1.5 pr-2 text-ink max-w-32 align-top font-medium">
+                          <pre className="whitespace-pre-wrap break-words font-mono max-h-20 overflow-y-auto">{tr.input}</pre>
+                        </td>
+                        <td className="py-1.5 pr-2 text-ink max-w-32 align-top">
+                          <pre className="whitespace-pre-wrap break-words font-mono max-h-20 overflow-y-auto">{tr.expected}</pre>
+                        </td>
+                        <td className="py-1.5 pr-2 text-ink max-w-32 align-top">
+                          <pre className="whitespace-pre-wrap break-words font-mono max-h-20 overflow-y-auto">{tr.actual}</pre>
+                        </td>
                         <td className="py-1.5 text-right">
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-bold uppercase tracking-wider ${
                             tr.passed ? 'bg-verify/12 text-verify' : 'bg-alert/12 text-alert'

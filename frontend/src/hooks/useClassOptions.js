@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { metaAPI } from '../services/api';
 import { CLASSES } from '../lib/departments';
 
-// Single source of truth for the year/batch (class) options offered
+// Single source of truth for the year/class options offered
 // across the whole site. Everything is pulled from /api/meta/options so
 // Login, CompleteProfile and the Test Creator always show the same lists
 // that are actually in the database. Hardcoded constants act only as a
@@ -17,8 +17,8 @@ export function useClassOptions() {
   });
 
   const years = data?.years?.length ? data.years : FALLBACK_YEARS;
-  const batches = data?.batches?.length ? data.batches : CLASSES;
+  const classes = data?.classes?.length ? data.classes : CLASSES;
   const departments = data?.departments;
 
-  return { years, batches, departments, isLoading };
+  return { years, classes, departments, isLoading };
 }

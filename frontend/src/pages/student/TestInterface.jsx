@@ -25,11 +25,41 @@ const LANG_MAP = {
 };
 
 const AUTO_SAVE_INTERVAL = 30000;
+const DEBOUNCE_SAVE_DELAY = 3000;
 const MAX_TAB_SWITCHES = 5;
 const FINGERPRINT_INTERVAL = 60000;
 
 const formatClock = (d) =>
   d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+// ── Local draft backup ────────────────────────────────────────
+// A network drop or a browser/tab crash can happen between two server
+// saves. Keeping the latest edits mirrored in localStorage means nothing
+// typed is ever lost to the server round-trip alone — on the next
+// start/resume it's merged back on top of whatever the server has.
+const draftKey = (submissionId) => `ct:draft:${submissionId}`;
+
+function saveDraft(submissionId, { answers, codeSolutions, flaggedQuestions }) {
+  if (!submissionId) return;
+  try {
+    localStorage.setItem(draftKey(submissionId), JSON.stringify({
+      answers, codeSolutions, flaggedQuestions, savedAt: Date.now(),
+    }));
+  } catch { /* storage full / unavailable — best effort only */ }
+}
+
+function loadDraft(submissionId) {
+  if (!submissionId) return null;
+  try {
+    const raw = localStorage.getItem(draftKey(submissionId));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function clearDraft(submissionId) {
+  if (!submissionId) return;
+  try { localStorage.removeItem(draftKey(submissionId)); } catch { /* noop */ }
+}
 
 export default function TestInterface() {
   const { testId } = useParams();
@@ -76,9 +106,14 @@ export default function TestInterface() {
   const fingerprintRef = useRef(null);
 
   const autoSaveRef = useRef(null);
+  const debounceSaveRef = useRef(null);
   const justSavedRef = useRef(null);
   const lockdownApplied = useRef(false);
   const tabSwitchCountRef = useRef(0);
+  // Always-current snapshot for the save/flush callbacks below, so a fixed
+  // 30s interval and an online/beforeunload flush never fire against a
+  // stale closure of answers/codeSolutions from whenever the effect last ran.
+  const latestRef = useRef({ answers: {}, codeSolutions: {}, flagged: new Set(), selectedProblems: [] });
   const handleSubmitRef = useRef(null);
   const autoSubmitTriggeredRef = useRef(false);
   const lastViolationAtRef = useRef(0);
@@ -105,18 +140,38 @@ export default function TestInterface() {
     onSuccess: async (data) => {
       setRemainingSeconds(data.remainingSeconds);
       setTestStarted(true);
-      if (data.submission?.answers) {
-        try { setAnswers(JSON.parse(data.submission.answers) || {}); } catch {/*noop*/}
+
+      // The API client already parses the JSON response body, so these
+      // fields arrive as real objects/arrays — restore them directly. This
+      // is what puts a resumed (or refreshed mid-test) student's previous
+      // answers back on screen instead of a blank slate.
+      const sub = data.submission || {};
+      let restoredAnswers = (sub.answers && typeof sub.answers === 'object') ? sub.answers : {};
+      let restoredCode = (sub.code_solutions && typeof sub.code_solutions === 'object') ? sub.code_solutions : {};
+      if (Array.isArray(sub.selected_problems) && sub.selected_problems.length > 0) {
+        setSelectedProblems(sub.selected_problems);
       }
-      if (data.submission?.code_solutions) {
-        try { setCodeSolutions(JSON.parse(data.submission.code_solutions) || {}); } catch {/*noop*/}
+      if (Array.isArray(sub.flagged_questions) && sub.flagged_questions.length > 0) {
+        setFlagged(new Set(sub.flagged_questions));
       }
-      if (data.submission?.selected_problems) {
-        try {
-          const sp = JSON.parse(data.submission.selected_problems);
-          if (Array.isArray(sp) && sp.length > 0) setSelectedProblems(sp);
-        } catch {/*noop*/}
+      if (typeof sub.tab_switch_count === 'number' && sub.tab_switch_count > 0) {
+        tabSwitchCountRef.current = sub.tab_switch_count;
+        setTabSwitchCount(sub.tab_switch_count);
       }
+
+      // A save that failed while offline may have left a newer draft in
+      // localStorage than what made it to the server — merge it back in.
+      const draft = loadDraft(sub.id);
+      if (draft) {
+        restoredAnswers = { ...restoredAnswers, ...(draft.answers || {}) };
+        restoredCode = { ...restoredCode, ...(draft.codeSolutions || {}) };
+        if (Array.isArray(draft.flaggedQuestions) && draft.flaggedQuestions.length) {
+          setFlagged(new Set(draft.flaggedQuestions));
+        }
+      }
+      setAnswers(restoredAnswers);
+      setCodeSolutions(restoredCode);
+
       setSubmissionId(data.submission.id);
 
       await shuffleAPI.assign(testId);
@@ -150,6 +205,8 @@ export default function TestInterface() {
 
   const saveMut = useMutation({
     mutationFn: submissionsAPI.save,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     onSuccess: () => {
       setLastSaved(new Date());
       setSaveStatus('ok');
@@ -160,8 +217,11 @@ export default function TestInterface() {
   });
   const submitMut = useMutation({
     mutationFn: submissionsAPI.submit,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     onSuccess: () => {
       clearInterval(autoSaveRef.current);
+      clearDraft(submissionId);
       setSubmitting(false);
       const reason = endReasonRef.current;
       endReasonRef.current = null;
@@ -212,20 +272,67 @@ export default function TestInterface() {
     return () => { wsRef.current = null; ws.close(); };
   }, [testStarted, user?.token]);
 
+  // Keep a ref mirror of the latest answer state so the interval/flush
+  // callbacks below always see current data without needing to be torn
+  // down and rebuilt (and thus re-timed) on every keystroke.
+  useEffect(() => {
+    latestRef.current = { answers, codeSolutions, flagged, selectedProblems };
+  }, [answers, codeSolutions, flagged, selectedProblems]);
+
+  const saveMutate = saveMut.mutate;
+  const flushSave = useCallback(() => {
+    if (!testStarted) return;
+    const snap = latestRef.current;
+    saveMutate({
+      testId,
+      answers: snap.answers,
+      codeSolutions: snap.codeSolutions,
+      flaggedQuestions: Array.from(snap.flagged),
+      tabSwitchCount: tabSwitchCountRef.current,
+      selectedProblems: snap.selectedProblems,
+    });
+  }, [testId, testStarted, saveMutate]);
+
+  // Fixed-cadence safety net: a real 30s interval, independent of typing
+  // activity. (Rebuilding this interval on every answer/code change — as a
+  // dependency array of [answers, codeSolutions, ...] would do — restarts
+  // the 30s countdown on every keystroke, so a student typing continuously
+  // in the code editor could go the whole test without a single autosave.)
   useEffect(() => {
     if (!testStarted) return;
-    autoSaveRef.current = setInterval(() => {
-      saveMut.mutate({
-        testId,
-        answers,
-        codeSolutions,
-        flaggedQuestions: Array.from(flagged),
-        tabSwitchCount,
-        selectedProblems,
-      });
-    }, AUTO_SAVE_INTERVAL);
+    autoSaveRef.current = setInterval(flushSave, AUTO_SAVE_INTERVAL);
     return () => clearInterval(autoSaveRef.current);
-  }, [testStarted, answers, codeSolutions, flagged, tabSwitchCount, selectedProblems]);
+  }, [testStarted, flushSave]);
+
+  // Fast-path: also save shortly after the student stops typing/selecting,
+  // instead of always waiting for the next 30s tick — this is what keeps
+  // losses down to a few seconds of edits if the tab crashes or the network
+  // drops mid-test.
+  useEffect(() => {
+    if (!testStarted) return;
+    if (debounceSaveRef.current) clearTimeout(debounceSaveRef.current);
+    debounceSaveRef.current = setTimeout(flushSave, DEBOUNCE_SAVE_DELAY);
+    return () => clearTimeout(debounceSaveRef.current);
+  }, [testStarted, answers, codeSolutions, flagged, selectedProblems, flushSave]);
+
+  // Local backup on every change — synchronous and network-independent, so
+  // a dropped connection never loses work that hasn't reached the server
+  // yet. Restored on the next start/resume (see startMut.onSuccess above).
+  useEffect(() => {
+    if (!testStarted || !submissionId) return;
+    saveDraft(submissionId, {
+      answers, codeSolutions, flaggedQuestions: Array.from(flagged),
+    });
+  }, [testStarted, submissionId, answers, codeSolutions, flagged]);
+
+  // Flush immediately when connectivity returns, rather than waiting for
+  // the next scheduled tick.
+  useEffect(() => {
+    if (!testStarted) return;
+    const onOnline = () => flushSave();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [testStarted, flushSave]);
 
   useEffect(() => {
     if (!testStarted || lockdownApplied.current) return;

@@ -38,9 +38,9 @@ async function cacheDel(key) {
   await r.del(key);
 }
 
-// Delete all keys matching a prefix (used for batch-aware cache keys, e.g.
+// Delete all keys matching a prefix (used for class-aware cache keys, e.g.
 // "test:<id>:full:*" — one test can have several cached variants, one per
-// MCQ set/batch).
+// MCQ set/class).
 async function cacheDelPattern(prefix) {
   const r = await getRedis();
   let cursor = 0;

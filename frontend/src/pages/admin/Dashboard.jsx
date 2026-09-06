@@ -69,17 +69,17 @@ export default function AdminDashboard() {
     passing: b >= 40,
   }));
 
-  // ── Cluster breakdown: department → year → batch ──────────
+  // ── Cluster breakdown: department → year → class ──────────
   const deptOrder = DEPT_ORDER;
   const clusterMap = {};
   scoredSubs.forEach(sb => {
     const dept  = sb.user_department || sb.department || 'Unknown';
     const year  = sb.year_display ?? sb.user_year ?? 'Any';
-    const batch = sb.batch_display || sb.user_batch || 'Unknown';
+    const className = sb.class_display || sb.user_class || 'Unknown';
     if (!clusterMap[dept]) clusterMap[dept] = {};
     if (!clusterMap[dept][year]) clusterMap[dept][year] = {};
-    if (!clusterMap[dept][year][batch]) clusterMap[dept][year][batch] = { count: 0, totalPct: 0, passCount: 0 };
-    const d = clusterMap[dept][year][batch];
+    if (!clusterMap[dept][year][className]) clusterMap[dept][year][className] = { count: 0, totalPct: 0, passCount: 0 };
+    const d = clusterMap[dept][year][className];
     d.count++;
     const pct = sb.max_score > 0 ? (sb.score / sb.max_score) * 100 : 0;
     d.totalPct += pct;
@@ -98,12 +98,12 @@ export default function AdminDashboard() {
       department,
       years: Object.entries(years)
         .sort((a, b) => (Number(a[0]) || 0) - (Number(b[0]) || 0))
-        .map(([year, batches]) => ({
+        .map(([year, classes]) => ({
           year,
-          batches: Object.entries(batches)
+          classes: Object.entries(classes)
             .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
-            .map(([batch, d]) => ({
-              batch,
+            .map(([className, d]) => ({
+              className,
               count: d.count,
               avg: Math.round(d.totalPct / d.count),
               passRate: Math.round((d.passCount / d.count) * 100),
@@ -282,10 +282,10 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Class-wise Breakdown (department → year → batch) */}
+      {/* Class-wise Breakdown (department → year → class) */}
       {clusterData.length > 0 && (
         <div className="panel p-4">
-          <h3 className="text-label text-annotation mb-3">Cluster-wise Breakdown (Dept / Year / Batch)</h3>
+          <h3 className="text-label text-annotation mb-3">Cluster-wise Breakdown (Dept / Year / Class)</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -381,7 +381,7 @@ export default function AdminDashboard() {
   );
 }
 
-/* ── Renders a cluster (department → year → batch) as table rows ── */
+/* ── Renders a cluster (department → year → class) as table rows ── */
 const yearOrdinal = (y) => {
   const n = Number(y);
   if (!Number.isFinite(n) || y === '' || y === null) return `Year ${y}`;
@@ -396,7 +396,7 @@ function ClusterRows({ cluster }) {
       <tr className="bg-deck/40 border-b border-rim/40">
         <td className="py-1.5 pl-2 font-semibold text-ink">{cluster.department}</td>
         <td className="text-right py-1.5 font-mono text-annotation" colSpan={3}>
-          {cluster.years.reduce((sum, y) => sum + y.batches.reduce((a, b) => a + b.count, 0), 0)} submitted
+          {cluster.years.reduce((sum, y) => sum + y.classes.reduce((a, b) => a + b.count, 0), 0)} submitted
         </td>
       </tr>
       {cluster.years.map(y => (
@@ -406,16 +406,16 @@ function ClusterRows({ cluster }) {
             <span className="text-annotation/50 font-normal"> (Year)</span>
           </td>
           <td className="text-right py-1 font-mono text-annotation/80">
-            {y.batches.reduce((a, b) => a + b.count, 0)}
+            {y.classes.reduce((a, b) => a + b.count, 0)}
           </td>
           <td />
           <td />
         </tr>
         ))}
       {cluster.years.flatMap(y =>
-        y.batches.map(b => (
-          <tr key={`${cluster.department}-${y.year}-${b.batch}`} className="border-b border-rim/30">
-            <td className="py-1.5 pl-10 font-medium text-ink">{b.batch}</td>
+        y.classes.map(b => (
+          <tr key={`${cluster.department}-${y.year}-${b.className}`} className="border-b border-rim/30">
+            <td className="py-1.5 pl-10 font-medium text-ink">{b.className}</td>
             <td className="text-right py-1.5 font-mono">{b.count}</td>
             <td className="text-right py-1.5 font-mono">{b.avg}%</td>
             <td className="text-right py-1.5 font-mono">{b.passRate}%</td>

@@ -1,34 +1,34 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { analyticsAPI, batchesAPI } from '../../../services/api';
+import { analyticsAPI, classesAPI } from '../../../services/api';
 import { Btn, Spinner, Input, Select } from '../../../components/shared/UI';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export default function PlacementPredictions() {
-  const [batchFilter, setBatchFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
   const [minProb, setMinProb] = useState(0);
   const [department, setDepartment] = useState('');
 
-  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
+  const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: classesAPI.list });
 
   const params = {};
-  if (batchFilter) params.batch_id = batchFilter;
+  if (classFilter) params.class_id = classFilter;
   if (department) params.department = department;
   if (minProb > 0) params.min_probability = minProb;
 
   const { data, isLoading } = useQuery({
     queryKey: ['placement-probability', params],
-    queryFn: () => analyticsAPI.placementBatch(params),
+    queryFn: () => analyticsAPI.placementByClass(params),
   });
 
-  const batches = batchesData?.batches || [];
+  const classes = classesData?.classes || [];
 
   const exportCsv = () => {
     if (!data?.students?.length) return;
-    const headers = ['Name', 'Email', 'Branch', 'Roll No', 'Batch', 'Avg Score', 'Pass Rate', 'Tests', 'Probability', 'Confidence', 'Recommendation'];
+    const headers = ['Name', 'Email', 'Branch', 'Roll No', 'Class', 'Avg Score', 'Pass Rate', 'Tests', 'Probability', 'Confidence', 'Recommendation'];
     const rows = data.students.map(s => [
-      s.name, s.email, s.branch || '', s.roll_number || '', s.batch || '',
+      s.name, s.email, s.branch || '', s.roll_number || '', s.class_name || '',
       `${s.avg_score}%`, `${s.pass_rate}%`, s.test_count,
       `${s.probability}%`, s.confidence, `"${s.recommendation}"`,
     ]);
@@ -70,10 +70,22 @@ export default function PlacementPredictions() {
 
       <div className="panel p-3 flex flex-wrap gap-3 items-end">
         <div>
-          <label htmlFor="pp-batch" className="text-2xs text-annotation/60 mb-1.5">Batch</label>
-          <select value={batchFilter} onChange={e => setBatchFilter(e.target.value)} className="select-field max-w-xs" id="pp-batch">
-            <option value="">All batches</option>
-            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <label htmlFor="pp-class" className="text-2xs text-annotation/60 mb-1.5">Class</label>
+          <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="select-field max-w-xs" id="pp-class">
+            <option value="">All classes</option>
+            {/* Grouped by department — every department has its own Class
+                1-4, so an ungrouped list would show "Class 1" repeated
+                eight times with no way to tell them apart. */}
+            {Object.entries(
+              classes.reduce((acc, c) => {
+                (acc[c.department] ||= []).push(c);
+                return acc;
+              }, {})
+            ).map(([dept, deptClasses]) => (
+              <optgroup key={dept} label={dept}>
+                {deptClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div>

@@ -7,6 +7,86 @@ async function migrate() {
   await query(`
     CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+    -- ═══════════════════════════════════════════════════════════
+    -- TERMINOLOGY MIGRATION: batch → class
+    -- One-time compatibility shim for databases created before the
+    -- "batch" terminology was renamed to "class" throughout the app.
+    -- Each rename is a no-op (caught) on a fresh install, where these
+    -- tables/columns don't exist under the old names yet, and a no-op
+    -- on a database that's already been migrated once.
+    -- ═══════════════════════════════════════════════════════════
+    DO $$ BEGIN
+      ALTER TABLE batches RENAME TO classes;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE student_batches RENAME TO student_classes;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE test_batches RENAME TO test_classes;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE drive_batches RENAME TO drive_classes;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
+
+    -- Note: each of these column renames can fail two different ways on a
+    -- database that predates this migration entirely — either the column
+    -- doesn't exist yet (undefined_column) or, on a truly fresh database,
+    -- the whole table doesn't exist yet either since it's created further
+    -- down this same script (undefined_table). Both are harmless no-ops.
+    DO $$ BEGIN
+      ALTER TABLE student_classes RENAME COLUMN batch_id TO class_id;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE test_classes RENAME COLUMN batch_id TO class_id;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE drive_classes RENAME COLUMN batch_id TO class_id;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE users RENAME COLUMN batch TO class_name;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE submissions RENAME COLUMN batch_snapshot TO class_snapshot;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE announcements RENAME COLUMN target_batches TO target_classes;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE tests RENAME COLUMN batches TO classes;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END $$;
+
+    -- Payment/billing was never wired up to an actual provider — drop the
+    -- dead schema outright rather than carrying it forward unused.
+    DROP TABLE IF EXISTS payment_transactions;
+    DROP TABLE IF EXISTS payment_plans;
+
     -- Users table
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -136,8 +216,8 @@ async function migrate() {
       invited_at TIMESTAMPTZ DEFAULT NOW()
     );
 
-    -- Batches table
-    CREATE TABLE IF NOT EXISTS batches (
+    -- Classes table
+    CREATE TABLE IF NOT EXISTS classes (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       name VARCHAR(100) NOT NULL,
       department VARCHAR(100) NOT NULL,
@@ -147,21 +227,21 @@ async function migrate() {
       UNIQUE(name, department)
     );
 
-    -- Test-to-batch mapping (reconfigurable per drive)
-    CREATE TABLE IF NOT EXISTS test_batches (
+    -- Test-to-class mapping (reconfigurable per drive)
+    CREATE TABLE IF NOT EXISTS test_classes (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
-      batch_id UUID NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
       section_mapping JSONB DEFAULT '{}',
       created_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(test_id, batch_id)
+      UNIQUE(test_id, class_id)
     );
 
-    -- Student batch assignments (semester-based)
-    CREATE TABLE IF NOT EXISTS student_batches (
+    -- Student class assignments (semester-based)
+    CREATE TABLE IF NOT EXISTS student_classes (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      batch_id UUID NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
       year_of_study INTEGER NOT NULL DEFAULT 1,
       semester VARCHAR(20),
       assigned_at TIMESTAMPTZ DEFAULT NOW(),
@@ -174,9 +254,9 @@ async function migrate() {
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
-    -- Add batch/year columns to users
+    -- Add class/year columns to users
     DO $$ BEGIN
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS batch VARCHAR(100);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS class_name VARCHAR(100);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS year_of_study INTEGER DEFAULT 1;
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
@@ -189,17 +269,17 @@ async function migrate() {
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
-    -- Historical snapshot of the student's batch/year at the time they took the
+    -- Historical snapshot of the student's class/year at the time they took the
     -- test, so later semester reshuffles don't rewrite past class-wise results.
     DO $$ BEGIN
-      ALTER TABLE submissions ADD COLUMN IF NOT EXISTS batch_snapshot VARCHAR(100);
+      ALTER TABLE submissions ADD COLUMN IF NOT EXISTS class_snapshot VARCHAR(100);
       ALTER TABLE submissions ADD COLUMN IF NOT EXISTS year_snapshot INTEGER;
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
     -- MCQ "set" (A/B/C/D) — lets an admin tag questions into up to 4 variants
-    -- and map different batches to different sets for the same drive, to
-    -- reduce answer-sharing between batches sitting the same aptitude round.
+    -- and map different classes to different sets for the same drive, to
+    -- reduce answer-sharing between classes sitting the same aptitude round.
     DO $$ BEGIN
       ALTER TABLE questions ADD COLUMN IF NOT EXISTS question_set CHAR(1) DEFAULT 'A';
     EXCEPTION WHEN duplicate_column THEN NULL;
@@ -250,13 +330,13 @@ async function migrate() {
       UNIQUE(drive_id, test_id)
     );
 
-    -- Drive-batch mappings
-    CREATE TABLE IF NOT EXISTS drive_batches (
+    -- Drive-class mappings
+    CREATE TABLE IF NOT EXISTS drive_classes (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       drive_id UUID NOT NULL REFERENCES drives(id) ON DELETE CASCADE,
-      batch_id UUID NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
       created_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(drive_id, batch_id)
+      UNIQUE(drive_id, class_id)
     );
 
     -- Audit log
@@ -274,11 +354,11 @@ async function migrate() {
     -- Additional indexes for performance
     CREATE INDEX IF NOT EXISTS idx_questions_genre ON questions(genre);
     CREATE INDEX IF NOT EXISTS idx_submissions_tab_switch ON submissions(tab_switch_count);
-    CREATE INDEX IF NOT EXISTS idx_test_batches_test_id ON test_batches(test_id);
-    CREATE INDEX IF NOT EXISTS idx_test_batches_batch_id ON test_batches(batch_id);
-    CREATE INDEX IF NOT EXISTS idx_student_batches_user_id ON student_batches(user_id);
-    CREATE INDEX IF NOT EXISTS idx_student_batches_batch_id ON student_batches(batch_id);
-    CREATE INDEX IF NOT EXISTS idx_users_batch ON users(batch);
+    CREATE INDEX IF NOT EXISTS idx_test_classes_test_id ON test_classes(test_id);
+    CREATE INDEX IF NOT EXISTS idx_test_classes_class_id ON test_classes(class_id);
+    CREATE INDEX IF NOT EXISTS idx_student_classes_user_id ON student_classes(user_id);
+    CREATE INDEX IF NOT EXISTS idx_student_classes_class_id ON student_classes(class_id);
+    CREATE INDEX IF NOT EXISTS idx_users_class_name ON users(class_name);
 
     -- ═══════════════════════════════════════════════════════════
     -- LEADERBOARD (student XP backing data)
@@ -351,7 +431,7 @@ async function migrate() {
       body TEXT NOT NULL,
       priority VARCHAR(10) NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
       target_role VARCHAR(20) DEFAULT 'all' CHECK (target_role IN ('all', 'student', 'admin')),
-      target_batches JSONB DEFAULT '[]',
+      target_classes JSONB DEFAULT '[]',
       created_by UUID REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       expires_at TIMESTAMPTZ
@@ -430,6 +510,20 @@ async function migrate() {
       ALTER TABLE suspicious_flags ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT false;
       ALTER TABLE suspicious_flags ADD COLUMN IF NOT EXISTS severity VARCHAR(10) DEFAULT 'medium'
         CHECK (severity IN ('low', 'medium', 'high', 'critical'));
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+
+    -- controllers/security.js's reviewAlert/disqualifySubmission already
+    -- read and write these three columns (flag_type, reviewed_by,
+    -- action_taken) — they were never actually added to the table, so
+    -- reviewing any security alert has been failing with a DB error since
+    -- that feature shipped. Adding them now also gives the new plagiarism
+    -- bulk-action endpoint (ignore/warn/disqualify) the same audit trail.
+    DO $$ BEGIN
+      ALTER TABLE suspicious_flags ADD COLUMN IF NOT EXISTS flag_type VARCHAR(50) DEFAULT 'other';
+      ALTER TABLE suspicious_flags ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE suspicious_flags ADD COLUMN IF NOT EXISTS action_taken VARCHAR(20)
+        CHECK (action_taken IS NULL OR action_taken IN ('warn', 'disqualify', 'ignore'));
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
@@ -586,7 +680,7 @@ async function migrate() {
     END $$;
 
     DO $$ BEGIN
-      ALTER TABLE batches ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id);
+      ALTER TABLE classes ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id);
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
@@ -597,7 +691,7 @@ async function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_tests_tenant ON tests(tenant_id);
-    CREATE INDEX IF NOT EXISTS idx_batches_tenant ON batches(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_classes_tenant ON classes(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_drives_tenant ON drives(tenant_id);
 
     -- ═══════════════════════════════════════════════════════════
@@ -626,14 +720,14 @@ async function migrate() {
     -- Seed default roles
     INSERT INTO roles (name, description, permissions) VALUES
       ('super_admin', 'Full system access', '["*"]'),
-      ('dept_admin', 'Department-level administration', '["tests:create","tests:edit","tests:delete","tests:publish","results:view","results:export","users:view","users:create","users:edit","question-bank:manage","batches:manage"]'),
+      ('dept_admin', 'Department-level administration', '["tests:create","tests:edit","tests:delete","tests:publish","results:view","results:export","users:view","users:create","users:edit","question-bank:manage","classes:manage"]'),
       ('proctor', 'Live exam monitoring', '["proctor:view-sessions","proctor:terminate","proctor:attendance","results:view"]'),
       ('auditor', 'Read-only access to logs and results', '["audit:view","audit:export","results:view"]'),
       ('student', 'Test taking and own results', '[]')
     ON CONFLICT (name) DO NOTHING;
 
     -- ═══════════════════════════════════════════════════════════
-    -- USAGE QUOTAS & BILLING
+    -- USAGE QUOTAS (per-tenant resource limits)
     -- ═══════════════════════════════════════════════════════════
 
     CREATE TABLE IF NOT EXISTS usage_quotas (
@@ -758,11 +852,20 @@ async function migrate() {
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
-    -- Batch targeting: which batches can sit this test. 'batches' holds a
-    -- JSON array of batch names (matching users.batch); an empty array means
-    -- every batch.
+    -- Class targeting: which classes can sit this test. 'classes' holds a
+    -- JSON array of class names (matching users.class_name); an empty array
+    -- means every class.
     DO $$ BEGIN
-      ALTER TABLE tests ADD COLUMN IF NOT EXISTS batches JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE tests ADD COLUMN IF NOT EXISTS classes JSONB DEFAULT '[]'::jsonb;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+
+    -- Manual results release: when settings.showResults is 'manual', a
+    -- submission's score/breakdown stays hidden from the student until an
+    -- admin explicitly flips this. Also doubles as the marker used for
+    -- 'after_end' tests whose end_time is unset.
+    DO $$ BEGIN
+      ALTER TABLE tests ADD COLUMN IF NOT EXISTS results_published_at TIMESTAMPTZ;
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
 
@@ -862,36 +965,6 @@ async function migrate() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS outlook_calendar_refresh_token TEXT;
   EXCEPTION WHEN duplicate_column THEN NULL;
   END $$;
-
-  -- Payment plans table
-  CREATE TABLE IF NOT EXISTS payment_plans (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    amount NUMERIC(10,2) NOT NULL,
-    currency VARCHAR(3) DEFAULT 'INR',
-    duration_days INTEGER DEFAULT 30,
-    features JSONB DEFAULT '[]',
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-  );
-
-  -- Payment transactions table
-  CREATE TABLE IF NOT EXISTS payment_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan_id UUID REFERENCES payment_plans(id) ON DELETE SET NULL,
-    amount NUMERIC(10,2) NOT NULL,
-    currency VARCHAR(3) DEFAULT 'INR',
-    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed', 'refunded')),
-    provider VARCHAR(20) NOT NULL CHECK (provider IN ('stripe', 'razorpay')),
-    provider_txn_id VARCHAR(255),
-    metadata JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  );
-  CREATE INDEX IF NOT EXISTS idx_payment_transactions_user ON payment_transactions(user_id);
-  CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
 
   -- Webhook configs (Slack/Discord)
   CREATE TABLE IF NOT EXISTS webhook_configs (
@@ -1018,6 +1091,25 @@ async function migrate() {
   CREATE INDEX IF NOT EXISTS idx_question_feedback_status ON question_feedback(status);
 
   -- ═══════════════════════════════════════════════════════════
+  -- QUESTION BANK ⇄ TEST LINKAGE
+  -- Tracks which bank question a test question was pulled from
+  -- (or auto-saved to), so the bank can show "used in" clustering
+  -- and so re-saving a test doesn't lose that link.
+  -- ═══════════════════════════════════════════════════════════
+  DO $$ BEGIN
+    ALTER TABLE questions ADD COLUMN IF NOT EXISTS bank_question_id UUID REFERENCES bank_questions(id) ON DELETE SET NULL;
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END $$;
+
+  DO $$ BEGIN
+    ALTER TABLE coding_problems ADD COLUMN IF NOT EXISTS bank_question_id UUID REFERENCES bank_questions(id) ON DELETE SET NULL;
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END $$;
+
+  CREATE INDEX IF NOT EXISTS idx_questions_bank_question_id ON questions(bank_question_id);
+  CREATE INDEX IF NOT EXISTS idx_coding_problems_bank_question_id ON coding_problems(bank_question_id);
+
+  -- ═══════════════════════════════════════════════════════════
   -- DEPARTMENT RESTRICTION
   -- The platform is restricted to the eligible departments below.
   -- Existing student accounts that belong to any other department
@@ -1037,6 +1129,65 @@ async function migrate() {
        'Electrical Engineering',
        'Mechanical Engineering'
      );
+
+  -- ═══════════════════════════════════════════════════════════
+  -- TERMINOLOGY MIGRATION (data values): "Batch N" → "Class N"
+  -- Runs after every table above is guaranteed to exist, so it's safe
+  -- to reference them directly without existence guards.
+  -- ═══════════════════════════════════════════════════════════
+  UPDATE classes SET name = REPLACE(name, 'Batch ', 'Class ') WHERE name LIKE 'Batch %';
+  UPDATE users SET class_name = REPLACE(class_name, 'Batch ', 'Class ') WHERE class_name LIKE 'Batch %';
+  UPDATE submissions SET class_snapshot = REPLACE(class_snapshot, 'Batch ', 'Class ') WHERE class_snapshot LIKE 'Batch %';
+  UPDATE tests SET classes = (
+    SELECT COALESCE(jsonb_agg(REPLACE(elem::text, '"Batch ', '"Class ')::jsonb), '[]'::jsonb)
+    FROM jsonb_array_elements(classes) elem
+  ) WHERE classes::text LIKE '%Batch %';
+  UPDATE announcements SET target_classes = (
+    SELECT COALESCE(jsonb_agg(REPLACE(elem::text, '"Batch ', '"Class ')::jsonb), '[]'::jsonb)
+    FROM jsonb_array_elements(target_classes) elem
+  ) WHERE target_classes::text LIKE '%Batch %';
+
+  -- ═══════════════════════════════════════════════════════════
+  -- MANUAL GRADING + ADMIN-FORCED START/STOP
+  -- Lets an admin/super_admin override a submission's score (single or
+  -- bulk via CSV/JSON) and force-end an in-progress test from a
+  -- student's profile, with a record of who did it.
+  -- ═══════════════════════════════════════════════════════════
+  DO $$ BEGIN
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS graded_by UUID REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS graded_at TIMESTAMPTZ;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS grading_note TEXT;
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ended_by UUID REFERENCES users(id) ON DELETE SET NULL;
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END $$;
+
+  -- ═══════════════════════════════════════════════════════════
+  -- PLACEMENT RESOURCES (study material library)
+  -- Admin-uploaded files (PDF/DOC/DOCX/PPT/PPTX/XLS/XLSX) grouped into
+  -- four fixed categories, stored as bytea rows the same way the
+  -- images table already does — no third-party file host in this app.
+  -- Targeting (departments/years/classes) mirrors the tests table's
+  -- own targeting columns exactly, so the same access-check shape can
+  -- be reused for "can this student see this resource".
+  -- ═══════════════════════════════════════════════════════════
+  CREATE TABLE IF NOT EXISTS resources (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    category VARCHAR(20) NOT NULL CHECK (category IN ('aptitude', 'coding', 'gd', 'pi')),
+    file_data BYTEA NOT NULL,
+    mimetype VARCHAR(150) NOT NULL,
+    filename VARCHAR(255),
+    size_bytes INTEGER,
+    departments JSONB DEFAULT '[]'::jsonb,
+    years JSONB DEFAULT '[]'::jsonb,
+    classes JSONB DEFAULT '[]'::jsonb,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_resources_category ON resources(category);
+  CREATE INDEX IF NOT EXISTS idx_resources_created_by ON resources(created_by);
   `);
 
   console.log('✅ Migrations complete.');

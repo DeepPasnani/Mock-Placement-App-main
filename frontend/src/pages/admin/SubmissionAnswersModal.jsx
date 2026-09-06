@@ -17,7 +17,7 @@ import { Modal, Badge, Spinner } from '../../components/shared/UI';
 
 const LANG_MAP = {
   python: 'python', javascript: 'javascript', java: 'java', cpp: 'cpp',
-  c: 'c', go: 'go', rust: 'rust', ruby: 'ruby', kotlin: 'kotlin', sql: 'sql',
+  c: 'c', sql: 'sql',
 };
 
 // JSONB columns come back already-parsed from the API in the normal case,
@@ -190,12 +190,16 @@ export default function SubmissionAnswersModal({ submissionId, test, onClose }) 
                                 {i + 1}
                                 {tr.hidden && <span className="badge-accent text-2xs ml-1">Hidden</span>}
                               </td>
-                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">{tr.hidden ? '—' : tr.input}</td>
-                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">{tr.hidden ? '—' : tr.expected}</td>
-                              <td className="py-1.5 pr-2 text-ink max-w-32 truncate">
-                                {tr.actual}
+                              <td className="py-1.5 pr-2 text-ink max-w-32 align-top">
+                                <pre className="whitespace-pre-wrap break-words font-mono max-h-20 overflow-y-auto">{tr.hidden ? '—' : tr.input}</pre>
+                              </td>
+                              <td className="py-1.5 pr-2 text-ink max-w-32 align-top">
+                                <pre className="whitespace-pre-wrap break-words font-mono max-h-20 overflow-y-auto">{tr.hidden ? '—' : tr.expected}</pre>
+                              </td>
+                              <td className="py-1.5 pr-2 text-ink max-w-32 align-top">
+                                <pre className="whitespace-pre-wrap break-words font-mono max-h-20 overflow-y-auto">{tr.actual}</pre>
                                 {!tr.passed && (tr.stderr || tr.compileOutput) && (
-                                  <span className="ml-1 text-alert" title={(tr.compileOutput || tr.stderr)}>
+                                  <span className="block mt-0.5 text-alert" title={(tr.compileOutput || tr.stderr)}>
                                     {(tr.compileOutput || tr.stderr).trim().split('\n')[0]}
                                   </span>
                                 )}

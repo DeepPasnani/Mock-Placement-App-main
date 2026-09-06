@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { analyticsAPI, testsAPI, batchesAPI } from '../../../services/api';
+import { analyticsAPI, testsAPI, classesAPI } from '../../../services/api';
 import { Spinner } from '../../../components/shared/UI';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -10,32 +10,32 @@ import {
 const COLORS = ['var(--ct-accent)', 'var(--ct-clarify)', 'var(--ct-verify)', 'var(--ct-alert)', '#8B5CF6', '#F59E0B'];
 
 export default function CohortAnalytics() {
-  const [batchId, setBatchId] = useState('');
+  const [classId, setClassId] = useState('');
   const [department, setDepartment] = useState('');
   const [testId, setTestId] = useState('');
 
   const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
-  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
+  const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: classesAPI.list });
 
   const params = {};
-  if (batchId) params.batch_id = batchId;
+  if (classId) params.class_id = classId;
   if (department) params.department = department;
   if (testId) params.test_id = testId;
 
   const { data: radarData, isLoading: radarLoading } = useQuery({
     queryKey: ['cohort-radar', params],
     queryFn: () => analyticsAPI.cohortRadar(params),
-    enabled: !!params.batch_id || !!params.department || !!params.test_id,
+    enabled: !!params.class_id || !!params.department || !!params.test_id,
   });
 
   const { data: distData, isLoading: distLoading } = useQuery({
     queryKey: ['cohort-dist', params],
     queryFn: () => analyticsAPI.cohortDistribution(params),
-    enabled: !!params.batch_id || !!params.department || !!params.test_id,
+    enabled: !!params.class_id || !!params.department || !!params.test_id,
   });
 
   const tests = testsData?.tests || [];
-  const batches = batchesData?.batches || [];
+  const classes = classesData?.classes || [];
 
   return (
     <div className="animate-fade-up space-y-5">
@@ -48,10 +48,22 @@ export default function CohortAnalytics() {
 
       <div className="panel p-3 flex flex-wrap gap-3 items-end">
         <div>
-          <label className="text-2xs text-annotation/60 mb-1.5">Batch</label>
-          <select value={batchId} onChange={e => setBatchId(e.target.value)} className="select-field max-w-xs">
-            <option value="">All batches</option>
-            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <label className="text-2xs text-annotation/60 mb-1.5">Class</label>
+          <select value={classId} onChange={e => setClassId(e.target.value)} className="select-field max-w-xs">
+            <option value="">All classes</option>
+            {/* Grouped by department — every department has its own Class
+                1-4, so an ungrouped list would show "Class 1" repeated
+                eight times with no way to tell them apart. */}
+            {Object.entries(
+              classes.reduce((acc, c) => {
+                (acc[c.department] ||= []).push(c);
+                return acc;
+              }, {})
+            ).map(([dept, deptClasses]) => (
+              <optgroup key={dept} label={dept}>
+                {deptClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div>
@@ -72,13 +84,13 @@ export default function CohortAnalytics() {
         </div>
       </div>
 
-      {!params.batch_id && !params.department && !params.test_id && (
+      {!params.class_id && !params.department && !params.test_id && (
         <div className="empty-state mt-8">
           <svg className="empty-state-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
           <p className="empty-state-title">Select filters</p>
-          <p className="empty-state-desc">Choose batch, department, or test to compare cohorts.</p>
+          <p className="empty-state-desc">Choose class, department, or test to compare cohorts.</p>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 const { query } = require('../db');
 const logger = require('../services/logger');
+const { resultsVisibleToStudent } = require('../services/resultsVisibility');
 
 const ADMIN_ROLES = ['admin', 'super_admin'];
 
@@ -24,7 +25,7 @@ function addScopeFilters(params, filters, user) {
 // page loads, which made the board look different for every student.
 async function getLeaderboard(req, res) {
   try {
-    const { testId, batch, class: className } = req.query;
+    const { testId, class: studentClass, branch } = req.query;
     const params = [];
     const filters = [];
 
@@ -54,18 +55,30 @@ async function getLeaderboard(req, res) {
       return res.json({ leaderboard: [], myRank: null, test: null, maxScore: null });
     }
 
+    // Scores are only ready to show once the test's own release setting
+    // clears them — same rule submissions.js applies to a single result, so
+    // the leaderboard can't be used as a side door to see scores early.
+    const { rows: [releaseInfo] } = await query(
+      'SELECT settings, end_time, results_published_at FROM tests WHERE id=$1',
+      [activeTestId]
+    );
+    if (!isAdmin(req.user) && (!releaseInfo || !resultsVisibleToStudent(releaseInfo))) {
+      const { rows: [testMeta] } = await query('SELECT id, title, end_time FROM tests WHERE id = $1', [activeTestId]);
+      return res.json({ leaderboard: [], myRank: null, test: testMeta || null, maxScore: null, resultsAvailable: false });
+    }
+
     params.push(activeTestId, 'submitted', 'auto_submitted');
     filters.push(
       `s.test_id = $${params.length - 2}`,
       `s.status IN ($${params.length - 1}, $${params.length})`
     );
 
-    // Students may narrow to a batch within their own department + year. The
+    // Students may narrow to a class within their own department + year. The
     // branch/year filters above are always enforced, so this can never leak
     // peers from other departments or years.
-    if (batch) { params.push(batch); filters.push(`u.batch = $${params.length}`); }
-    // Only admins may additionally switch branch/class.
-    if (isAdmin(req.user) && className) { params.push(className); filters.push(`u.branch = $${params.length}`); }
+    if (studentClass) { params.push(studentClass); filters.push(`u.class_name = $${params.length}`); }
+    // Only admins may additionally switch branch.
+    if (isAdmin(req.user) && branch) { params.push(branch); filters.push(`u.branch = $${params.length}`); }
 
     // Deterministic ordering (score, then earlier submission, then name) so
     // ties are broken identically for every viewer.
@@ -73,7 +86,7 @@ async function getLeaderboard(req, res) {
       SELECT
         u.id,
         u.id as user_id,
-        u.name, u.email, u.avatar_url, u.branch, u.batch, u.roll_number,
+        u.name, u.avatar_url, u.branch, u.class_name, u.roll_number,
         s.score as score,
         s.max_score as max_score,
         ROW_NUMBER() OVER (
@@ -110,13 +123,13 @@ async function getLeaderboard(req, res) {
 // Students only see tests where their own department + year has results.
 async function listLeaderboardTests(req, res) {
   try {
-    const { batch } = req.query;
+    const { class: studentClass } = req.query;
     const params = ['submitted', 'auto_submitted'];
     const filters = [`s.status IN ($1, $2)`];
 
     addScopeFilters(params, filters, req.user);
 
-    if (batch) { params.push(batch); filters.push(`u.batch = $${params.length}`); }
+    if (studentClass) { params.push(studentClass); filters.push(`u.class_name = $${params.length}`); }
 
     const { rows } = await query(`
       SELECT DISTINCT t.id, t.title, t.end_time

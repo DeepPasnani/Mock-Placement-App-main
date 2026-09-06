@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { analyticsAPI, testsAPI, batchesAPI } from '../../../services/api';
+import { analyticsAPI, testsAPI, classesAPI } from '../../../services/api';
 import { Btn, Spinner } from '../../../components/shared/UI';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie,
@@ -14,7 +14,7 @@ const METRIC_OPTIONS = [
 ];
 
 const GROUP_OPTIONS = [
-  { value: 'batch', label: 'Batch' },
+  { value: 'class', label: 'Class' },
   { value: 'department', label: 'Department' },
   { value: 'year', label: 'Year of Study' },
 ];
@@ -23,14 +23,14 @@ export default function ReportBuilder() {
   const [step, setStep] = useState(1);
   const [selectedMetrics, setSelectedMetrics] = useState(['avg_score', 'avg_percentage']);
   const [filters, setFilters] = useState({});
-  const [groupBy, setGroupBy] = useState('batch');
+  const [groupBy, setGroupBy] = useState('class');
   const [reportName, setReportName] = useState('');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [drillDown, setDrillDown] = useState(null);
 
   const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
-  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
+  const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: classesAPI.list });
 
   const reportPayload = {
     metrics: selectedMetrics,
@@ -91,10 +91,22 @@ export default function ReportBuilder() {
                 </select>
               </div>
               <div>
-                <label className="text-2xs text-annotation/60 mb-1.5">Batch</label>
-                <select value={filters.batch_id || ''} onChange={e => setFilters(f => ({ ...f, batch_id: e.target.value || undefined }))} className="select-field">
-                  <option value="">All batches</option>
-                  {(batchesData?.batches || []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                <label className="text-2xs text-annotation/60 mb-1.5">Class</label>
+                <select value={filters.class_id || ''} onChange={e => setFilters(f => ({ ...f, class_id: e.target.value || undefined }))} className="select-field">
+                  <option value="">All classes</option>
+                  {/* Grouped by department — every department has its own Class
+                      1-4, so an ungrouped list would show "Class 1" repeated
+                      eight times with no way to tell them apart. */}
+                  {Object.entries(
+                    (classesData?.classes || []).reduce((acc, c) => {
+                      (acc[c.department] ||= []).push(c);
+                      return acc;
+                    }, {})
+                  ).map(([dept, deptClasses]) => (
+                    <optgroup key={dept} label={dept}>
+                      {deptClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               <div>
@@ -228,7 +240,7 @@ export default function ReportBuilder() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-rim">
-                <th className="text-left py-2 font-medium text-annotation">{groupBy === 'batch' ? 'Batch' : groupBy === 'department' ? 'Department' : 'Year'}</th>
+                <th className="text-left py-2 font-medium text-annotation">{groupBy === 'class' ? 'Class' : groupBy === 'department' ? 'Department' : 'Year'}</th>
                 {selectedMetrics.includes('avg_percentage') && <th className="text-right py-2 font-medium text-annotation">Avg %</th>}
                 {selectedMetrics.includes('avg_score') && <th className="text-right py-2 font-medium text-annotation">Avg Score</th>}
                 {selectedMetrics.includes('completion_rate') && <th className="text-right py-2 font-medium text-annotation">Submissions</th>}

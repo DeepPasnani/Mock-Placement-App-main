@@ -2,21 +2,21 @@ const { query } = require('../db');
 
 // ── POST /api/announcements (admin) ─────────────────────────
 async function createAnnouncement(req, res) {
-  const { title, body, priority, targetRole, targetBatches, expiresAt } = req.body;
+  const { title, body, priority, targetRole, targetClasses, expiresAt } = req.body;
 
   if (!title || !body) {
     return res.status(400).json({ error: 'Title and body are required' });
   }
 
   const { rows } = await query(
-    `INSERT INTO announcements (title, body, priority, target_role, target_batches, created_by, expires_at)
+    `INSERT INTO announcements (title, body, priority, target_role, target_classes, created_by, expires_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
     [
       title,
       body,
       priority || 'normal',
       targetRole || 'all',
-      JSON.stringify(targetBatches || []),
+      JSON.stringify(targetClasses || []),
       req.user.id,
       expiresAt || null,
     ]
@@ -80,7 +80,7 @@ async function listAnnouncements(req, res) {
 // ── PUT /api/announcements/:id (admin) ──────────────────────
 async function updateAnnouncement(req, res) {
   const { id } = req.params;
-  const { title, body, priority, targetRole, targetBatches, expiresAt } = req.body;
+  const { title, body, priority, targetRole, targetClasses, expiresAt } = req.body;
 
   const { rowCount, rows } = await query(
     `UPDATE announcements
@@ -88,11 +88,11 @@ async function updateAnnouncement(req, res) {
          body = COALESCE($2, body),
          priority = COALESCE($3, priority),
          target_role = COALESCE($4, target_role),
-         target_batches = COALESCE($5, target_batches),
+         target_classes = COALESCE($5, target_classes),
          expires_at = COALESCE($6, expires_at)
      WHERE id = $7
      RETURNING *`,
-    [title, body, priority, targetRole, targetBatches ? JSON.stringify(targetBatches) : null, expiresAt, id]
+    [title, body, priority, targetRole, targetClasses ? JSON.stringify(targetClasses) : null, expiresAt, id]
   );
 
   if (rowCount === 0) {

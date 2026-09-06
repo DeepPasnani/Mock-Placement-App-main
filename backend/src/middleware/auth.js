@@ -24,7 +24,7 @@ const authenticate = async (req, res, next) => {
 
     if (!user) {
       const { rows } = await query(
-        'SELECT id, name, email, role, is_active, avatar_url, branch, roll_number, department, batch, year_of_study FROM users WHERE id = $1',
+        'SELECT id, name, email, role, is_active, avatar_url, branch, roll_number, department, class_name, year_of_study, tenant_id FROM users WHERE id = $1',
         [decoded.userId]
       );
       if (!rows.length) return res.status(401).json({ error: 'User not found' });

@@ -59,10 +59,10 @@ async function sendDriveReminders() {
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
   const { rows: upcomingDrives } = await query(`
-    SELECT d.*, db.batch_id, b.name as batch_name
+    SELECT d.*, dc.class_id, c.name as class_name
     FROM drives d
-    JOIN drive_batches db ON db.drive_id = d.id
-    JOIN batches b ON b.id = db.batch_id
+    JOIN drive_classes dc ON dc.drive_id = d.id
+    JOIN classes c ON c.id = dc.class_id
     WHERE d.status = 'published'
       AND d.start_time BETWEEN $1 AND $2
   `, [now, in24h]);
@@ -80,22 +80,22 @@ async function sendDriveReminders() {
         end_time: drive.end_time,
         duration_minutes: drive.mcq_duration_minutes + drive.coding_duration_minutes,
         department: drive.department,
-        batches: [],
+        classes: [],
       };
     }
-    driveMap[drive.id].batches.push(drive.batch_name);
+    driveMap[drive.id].classes.push(drive.class_name);
   }
 
   for (const drive of Object.values(driveMap)) {
     const { rows: students } = await query(`
       SELECT DISTINCT u.id, u.name, u.email
       FROM users u
-      JOIN student_batches sb ON sb.user_id = u.id
-      JOIN batches b ON b.id = sb.batch_id
+      JOIN student_classes sc ON sc.user_id = u.id
+      JOIN classes c ON c.id = sc.class_id
       WHERE u.role = 'student'
         AND u.is_active = true
-        AND b.name = ANY($1::text[])
-    `, [drive.batches]);
+        AND c.name = ANY($1::text[])
+    `, [drive.classes]);
 
     const { rows: [lastNotify] } = await query(`
       SELECT created_at FROM audit_log
@@ -128,7 +128,7 @@ async function sendDriveReminders() {
     await query(`
       INSERT INTO audit_log (action, entity_type, entity_id, metadata)
       VALUES ('drive_reminder', 'drive', $1, $2)
-    `, [drive.id, JSON.stringify({ sent_to: students.length, batches: drive.batches })]);
+    `, [drive.id, JSON.stringify({ sent_to: students.length, classes: drive.classes })]);
 
     logger.info({ driveId: drive.id, students: students.length }, 'Drive reminder sent');
   }

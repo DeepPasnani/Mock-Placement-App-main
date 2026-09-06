@@ -3,7 +3,7 @@ const jwt    = require('jsonwebtoken');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { query }        = require('../db');
-const { cacheSet, cacheDel, cacheGet } = require('../db/redis');
+const { cacheSet, cacheDel, cacheGet, incrementRateLimit } = require('../db/redis');
 const { normalizeDepartment, ALLOWED_DEPARTMENTS } = require('../config/departments');
 const { ALLOWED_YEARS, isAllowedYear } = require('../config/classes');
 const {
@@ -30,7 +30,7 @@ function publicUser(user) {
     department: user.department || null,
     branch: user.branch || null,
     roll_number: user.roll_number || null,
-    batch: user.batch || null,
+    class_name: user.class_name || null,
     year_of_study: user.year_of_study || null,
     profileComplete: isStudentProfileComplete(user),
   };
@@ -42,50 +42,50 @@ function isStudentProfileComplete(user) {
   return Boolean(
     user.roll_number &&
     String(user.roll_number).trim() &&
-    user.batch &&
-    String(user.batch).trim() &&
+    user.class_name &&
+    String(user.class_name).trim() &&
     user.year_of_study
   );
 }
 
-async function assignUserToCluster({ userId, rollNumber, batchName, department, yearOfStudy }) {
+async function assignUserToCluster({ userId, rollNumber, studentClass, department, yearOfStudy }) {
   const year = parseInt(yearOfStudy, 10) || 1;
   const dept = department || null;
-  const batch = batchName.trim();
+  const className = studentClass.trim();
   const roll = rollNumber.trim();
 
   await query(
     `UPDATE users SET
        roll_number = $1,
-       batch = $2,
+       class_name = $2,
        year_of_study = $3,
        department = COALESCE($4, department),
        branch = COALESCE(branch, $4)
      WHERE id = $5`,
-    [roll, batch, year, dept, userId]
+    [roll, className, year, dept, userId]
   );
 
-  // Ensure a batches row exists so the student lands in the same cluster
+  // Ensure a classes row exists so the student lands in the same cluster
   // admins use for test/drive mapping.
   if (dept) {
-    const { rows: [batchRow] } = await query(
-      `INSERT INTO batches (name, department, year_of_study)
+    const { rows: [classRow] } = await query(
+      `INSERT INTO classes (name, department, year_of_study)
        VALUES ($1, $2, $3)
        ON CONFLICT (name, department) DO UPDATE SET
-         year_of_study = COALESCE(EXCLUDED.year_of_study, batches.year_of_study)
+         year_of_study = COALESCE(EXCLUDED.year_of_study, classes.year_of_study)
        RETURNING id`,
-      [batch, dept, year]
+      [className, dept, year]
     );
 
-    if (batchRow?.id) {
+    if (classRow?.id) {
       const semester = process.env.CURRENT_SEMESTER || `${new Date().getFullYear()}-Spring`;
       await query(
-        `INSERT INTO student_batches (user_id, batch_id, year_of_study, semester)
+        `INSERT INTO student_classes (user_id, class_id, year_of_study, semester)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (user_id, semester) DO UPDATE SET
-           batch_id = EXCLUDED.batch_id,
+           class_id = EXCLUDED.class_id,
            year_of_study = EXCLUDED.year_of_study`,
-        [userId, batchRow.id, year, semester]
+        [userId, classRow.id, year, semester]
       );
     }
   }
@@ -93,7 +93,7 @@ async function assignUserToCluster({ userId, rollNumber, batchName, department, 
   await cacheDel(`user:${userId}`);
 
   const { rows: [user] } = await query(
-    `SELECT id, name, email, role, avatar_url, department, branch, roll_number, batch, year_of_study, is_active
+    `SELECT id, name, email, role, avatar_url, department, branch, roll_number, class_name, year_of_study, is_active
      FROM users WHERE id = $1`,
     [userId]
   );
@@ -107,7 +107,7 @@ async function login(req, res) {
 
   const { rows } = await query(
     `SELECT id, name, email, role, password_hash, is_active, avatar_url,
-            department, branch, roll_number, batch, year_of_study
+            department, branch, roll_number, class_name, year_of_study
      FROM users WHERE email = $1`,
     [email.toLowerCase().trim()]
   );
@@ -127,7 +127,7 @@ async function login(req, res) {
 
 // ── POST /api/auth/register ───────────────────────────────────
 async function register(req, res) {
-  const { name, email, password, department, rollNumber, branch, batch, yearOfStudy } = req.body;
+  const { name, email, password, department, rollNumber, branch, className, yearOfStudy } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email and password are required' });
   }
@@ -150,18 +150,18 @@ async function register(req, res) {
 
   const hash = await bcrypt.hash(password, 12);
   const { rows: [created] } = await query(
-    `INSERT INTO users (name, email, password_hash, role, department, roll_number, branch, batch, year_of_study, is_active)
+    `INSERT INTO users (name, email, password_hash, role, department, roll_number, branch, class_name, year_of_study, is_active)
      VALUES ($1,$2,$3,'student',$4,$5,$6,$7,$8,$9)
-     RETURNING id, name, email, role, department, avatar_url, roll_number, branch, batch, year_of_study`,
-    [name.trim(), emailLower, hash, allowedDept || null, rollNumber || null, branch || allowedDept || null, batch || null, yearOfStudy || 1, true]
+     RETURNING id, name, email, role, department, avatar_url, roll_number, branch, class_name, year_of_study`,
+    [name.trim(), emailLower, hash, allowedDept || null, rollNumber || null, branch || allowedDept || null, className || null, yearOfStudy || 1, true]
   );
 
   let user = created;
-  if (rollNumber && batch && allowedDept) {
+  if (rollNumber && className && allowedDept) {
     user = await assignUserToCluster({
       userId: created.id,
       rollNumber,
-      batchName: batch,
+      studentClass: className,
       department: allowedDept,
       yearOfStudy: yearOfStudy || 1,
     });
@@ -203,7 +203,7 @@ async function googleLogin(req, res) {
   // their Google account instead of tripping the UNIQUE email constraint.
   const { rows: existingRows } = await query(
     `SELECT id, name, email, role, avatar_url, is_active, google_id,
-            department, branch, roll_number, batch, year_of_study
+            department, branch, roll_number, class_name, year_of_study
      FROM users
      WHERE google_id = $1 OR email = $2
      ORDER BY (google_id = $1) DESC
@@ -221,7 +221,7 @@ async function googleLogin(req, res) {
         `UPDATE users SET email = $1, name = $2, avatar_url = $3, last_login = NOW()
          WHERE id = $4
          RETURNING id, name, email, role, avatar_url, is_active, google_id,
-                   department, branch, roll_number, batch, year_of_study`,
+                   department, branch, roll_number, class_name, year_of_study`,
         [emailLower, name, picture, user.id]
       ));
     } else {
@@ -230,7 +230,7 @@ async function googleLogin(req, res) {
         `UPDATE users SET google_id = $1, avatar_url = $2, last_login = NOW()
          WHERE id = $3
          RETURNING id, name, email, role, avatar_url, is_active, google_id,
-                   department, branch, roll_number, batch, year_of_study`,
+                   department, branch, roll_number, class_name, year_of_study`,
         [googleId, picture, user.id]
       ));
     }
@@ -240,7 +240,7 @@ async function googleLogin(req, res) {
       `INSERT INTO users (google_id, email, name, avatar_url, role)
        VALUES ($1,$2,$3,$4,'student')
        RETURNING id, name, email, role, avatar_url, is_active, google_id,
-                 department, branch, roll_number, batch, year_of_study`,
+                 department, branch, roll_number, class_name, year_of_study`,
       [googleId, emailLower, name, picture]
     ));
   }
@@ -261,10 +261,10 @@ async function googleLogin(req, res) {
 // ── POST /api/auth/complete-profile ───────────────────────────
 // Required after Google sign-in (and for any student missing cluster fields).
 async function completeProfile(req, res) {
-  const { rollNumber, batch, yearOfStudy, department } = req.body;
-  if (!rollNumber || !batch || !yearOfStudy) {
+  const { rollNumber, className, yearOfStudy, department } = req.body;
+  if (!rollNumber || !className || !yearOfStudy) {
     return res.status(400).json({
-      error: 'Enrollment number, class/batch, and year of study are required',
+      error: 'Enrollment number, class, and year of study are required',
     });
   }
   if (req.user.role !== 'student') {
@@ -287,7 +287,7 @@ async function completeProfile(req, res) {
   const user = await assignUserToCluster({
     userId: req.user.id,
     rollNumber: String(rollNumber),
-    batchName: String(batch),
+    studentClass: String(className),
     department: allowedDept,
     yearOfStudy: year,
   });
@@ -377,6 +377,18 @@ async function resetPassword(req, res) {
   const user       = rows[0];
   const cachedOtp  = await cacheGet(`otp:${user.id}`);
 
+  // A 6-digit OTP is only 900k possibilities — without a cap, someone could
+  // just try all of them inside the 15-minute window. This counts wrong
+  // guesses against *this one* reset request only (keyed by user id, same
+  // lifetime as the OTP itself), so it can't false-positive against normal
+  // login traffic the way the old blanket per-IP login limiter did.
+  const attemptsKey = `otp-attempts:${user.id}`;
+  const attempts = await incrementRateLimit(attemptsKey, 900);
+  if (attempts > 5) {
+    await cacheDel(`otp:${user.id}`);
+    return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new OTP.' });
+  }
+
   if (!cachedOtp || cachedOtp !== otp) {
     return res.status(400).json({ error: 'Invalid or expired OTP' });
   }
@@ -384,8 +396,9 @@ async function resetPassword(req, res) {
   const hash = await bcrypt.hash(newPassword, 12);
   await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
 
-  // Delete OTP so it can't be reused
+  // Delete OTP (and its attempt counter) so neither can be reused
   await cacheDel(`otp:${user.id}`);
+  await cacheDel(attemptsKey);
   await cacheDel(`user:${user.id}`);
 
   res.json({ message: 'Password reset successfully. Please log in.' });

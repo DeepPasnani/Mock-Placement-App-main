@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testsAPI, batchesAPI, questionBankAPI } from '../../services/api';
+import { testsAPI, classesAPI, questionBankAPI } from '../../services/api';
 import { Btn, Badge, Table, ConfirmModal, Spinner, Modal, Select } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -17,7 +17,7 @@ export default function AdminTests() {
   const [deleteId, setDeleteId] = useState(null);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [batchModalTest, setBatchModalTest] = useState(null);
+  const [classModalTest, setClassModalTest] = useState(null);
   const { data, isLoading } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
 
   const deleteMut = useMutation({
@@ -151,11 +151,11 @@ export default function AdminTests() {
       label: '',
       render: (t) => (
         <div className="flex gap-1 justify-end">
-          <Btn variant="ghost" size="sm" onClick={() => setBatchModalTest(t)} aria-label="Manage batches & sets">
+          <Btn variant="ghost" size="sm" onClick={() => setClassModalTest(t)} aria-label="Manage classes & sets">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
-            <span className="hidden sm:inline">Batches</span>
+            <span className="hidden sm:inline">Classes</span>
           </Btn>
           <Link to={`/admin/results/${t.id}`}>
             <Btn variant="ghost" size="sm" aria-label="View results">
@@ -284,57 +284,57 @@ export default function AdminTests() {
         message={`This will permanently delete ${selectedIds.size} selected test(s) and all their submissions. Cannot be undone.`}
       />
 
-      <BatchMappingModal test={batchModalTest} onClose={() => setBatchModalTest(null)} />
+      <ClassMappingModal test={classModalTest} onClose={() => setClassModalTest(null)} />
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════
-// Batch → MCQ Set mapping
+// Class → MCQ Set mapping
 //
-// Lets an admin tag which batches sit this drive and which MCQ
+// Lets an admin tag which classes sit this drive and which MCQ
 // "set" (A–D, tagged per-question in the Test Creator) each
-// batch receives — the "map batches to test sets, reconfigurable
+// class receives — the "map classes to test sets, reconfigurable
 // each time" anti-answer-sharing feature from the masterplan.
 // ═══════════════════════════════════════════════════════════
-function BatchMappingModal({ test, onClose }) {
+function ClassMappingModal({ test, onClose }) {
   const qc = useQueryClient();
-  const [newBatchName, setNewBatchName] = useState('');
-  const [newBatchDept, setNewBatchDept] = useState('');
-  const [selected, setSelected] = useState({}); // batchId -> { checked, set }
+  const [newClassName, setNewClassName] = useState('');
+  const [newClassDept, setNewClassDept] = useState('');
+  const [selected, setSelected] = useState({}); // classId -> { checked, set }
 
-  const { data: batchData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list, enabled: !!test });
+  const { data: classData } = useQuery({ queryKey: ['classes'], queryFn: classesAPI.list, enabled: !!test });
   const { data: mappedData } = useQuery({
-    queryKey: ['test-batches', test?.id],
-    queryFn: () => batchesAPI.listForTest(test.id),
+    queryKey: ['test-classes', test?.id],
+    queryFn: () => classesAPI.listForTest(test.id),
     enabled: !!test,
   });
 
-  const batches = batchData?.batches || [];
+  const classes = classData?.classes || [];
 
   // Seed local selection state from the test's existing mapping once it loads
   useEffect(() => {
     if (!test) { setSelected({}); return; }
-    if (mappedData?.batches?.length) {
+    if (mappedData?.classes?.length) {
       const seeded = {};
-      mappedData.batches.forEach(b => { seeded[b.batch_id] = { checked: true, set: b.section_mapping?.set || 'A' }; });
+      mappedData.classes.forEach(c => { seeded[c.class_id] = { checked: true, set: c.section_mapping?.set || 'A' }; });
       setSelected(seeded);
     }
   }, [test?.id, mappedData]);
 
-  const createBatchMut = useMutation({
-    mutationFn: batchesAPI.create,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['batches'] }); setNewBatchName(''); setNewBatchDept(''); toast.success('Batch added'); },
+  const createClassMut = useMutation({
+    mutationFn: classesAPI.create,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['classes'] }); setNewClassName(''); setNewClassDept(''); toast.success('Class added'); },
   });
 
   const saveMut = useMutation({
     mutationFn: () => {
-      const batchIds = Object.entries(selected).filter(([, v]) => v.checked).map(([id]) => id);
+      const classIds = Object.entries(selected).filter(([, v]) => v.checked).map(([id]) => id);
       const sectionMapping = {};
-      batchIds.forEach(id => { sectionMapping[id] = { set: selected[id].set || 'A' }; });
-      return batchesAPI.mapToTest(test.id, { batchIds, sectionMapping });
+      classIds.forEach(id => { sectionMapping[id] = { set: selected[id].set || 'A' }; });
+      return classesAPI.mapToTest(test.id, { classIds, sectionMapping });
     },
-    onSuccess: () => { toast.success('Batch mapping saved'); qc.invalidateQueries({ queryKey: ['test-batches', test.id] }); onClose(); },
+    onSuccess: () => { toast.success('Class mapping saved'); qc.invalidateQueries({ queryKey: ['test-classes', test.id] }); onClose(); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to save mapping'),
   });
 
@@ -342,27 +342,27 @@ function BatchMappingModal({ test, onClose }) {
   const setSet = (id, set) => setSelected(p => ({ ...p, [id]: { ...p[id], set } }));
 
   return (
-    <Modal isOpen={!!test} onClose={() => { setSelected({}); onClose(); }} title={`Batches & Sets — ${test?.title || ''}`} width="max-w-2xl"
+    <Modal isOpen={!!test} onClose={() => { setSelected({}); onClose(); }} title={`Classes & Sets — ${test?.title || ''}`} width="max-w-2xl"
       footer={<><Btn variant="ghost" onClick={() => { setSelected({}); onClose(); }}>Cancel</Btn><Btn onClick={() => saveMut.mutate()} disabled={saveMut.isLoading}>{saveMut.isLoading ? <Spinner size={14} /> : 'Save Mapping'}</Btn></>}>
       <div className="space-y-4">
         <p className="text-xs text-annotation">
-          Choose which batches can sit this drive, and which MCQ set (tagged per-question in the Test Creator)
-          each one receives. Leave a batch unchecked to keep it off this drive; leave everything unmapped to give
-          every batch Set A (the default, unchanged behaviour).
+          Choose which classes can sit this drive, and which MCQ set (tagged per-question in the Test Creator)
+          each one receives. Leave a class unchecked to keep it off this drive; leave everything unmapped to give
+          every class Set A (the default, unchanged behaviour).
         </p>
 
-        {batches.length === 0 ? (
-          <p className="text-xs text-annotation/60">No batches yet — add one below.</p>
+        {classes.length === 0 ? (
+          <p className="text-xs text-annotation/60">No classes yet — add one below.</p>
         ) : (
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
-            {batches.map(b => (
-              <div key={b.id} className="flex items-center gap-3 panel p-2.5">
-                <input type="checkbox" className="accent-accent w-4 h-4" checked={!!selected[b.id]?.checked} onChange={() => toggle(b.id)} aria-label={`Select batch ${b.name}`} />
+            {classes.map(c => (
+              <div key={c.id} className="flex items-center gap-3 panel p-2.5">
+                <input type="checkbox" className="accent-accent w-4 h-4" checked={!!selected[c.id]?.checked} onChange={() => toggle(c.id)} aria-label={`Select class ${c.name}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-ink font-medium truncate">{b.name}</div>
-                  <div className="text-2xs text-annotation/60">{b.department} · Year {b.year_of_study}</div>
+                  <div className="text-sm text-ink font-medium truncate">{c.name}</div>
+                  <div className="text-2xs text-annotation/60">{c.department} · Year {c.year_of_study}</div>
                 </div>
-                <Select value={selected[b.id]?.set || 'A'} onChange={e => setSet(b.id, e.target.value)} className="w-24 text-xs py-1" disabled={!selected[b.id]?.checked}>
+                <Select value={selected[c.id]?.set || 'A'} onChange={e => setSet(c.id, e.target.value)} className="w-24 text-xs py-1" disabled={!selected[c.id]?.checked}>
                   <option value="A">Set A</option>
                   <option value="B">Set B</option>
                   <option value="C">Set C</option>
@@ -374,17 +374,17 @@ function BatchMappingModal({ test, onClose }) {
         )}
 
         <div className="border-t border-rim pt-3">
-          <label className="input-label">Add a new batch</label>
+          <label className="input-label">Add a new class</label>
           <div className="flex gap-2">
-            <Select value={newBatchName} onChange={e => setNewBatchName(e.target.value)} className="flex-1 text-xs">
-              <option value="">Select batch</option>
+            <Select value={newClassName} onChange={e => setNewClassName(e.target.value)} className="flex-1 text-xs">
+              <option value="">Select class</option>
               {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
             </Select>
-            <Select value={newBatchDept} onChange={e => setNewBatchDept(e.target.value)} className="flex-1 text-xs">
+            <Select value={newClassDept} onChange={e => setNewClassDept(e.target.value)} className="flex-1 text-xs">
               <option value="">Select department</option>
               {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
             </Select>
-            <Btn variant="ghost" onClick={() => newBatchName && newBatchDept && createBatchMut.mutate({ name: newBatchName, department: newBatchDept })} disabled={createBatchMut.isLoading}>
+            <Btn variant="ghost" onClick={() => newClassName && newClassDept && createClassMut.mutate({ name: newClassName, department: newClassDept })} disabled={createClassMut.isLoading}>
               Add
             </Btn>
           </div>

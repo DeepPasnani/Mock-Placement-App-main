@@ -1,52 +1,64 @@
 const { query } = require('../db');
 
 // ── CSV parsing (stdlib, no dependency) ──────────────────────
-function parseCsv(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return { rows: [], errors: [] };
-
-  const headers = parseCsvLine(lines[0]);
+// Quote-aware across the *whole* file rather than split-by-newline-first,
+// so a quoted field (e.g. a multi-line sample output/testCases blob) can
+// contain literal commas and newlines without corrupting row boundaries —
+// splitting on '\n' before parsing quotes would otherwise cut a shape like
+// a printed triangle in half.
+function tokenizeCsv(text) {
   const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  const src = text.replace(/\r\n/g, '\n');
+
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (src[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field); field = '';
+    } else if (ch === '\n') {
+      row.push(field); field = '';
+      rows.push(row); row = [];
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+
+  // Drop fully-blank lines (a trailing newline, or a blank spacer row)
+  return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
+}
+
+function parseCsv(text) {
+  const rows = tokenizeCsv(text);
+  if (rows.length < 2) return { rows: [], errors: [] };
+
+  const headers = rows[0].map(h => h.trim());
+  const dataRows = [];
   const errors = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const values = parseCsvLine(line);
+  for (let i = 1; i < rows.length; i++) {
+    const values = rows[i];
     if (values.length !== headers.length) {
       errors.push({ row: i + 1, message: `Expected ${headers.length} columns, got ${values.length}` });
       continue;
     }
     const row = {};
-    headers.forEach((h, j) => { row[h.trim()] = (values[j] || '').trim(); });
-    rows.push(row);
+    headers.forEach((h, j) => { row[h] = (values[j] || '').trim(); });
+    dataRows.push(row);
   }
 
-  return { rows, errors };
-}
-
-function parseCsvLine(line) {
-  const result = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ',' && !inQuotes) {
-      result.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  result.push(current);
-  return result;
+  return { rows: dataRows, errors };
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -59,18 +71,40 @@ function parseCsvLine(line) {
  * ═══════════════════════════════════════════════════════════ */
 
 // ── GET /api/question-bank?type=mcq&genre=technical&search=heap ──
+// Each row also comes back with `usedIn`: the tests (if any) whose
+// questions/coding_problems still point back at this bank row via
+// bank_question_id — either pulled in via "Add from Bank" or
+// auto-saved here from the Test Creator's "Save to Question Bank"
+// checkbox. This powers the "used in" clustering in the bank UI.
 async function listBank(req, res) {
   const { type, genre, search } = req.query;
   const conditions = [];
   const params = [];
 
-  if (type) { params.push(type); conditions.push(`type = $${params.length}`); }
-  if (genre && genre !== 'all') { params.push(genre); conditions.push(`genre = $${params.length}`); }
-  if (search) { params.push(`%${search}%`); conditions.push(`data->>'text' ILIKE $${params.length} OR data->>'title' ILIKE $${params.length}`); }
+  if (type) { params.push(type); conditions.push(`bq.type = $${params.length}`); }
+  if (genre && genre !== 'all') { params.push(genre); conditions.push(`bq.genre = $${params.length}`); }
+  if (search) { params.push(`%${search}%`); conditions.push(`bq.data->>'text' ILIKE $${params.length} OR bq.data->>'title' ILIKE $${params.length}`); }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const { rows } = await query(
-    `SELECT * FROM bank_questions ${where} ORDER BY created_at DESC`,
+    `SELECT bq.*,
+       COALESCE(usage.used_in, '[]'::json) AS used_in,
+       COALESCE(usage.usage_count, 0) AS usage_count
+     FROM bank_questions bq
+     LEFT JOIN (
+       SELECT bank_question_id,
+              COUNT(*) AS usage_count,
+              json_agg(DISTINCT jsonb_build_object('testId', t.id, 'testTitle', t.title)) AS used_in
+       FROM (
+         SELECT q.bank_question_id, s.test_id FROM questions q JOIN sections s ON s.id = q.section_id WHERE q.bank_question_id IS NOT NULL
+         UNION ALL
+         SELECT c.bank_question_id, s.test_id FROM coding_problems c JOIN sections s ON s.id = c.section_id WHERE c.bank_question_id IS NOT NULL
+       ) usages
+       JOIN tests t ON t.id = usages.test_id
+       GROUP BY bank_question_id
+     ) usage ON usage.bank_question_id = bq.id
+     ${where}
+     ORDER BY bq.created_at DESC`,
     params
   );
   res.json({ questions: rows });
@@ -156,6 +190,14 @@ async function importCsv(req, res) {
           options: [row.optionA, row.optionB, row.optionC, row.optionD],
           correctAnswer: parseInt(row.correctAnswer),
         };
+        // Optional columns: imageUrl (question figure) and per-option
+        // optionAImage-optionDImage. A row that omits them is unaffected —
+        // these only get attached when actually present in the CSV.
+        if (row.imageUrl) data.imageUrl = row.imageUrl;
+        if (row.explanation) data.explanation = row.explanation;
+        const optionImages = [row.optionAImage, row.optionBImage, row.optionCImage, row.optionDImage];
+        if (optionImages.some(Boolean)) data.optionImages = optionImages.map(v => v || '');
+
         const { rows: [q] } = await query(
           `INSERT INTO bank_questions (type, data, genre, difficulty, marks, tags, created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
@@ -175,6 +217,7 @@ async function importCsv(req, res) {
           sampleOutput: row.sampleOutput || '',
           testCases: row.testCases ? JSON.parse(row.testCases) : [],
         };
+        if (row.imageUrl) data.imageUrl = row.imageUrl;
         const { rows: [q] } = await query(
           `INSERT INTO bank_questions (type, data, genre, difficulty, marks, tags, created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
@@ -222,6 +265,14 @@ async function importJson(req, res) {
         options: item.options,
         correctAnswer: item.correctAnswer,
       };
+      // Optional: a question figure (imageUrl) and/or per-option images
+      // (optionImages, same length/order as options). Either can be a
+      // hosted URL (e.g. /api/images/<id> from /api/upload/image) or a
+      // data: URI — both render fine as an <img src>.
+      if (item.imageUrl) data.imageUrl = item.imageUrl;
+      if (Array.isArray(item.optionImages) && item.optionImages.some(Boolean)) data.optionImages = item.optionImages;
+      if (item.explanation) data.explanation = item.explanation;
+
       const { rows: [question] } = await query(
         `INSERT INTO bank_questions (type, data, genre, difficulty, marks, tags, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
@@ -323,4 +374,44 @@ async function importFromTest(req, res) {
   });
 }
 
-module.exports = { listBank, createBank, bulkImportBank, importCsv, importJson, deleteBank, importFromTest };
+// ── POST /api/question-bank/import-images ────────────────────
+// Quick-capture path for image-based questions (scanned worksheets,
+// screenshotted quant/DI figures, etc.): each uploaded image becomes
+// its own draft MCQ bank entry with the image attached and the
+// text/options left blank for an admin to fill in afterwards, instead
+// of requiring every field to be typed up front just to get the image
+// into the bank.
+async function importImages(req, res) {
+  const files = req.files;
+  if (!files || !files.length) {
+    return res.status(400).json({ error: 'At least one image file is required' });
+  }
+
+  const inserted = [];
+  for (const file of files) {
+    const { rows: [img] } = await query(
+      `INSERT INTO images (data, mimetype, filename, size_bytes, created_by)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [file.buffer, file.mimetype, file.originalname || null, file.size || file.buffer.length, req.user.id]
+    );
+    const data = {
+      text: '',
+      imageUrl: `/api/images/${img.id}`,
+      options: ['', '', '', ''],
+      correctAnswer: 0,
+    };
+    const { rows: [question] } = await query(
+      `INSERT INTO bank_questions (type, data, genre, difficulty, marks, status, created_by)
+       VALUES ('mcq',$1,'general','medium',2,'draft',$2) RETURNING *`,
+      [JSON.stringify(data), req.user.id]
+    );
+    inserted.push(question);
+  }
+
+  res.status(201).json({
+    message: `Added ${inserted.length} draft question(s) from images — fill in the text and options before publishing`,
+    questions: inserted,
+  });
+}
+
+module.exports = { listBank, createBank, bulkImportBank, importCsv, importJson, deleteBank, importFromTest, importImages };

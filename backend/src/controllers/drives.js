@@ -19,13 +19,13 @@ async function getDrive(req, res) {
      WHERE dt.drive_id = $1 ORDER BY dt.round_number, dt.order_index`,
     [id]
   );
-  const { rows: batches } = await query(
-    `SELECT db.*, b.name as batch_name, b.department
-     FROM drive_batches db JOIN batches b ON db.batch_id = b.id
-     WHERE db.drive_id = $1`,
+  const { rows: classes } = await query(
+    `SELECT dc.*, c.name as class_name, c.department
+     FROM drive_classes dc JOIN classes c ON dc.class_id = c.id
+     WHERE dc.drive_id = $1`,
     [id]
   );
-  res.json({ drive, tests, batches });
+  res.json({ drive, tests, classes });
 }
 
 async function createDrive(req, res) {
@@ -92,23 +92,23 @@ async function removeTestFromDrive(req, res) {
   res.json({ message: 'Test removed from drive' });
 }
 
-async function addBatchToDrive(req, res) {
+async function addClassToDrive(req, res) {
   const { id } = req.params;
-  const { batch_id } = req.body;
-  if (!batch_id) return res.status(400).json({ error: 'batch_id required' });
+  const { class_id } = req.body;
+  if (!class_id) return res.status(400).json({ error: 'class_id required' });
 
   const { rows: [mapping] } = await query(
-    'INSERT INTO drive_batches (drive_id, batch_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING *',
-    [id, batch_id]
+    'INSERT INTO drive_classes (drive_id, class_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING *',
+    [id, class_id]
   );
-  if (!mapping) return res.status(400).json({ error: 'Batch already mapped to this drive' });
+  if (!mapping) return res.status(400).json({ error: 'Class already mapped to this drive' });
   res.status(201).json({ mapping });
 }
 
-async function removeBatchFromDrive(req, res) {
-  const { id, batchId } = req.params;
-  await query('DELETE FROM drive_batches WHERE drive_id = $1 AND batch_id = $2', [id, batchId]);
-  res.json({ message: 'Batch removed from drive' });
+async function removeClassFromDrive(req, res) {
+  const { id, classId } = req.params;
+  await query('DELETE FROM drive_classes WHERE drive_id = $1 AND class_id = $2', [id, classId]);
+  res.json({ message: 'Class removed from drive' });
 }
 
 async function getDriveStats(req, res) {
@@ -151,4 +151,4 @@ async function getDriveStats(req, res) {
   res.json({ stats });
 }
 
-module.exports = { listDrives, getDrive, createDrive, updateDrive, deleteDrive, addTestToDrive, removeTestFromDrive, addBatchToDrive, removeBatchFromDrive, getDriveStats };
+module.exports = { listDrives, getDrive, createDrive, updateDrive, deleteDrive, addTestToDrive, removeTestFromDrive, addClassToDrive, removeClassFromDrive, getDriveStats };

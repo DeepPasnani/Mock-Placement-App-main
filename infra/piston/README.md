@@ -1,5 +1,14 @@
 # Piston (code execution engine)
 
+> **Note:** the root `docker-compose.yml` currently runs a single Piston
+> instance built from [`Dockerfile`](Dockerfile), with language packages
+> baked in at image build time via [`scripts/bake-package.sh`](scripts/bake-package.sh)
+> (one language per parallel build stage) — no install step needed after
+> `docker compose up`. The three-replica +
+> nginx load-balancer topology and `install-packages.sh` documented below
+> describe a heavier setup for higher-throughput deployments; they're not
+> what the root compose file wires up today.
+
 CampusTrack uses [Piston](https://github.com/engineer-man/piston) — the same
 open-source, self-hosted execution engine used by EMKC — to compile and run
 student code for "Run Code" and coding-test grading. It replaces the
@@ -21,7 +30,7 @@ piston-lb (nginx, least_conn)
 ```
 
 * `piston-lb` — nginx, load-balances across the three replicas with
-  `least_conn` so a slow Java/Kotlin compile on one replica doesn't back up
+  `least_conn` so a slow Java compile on one replica doesn't back up
   requests routed to the other two. Config: [`lb/nginx.conf`](lb/nginx.conf).
 * `piston1` / `piston2` / `piston3` — three replicas of the official Piston
   image. Each runs `privileged` (Piston needs this to sandbox untrusted code
@@ -46,8 +55,8 @@ docker compose up -d piston1 piston2 piston3 piston-lb
 
 This installs the exact versions `backend/src/services/piston.js` expects
 (python 3.10.0, node 18.15.0 for JavaScript, java 15.0.2, gcc 10.2.0 for C
-and C++, go 1.16.2, ruby 3.0.1, rust 1.68.2, kotlin 1.8.20, sqlite3 3.36.0
-for SQL) onto the shared volume — all three replicas immediately see them.
+and C++, sqlite3 3.36.0 for SQL) onto the shared volume — all three replicas
+immediately see them.
 **This step needs outbound internet access** on the Docker host, since
 `POST /api/v2/packages` pulls prebuilt runtime tarballs from Piston's package
 repository.

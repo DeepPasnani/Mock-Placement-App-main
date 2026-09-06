@@ -58,31 +58,28 @@ export default function StudentTests() {
     navigate(`/test/${test.id}`);
   };
 
-  return (
-    <div className="animate-fade-up">
-      {/* Header */}
-      <div className="section-header">
-        <div>
-          <h1 className="text-display">My Tests</h1>
-          <p className="section-subtitle">{tests.length} test{tests.length !== 1 ? 's' : ''} available</p>
-        </div>
-      </div>
+  const handleViewResult = (test) => {
+    const sub = subs[test.id];
+    if (sub) navigate(`/student/results/${sub.id}`);
+  };
 
-      {/* Test list */}
-      <div className="space-y-3">
-        {tests.map(test => {
-          const { started, ended, submitted, inProgress, notEnded } = getTestStatus(test);
-          const sub = subs[test.id];
-          const passed = sub?.max_score > 0 ? (sub.score / sub.max_score) * 100 >= (test.settings?.passingScore || 40) : false;
-          const pct = sub?.max_score > 0 ? Math.round((sub.score / sub.max_score) * 100) : 0;
+  const incompleteTests = tests.filter(t => !getTestStatus(t).submitted);
+  const completedTests = tests.filter(t => getTestStatus(t).submitted);
 
-          const available = started && notEnded && !submitted;
-          const upcoming = !started;
+  const renderTest = (test) => {
+    const { started, ended, submitted, inProgress, notEnded } = getTestStatus(test);
+    const sub = subs[test.id];
+    const passed = sub?.max_score > 0 ? (sub.score / sub.max_score) * 100 >= (test.settings?.passingScore || 40) : false;
+    const pct = sub?.max_score > 0 ? Math.round((sub.score / sub.max_score) * 100) : 0;
 
-          return (
+    const available = started && notEnded && !submitted;
+    const upcoming = !started;
+
+    return (
             <div
               key={test.id}
-              className="panel p-4 hover:border-accent/30 transition-colors group"
+              onClick={submitted ? () => handleViewResult(test) : undefined}
+              className={`panel p-4 hover:border-accent/30 transition-colors group ${submitted ? 'cursor-pointer' : ''}`}
             >
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 {/* Left: title + meta */}
@@ -193,8 +190,41 @@ export default function StudentTests() {
                 </div>
               </div>
             </div>
-          );
-        })}
+    );
+  };
+
+  return (
+    <div className="animate-fade-up">
+      {/* Header */}
+      <div className="section-header">
+        <div>
+          <h1 className="text-display">My Tests</h1>
+          <p className="section-subtitle">{tests.length} test{tests.length !== 1 ? 's' : ''} available</p>
+        </div>
+      </div>
+
+      {/* Incomplete: upcoming, available, in progress, or ended-without-submission */}
+      <div className="mb-6">
+        <h2 className="eyebrow mb-2">Incomplete</h2>
+        {incompleteTests.length === 0 ? (
+          <p className="text-xs text-annotation/60">Nothing here — every test has been submitted.</p>
+        ) : (
+          <div className="space-y-3">
+            {incompleteTests.map(renderTest)}
+          </div>
+        )}
+      </div>
+
+      {/* Completed: click a card to view its result */}
+      <div>
+        <h2 className="eyebrow mb-2">Completed</h2>
+        {completedTests.length === 0 ? (
+          <p className="text-xs text-annotation/60">No submitted tests yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {completedTests.map(renderTest)}
+          </div>
+        )}
       </div>
     </div>
   );

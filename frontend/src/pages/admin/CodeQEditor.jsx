@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Btn, Input, Select, Textarea, Alert, ImageUpload } from '../../components/shared/UI';
+import { CodingQuestionPreview } from '../../components/shared/QuestionPreview';
 import { uploadAPI } from '../../services/api';
 import Editor from '@monaco-editor/react';
 
@@ -14,6 +15,7 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
     { id: 'tests', label: 'Test Cases' },
     { id: 'code', label: 'Starter Code' },
     { id: 'settings', label: 'Settings' },
+    { id: 'preview', label: 'Preview' },
   ];
 
   return (
@@ -57,6 +59,17 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
         </Btn>
       </div>
 
+      <label className="flex items-center gap-1.5 text-xs text-annotation mb-3 cursor-pointer w-fit">
+        <input
+          type="checkbox"
+          checked={!!q.saveToBank}
+          disabled={!!q.bankQuestionId}
+          onChange={e => update('saveToBank', e.target.checked)}
+          className="accent-accent"
+        />
+        {q.bankQuestionId ? 'Linked to Question Bank' : 'Also save to Question Bank'}
+      </label>
+
       <div className="tab-bar mb-4 overflow-x-auto">
         {TABS.map(t => (
           <button
@@ -75,7 +88,7 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
             value={q.description}
             onChange={e => update('description', e.target.value)}
             placeholder="Full problem description..."
-            rows={7}
+            rows={12}
             className="text-sm"
           />
           <ImageUpload
@@ -320,6 +333,14 @@ export default function CodeQEditor({ q, onChange, onRemove }) {
             onChange={e => update('memoryLimit', +e.target.value)}
             hint="Max memory usage"
           />
+        </div>
+      )}
+      {tab === 'preview' && (
+        <div className="panel-muted p-5 border-2 border-dashed border-accent/30">
+          <p className="text-2xs text-annotation/70 font-mono uppercase tracking-wider mb-3">
+            Student view preview
+          </p>
+          <CodingQuestionPreview q={q} />
         </div>
       )}
     </div>

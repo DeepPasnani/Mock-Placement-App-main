@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { usersAPI } from '../../services/api';
-import { Btn, Table, Badge, Modal, Input, Alert, ConfirmModal, Spinner } from '../../components/shared/UI';
+import { Btn, Table, Badge, Modal, Input, Select, Alert, ConfirmModal, Spinner } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { ALLOWED_DEPARTMENTS as DEPT_ORDER } from '../../lib/departments';
+import { useClassOptions } from '../../hooks/useClassOptions';
 
 const ordinal = (n) => {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -21,7 +22,7 @@ const yearLabel = (y) => {
 
 /* ═══════════════════════════════════════════════════════════
  * Admin Users — Student management (clustered by
- * department → year of study → batch)
+ * department → year of study → class)
  * ═══════════════════════════════════════════════════════════ */
 
 export default function AdminUsers() {
@@ -29,9 +30,10 @@ export default function AdminUsers() {
   const [search, setSearch] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState('');
-  const [showBatchUpdate, setShowBatchUpdate] = useState(false);
-  const [batchCsvText, setBatchCsvText] = useState('');
+  const [showClassUpdate, setShowClassUpdate] = useState(false);
+  const [classCsvText, setClassCsvText] = useState('');
   const [deleteId, setDeleteId] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', 'student', search],
@@ -66,26 +68,26 @@ export default function AdminUsers() {
     },
   });
 
-  const batchUpdateMut = useMutation({
+  const classUpdateMut = useMutation({
     mutationFn: () => {
-      const lines = batchCsvText.trim().split('\n').slice(1);
+      const lines = classCsvText.trim().split('\n').slice(1);
       const students = lines
         .map(l => {
-          const [email, batch, yearOfStudy] = l
+          const [email, className, yearOfStudy] = l
             .split(',')
             .map(s => s.trim().replace(/"/g, ''));
-          return { email, batch, year_of_study: yearOfStudy ? parseInt(yearOfStudy) : undefined };
+          return { email, class_name: className, year_of_study: yearOfStudy ? parseInt(yearOfStudy) : undefined };
         })
         .filter(s => s.email);
-      return usersAPI.bulkUpdateBatch({ students });
+      return usersAPI.bulkUpdateClass({ students });
     },
     onSuccess: (r) => {
       toast.success(`Updated ${r.updated} students`);
       qc.invalidateQueries({ queryKey: ['users'] });
-      setShowBatchUpdate(false);
-      setBatchCsvText('');
+      setShowClassUpdate(false);
+      setClassCsvText('');
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Batch update failed'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Class update failed'),
   });
 
   const users = data?.users || [];
@@ -95,17 +97,17 @@ export default function AdminUsers() {
     users.forEach(u => {
       const dept = u.department || 'Unassigned';
       const year = u.year_of_study ?? 'Any';
-      const batch = u.batch || 'Unassigned';
+      const className = u.class_name || 'Unassigned';
 
       if (!deptMap.has(dept)) deptMap.set(dept, { department: dept, years: new Map(), total: 0 });
       const deptGroup = deptMap.get(dept);
       deptGroup.total++;
 
-      if (!deptGroup.years.has(year)) deptGroup.years.set(year, { year, batches: new Map() });
+      if (!deptGroup.years.has(year)) deptGroup.years.set(year, { year, classes: new Map() });
       const yearGroup = deptGroup.years.get(year);
 
-      if (!yearGroup.batches.has(batch)) yearGroup.batches.set(batch, { batch, students: [] });
-      yearGroup.batches.get(batch).students.push(u);
+      if (!yearGroup.classes.has(className)) yearGroup.classes.set(className, { className, students: [] });
+      yearGroup.classes.get(className).students.push(u);
     });
 
     return [...deptMap.values()]
@@ -127,8 +129,8 @@ export default function AdminUsers() {
           })
           .map(year => ({
             ...year,
-            batches: [...year.batches.values()]
-              .sort((a, b) => a.batch.localeCompare(b.batch, undefined, { numeric: true })),
+            classes: [...year.classes.values()]
+              .sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true })),
           })),
       }));
   }, [users]);
@@ -155,12 +157,12 @@ export default function AdminUsers() {
     },
     {
       key: 'cluster',
-      label: 'Department / Year / Batch',
+      label: 'Department / Year / Class',
       render: (u) => (
         <div className="flex flex-wrap gap-1 items-center">
           <Badge color="verify">{u.department || 'Unassigned'}</Badge>
           <Badge color="annotation">{yearLabel(u.year_of_study)}</Badge>
-          <Badge color="clarify">{u.batch || 'Unassigned'}</Badge>
+          <Badge color="clarify">{u.class_name || 'Unassigned'}</Badge>
         </div>
       ),
     },
@@ -207,6 +209,16 @@ export default function AdminUsers() {
             </svg>
           </Link>
           <button
+            onClick={() => setEditingUser(u)}
+            className="btn-ghost-icon"
+            title="Edit student"
+            aria-label="Edit student"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button
             onClick={() =>
               toggleMut.mutate({ id: u.id, isActive: !u.is_active })
             }
@@ -245,11 +257,11 @@ export default function AdminUsers() {
           <h1 className="section-title">Students</h1>
           <p className="section-subtitle">{data?.total || 0} registered</p>
         </div>
-        <Btn variant="ghost" size="sm" onClick={() => setShowBatchUpdate(true)}>
+        <Btn variant="ghost" size="sm" onClick={() => setShowClassUpdate(true)}>
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          Update Batch
+          Update Class
         </Btn>
         <Btn variant="primary" onClick={() => setShowImport(true)}>
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -301,13 +313,13 @@ export default function AdminUsers() {
                         {yearLabel(yr.year)}
                       </span>
                     </div>
-                    {yr.batches.map(b => (
-                      <div key={`${dept.department}-${yr.year}-${b.batch}`} className="border-t border-rim/40">
+                    {yr.classes.map(b => (
+                      <div key={`${dept.department}-${yr.year}-${b.className}`} className="border-t border-rim/40">
                         <div className="px-4 py-1.5 flex items-center gap-2 bg-deck/10">
                           <svg className="w-3 h-3 text-accent/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
-                          <span className="text-xs font-semibold text-ink">{b.batch}</span>
+                          <span className="text-xs font-semibold text-ink">{b.className}</span>
                           <span className="text-2xs font-mono text-annotation/60">
                             {b.students.length} student{b.students.length === 1 ? '' : 's'}
                           </span>
@@ -374,41 +386,41 @@ export default function AdminUsers() {
         )}
       </Modal>
 
-      {/* Bulk Update Batch Modal */}
+      {/* Bulk Update Class Modal */}
       <Modal
-        isOpen={showBatchUpdate}
-        onClose={() => setShowBatchUpdate(false)}
-        title="Bulk Update Batch / Year"
+        isOpen={showClassUpdate}
+        onClose={() => setShowClassUpdate(false)}
+        title="Bulk Update Class / Year"
         footer={
           <>
-            <Btn variant="ghost" onClick={() => setShowBatchUpdate(false)}>Cancel</Btn>
-            <Btn variant="primary" onClick={() => batchUpdateMut.mutate()} disabled={!batchCsvText.trim() || batchUpdateMut.isLoading}>
-              {batchUpdateMut.isLoading ? 'Updating…' : 'Update Batches'}
+            <Btn variant="ghost" onClick={() => setShowClassUpdate(false)}>Cancel</Btn>
+            <Btn variant="primary" onClick={() => classUpdateMut.mutate()} disabled={!classCsvText.trim() || classUpdateMut.isLoading}>
+              {classUpdateMut.isLoading ? 'Updating…' : 'Update Classes'}
             </Btn>
           </>
         }
       >
         <Alert type="info" className="mb-4">
-          Update student batch assignments and year of study for semester re-shuffling.
+          Update student class assignments and year of study for semester re-shuffling.
         </Alert>
         <p className="text-xs text-annotation/70 mb-3 font-mono bg-deck p-2 rounded border border-rim">
-          email,batch,year_of_study
+          email,class,year_of_study
           <br />
-          alice@college.edu,Batch 1,3
+          alice@college.edu,Class 1,3
           <br />
-          bob@college.edu,Batch 2,2
+          bob@college.edu,Class 2,2
         </p>
         <textarea
-          value={batchCsvText}
-          onChange={e => setBatchCsvText(e.target.value)}
+          value={classCsvText}
+          onChange={e => setClassCsvText(e.target.value)}
           rows={10}
-          placeholder="Paste CSV data here (email,batch,year_of_study)..."
-          aria-label="Paste CSV data here (email,batch,year_of_study)"
+          placeholder="Paste CSV data here (email,class,year_of_study)..."
+          aria-label="Paste CSV data here (email,class,year_of_study)"
           className="textarea-field"
         />
-        {batchUpdateMut.data && (
+        {classUpdateMut.data && (
           <Alert type="success" className="mt-3">
-            Updated: {batchUpdateMut.data.updated} · Skipped: {batchUpdateMut.data.skipped}
+            Updated: {classUpdateMut.data.updated} · Skipped: {classUpdateMut.data.skipped}
           </Alert>
         )}
       </Modal>
@@ -421,6 +433,75 @@ export default function AdminUsers() {
         message="This will permanently delete the student and all their submissions."
         confirmLabel="Remove"
       />
+
+      {editingUser && (
+        <EditStudentModal
+          student={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSaved={() => { setEditingUser(null); qc.invalidateQueries({ queryKey: ['users'] }); }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Edit Student ─────────────────────────────────────────────── */
+function EditStudentModal({ student, onClose, onSaved }) {
+  const { years, classes } = useClassOptions();
+  const [form, setForm] = useState({
+    name: student.name || '',
+    email: student.email || '',
+    rollNumber: student.roll_number || '',
+    branch: student.branch || '',
+    department: student.department || '',
+    className: student.class_name || '',
+    yearOfStudy: student.year_of_study != null ? String(student.year_of_study) : '',
+  });
+  const upd = (key, val) => setForm(f => ({ ...f, [key]: val }));
+
+  const mut = useMutation({
+    mutationFn: () => usersAPI.update(student.id, form),
+    onSuccess: () => { toast.success('Student updated'); onSaved(); },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update student'),
+  });
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Edit Student"
+      width="max-w-md"
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn variant="primary" onClick={() => mut.mutate()} disabled={!form.name.trim() || !form.email.trim() || mut.isLoading}>
+            {mut.isLoading ? 'Saving…' : 'Save Changes'}
+          </Btn>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Input label="Full Name *" value={form.name} onChange={e => upd('name', e.target.value)} />
+        <Input label="Email Address *" type="email" value={form.email} onChange={e => upd('email', e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Roll Number" value={form.rollNumber} onChange={e => upd('rollNumber', e.target.value)} />
+          <Input label="Branch" value={form.branch} onChange={e => upd('branch', e.target.value)} />
+        </div>
+        <Select label="Department" value={form.department} onChange={e => upd('department', e.target.value)}>
+          <option value="">— Not set —</option>
+          {DEPT_ORDER.map(d => <option key={d} value={d}>{d}</option>)}
+        </Select>
+        <div className="grid grid-cols-2 gap-3">
+          <Select label="Class" value={form.className} onChange={e => upd('className', e.target.value)}>
+            <option value="">— Not set —</option>
+            {classes.map(c => <option key={c} value={c}>{c}</option>)}
+          </Select>
+          <Select label="Year of Study" value={form.yearOfStudy} onChange={e => upd('yearOfStudy', e.target.value)}>
+            <option value="">— Not set —</option>
+            {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+          </Select>
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -2,8 +2,22 @@ const logger = require('../services/logger');
 const { query, getClient } = require('../db');
 const { setActiveSession, getActiveSession, deleteActiveSession, trackActiveUser, getActiveUserCount } = require('../db/redis');
 const { judgeSubmission: codeJudge, submitRunCode, pollSubmissionStatus } = require('../services/runner');
+const { resultsVisibleToStudent } = require('../services/resultsVisibility');
 
-function studentCanAccessTest(test, userDepartment, userBatch, userYear) {
+// Strips score/answer-correctness data from a submission row that isn't
+// cleared for release yet, leaving only what's needed to show "submitted,
+// results pending" in the UI.
+function withheldSubmissionView(sub) {
+  return {
+    ...sub,
+    score: null,
+    max_score: null,
+    code_results: null,
+    resultsAvailable: false,
+  };
+}
+
+function studentCanAccessTest(test, userDepartment, userClass, userYear) {
   const depts = Array.isArray(test.departments) && test.departments.length
     ? test.departments
     : (test.department ? [test.department] : []);
@@ -11,9 +25,9 @@ function studentCanAccessTest(test, userDepartment, userBatch, userYear) {
     const deptOk = depts.includes(userDepartment) || test.department === userDepartment;
     if (!deptOk) return false;
   }
-  const batchList = Array.isArray(test.batches) ? test.batches.filter(Boolean) : [];
-  if (batchList.length && !batchList.includes('all')) {
-    if (!userBatch || !batchList.includes(userBatch)) return false;
+  const classList = Array.isArray(test.classes) ? test.classes.filter(Boolean) : [];
+  if (classList.length && !classList.includes('all')) {
+    if (!userClass || !classList.includes(userClass)) return false;
   }
   const years = Array.isArray(test.years) ? test.years.filter(y => y !== null && y !== '') : [];
   if (years.length && !years.includes('all')) {
@@ -45,7 +59,7 @@ async function startTest(req, res) {
   const test = testRows[0];
   if (!test) return res.status(404).json({ error: 'Test not found or not available.' });
 
-  if (!studentCanAccessTest(test, req.user.department, req.user.batch, req.user.year_of_study)) {
+  if (!studentCanAccessTest(test, req.user.department, req.user.class_name, req.user.year_of_study)) {
     return res.status(403).json({ error: 'This test is not available for your class.' });
   }
 
@@ -59,9 +73,9 @@ async function startTest(req, res) {
     submission = existing[0];
   } else {
     const { rows } = await query(
-      `INSERT INTO submissions (test_id, user_id, status, ip_address, batch_snapshot, year_snapshot)
+      `INSERT INTO submissions (test_id, user_id, status, ip_address, class_snapshot, year_snapshot)
        VALUES ($1,$2,'in_progress',$3,$4,$5) RETURNING *`,
-      [testId, userId, req.ip, req.user.batch || null, req.user.year_of_study || null]
+      [testId, userId, req.ip, req.user.class_name || null, req.user.year_of_study || null]
     );
     submission = rows[0];
   }
@@ -100,7 +114,10 @@ async function saveAnswers(req, res) {
   if (answers !== undefined) { params.push(JSON.stringify(answers || {})); updateFields.push(`answers=$${++idx}`); }
   if (codeSolutions !== undefined) { params.push(JSON.stringify(codeSolutions || {})); updateFields.push(`code_solutions=$${++idx}`); }
   if (flaggedQuestions !== undefined) { params.push(JSON.stringify(flaggedQuestions || [])); updateFields.push(`flagged_questions=$${++idx}`); }
-  if (tabSwitchCount !== undefined) { params.push(tabSwitchCount); updateFields.push(`tab_switch_count=$${++idx}`); }
+  // GREATEST, not a raw overwrite — a client resending a lower count
+  // (accidentally, or to erase a real violation right before submitting)
+  // must never move the stored count backwards.
+  if (tabSwitchCount !== undefined) { params.push(tabSwitchCount); updateFields.push(`tab_switch_count=GREATEST(tab_switch_count, $${++idx})`); }
   if (selectedProblems !== undefined) { params.push(JSON.stringify(selectedProblems || [])); updateFields.push(`selected_problems=$${++idx}`); }
 
   if (!updateFields.length) return res.status(400).json({ error: 'Nothing to save' });
@@ -115,96 +132,12 @@ async function saveAnswers(req, res) {
   res.json({ saved: true });
 }
 
-// POST /api/submissions/submit
-async function submitTest(req, res) {
-  const { testId, answers, codeSolutions, flaggedQuestions, tabSwitchCount, selectedProblems, autoSubmitted } = req.body;
-  const userId = req.user.id;
-
-  const { rows: subRows } = await query(
-    "SELECT * FROM submissions WHERE test_id=$1 AND user_id=$2", [testId, userId]
-  );
-  const submission = subRows[0];
-  if (!submission) return res.status(404).json({ error: 'Submission not found.' });
-  if (submission.status !== 'in_progress') return res.status(400).json({ error: 'Test already submitted.' });
-
-  // Load test + correct answers for grading
-  const { rows: testRows } = await query('SELECT * FROM tests WHERE id=$1', [testId]);
-  const test = testRows[0];
-  const { rows: sections } = await query('SELECT * FROM sections WHERE test_id=$1 ORDER BY order_index', [testId]);
-
-  // Server-authoritative timer check
-  const elapsedSec = Math.floor((Date.now() - new Date(submission.started_at).getTime()) / 1000);
-  const maxDurationSec = test.duration_minutes * 60;
-  const timeExpired = elapsedSec >= maxDurationSec;
-
-  // Server-side tab-switch limit check
-  const effectiveTabCount = tabSwitchCount !== undefined ? tabSwitchCount : submission.tab_switch_count;
-  const tabSwitchLimit = 5;
-  const tabLimitExceeded = effectiveTabCount >= tabSwitchLimit;
-
-  if (timeExpired || tabLimitExceeded) {
-    const reason = timeExpired ? 'Time expired' : 'Tab switch limit exceeded';
-    const { rows: [autoSub] } = await query(
-      `UPDATE submissions SET
-         status='auto_submitted', tab_switch_count=$1, submitted_at=NOW(), time_taken_seconds=$2
-       WHERE id=$3 RETURNING *`,
-      [Math.max(effectiveTabCount, submission.tab_switch_count), elapsedSec, submission.id]
-    );
-    await deleteActiveSession(userId, testId);
-    return res.json({
-      submission: autoSub,
-      score: 0, maxScore: 0, percentage: 0, passed: false,
-      autoSubmitted: true,
-      reason,
-    });
-  }
-
-  // Server-side validation of coding problem selection
-  for (const section of sections) {
-    if (section.type === 'coding') {
-      const { rows: problems } = await query(
-        'SELECT id, difficulty FROM coding_problems WHERE section_id=$1', [section.id]
-      );
-      if (problems.length > 3) {
-        const selectedForSection = (selectedProblems || []).filter(pid =>
-          problems.some(p => p.id === pid)
-        );
-        if (selectedForSection.length > 3) {
-          return res.status(400).json({ error: 'Cannot select more than 3 coding problems.' });
-        }
-        const easySelected = problems.filter(p =>
-          p.difficulty === 'easy' && selectedForSection.includes(p.id)
-        ).length;
-        const hardSelected = problems.filter(p =>
-          p.difficulty === 'hard' && selectedForSection.includes(p.id)
-        ).length;
-        if (easySelected > 2) {
-          return res.status(400).json({ error: 'Cannot select more than 2 easy coding problems.' });
-        }
-        if (hardSelected > 1) {
-          return res.status(400).json({ error: 'Cannot select more than 1 hard coding problem.' });
-        }
-        // Store validated selection
-        if (!req.body.codeSolutions) req.body.codeSolutions = {};
-        if (req.body.codeSolutions && typeof req.body.codeSolutions === 'object') {
-          // Only grade selected problems
-          const validatedSolutions = {};
-          for (const pid of selectedForSection) {
-            if (req.body.codeSolutions[pid]) {
-              validatedSolutions[pid] = req.body.codeSolutions[pid];
-            }
-          }
-          // Merge back
-          for (const pid of Object.keys(req.body.codeSolutions)) {
-            if (!selectedForSection.includes(pid) || !problems.some(p => p.id === pid)) {
-              delete req.body.codeSolutions[pid];
-            }
-          }
-        }
-      }
-    }
-  }
-
+// Shared grading pipeline — used by a student's own submit and by an
+// admin force-stopping a student's in-progress test (POST
+// /submissions/:id/force-stop), so both paths score coding problems and
+// MCQs identically instead of the admin path leaving a submission
+// permanently unscored.
+async function gradeAnswers({ sections, answers, codeSolutions, test }) {
   let totalScore = 0;
   let maxScore = 0;
   const detailedResults = {};
@@ -308,10 +241,105 @@ async function submitTest(req, res) {
     }
   }
 
+  return { totalScore, maxScore, detailedResults };
+}
+
+// POST /api/submissions/submit
+async function submitTest(req, res) {
+  const { testId, answers, codeSolutions, flaggedQuestions, tabSwitchCount, selectedProblems, autoSubmitted } = req.body;
+  const userId = req.user.id;
+
+  const { rows: subRows } = await query(
+    "SELECT * FROM submissions WHERE test_id=$1 AND user_id=$2", [testId, userId]
+  );
+  const submission = subRows[0];
+  if (!submission) return res.status(404).json({ error: 'Submission not found.' });
+  if (submission.status !== 'in_progress') return res.status(400).json({ error: 'Test already submitted.' });
+
+  // Load test + correct answers for grading
+  const { rows: testRows } = await query('SELECT * FROM tests WHERE id=$1', [testId]);
+  const test = testRows[0];
+  const { rows: sections } = await query('SELECT * FROM sections WHERE test_id=$1 ORDER BY order_index', [testId]);
+
+  // Server-authoritative timer check
+  const elapsedSec = Math.floor((Date.now() - new Date(submission.started_at).getTime()) / 1000);
+  const maxDurationSec = test.duration_minutes * 60;
+  const timeExpired = elapsedSec >= maxDurationSec;
+
+  // Server-side tab-switch limit check
+  const effectiveTabCount = tabSwitchCount !== undefined ? tabSwitchCount : submission.tab_switch_count;
+  const tabSwitchLimit = 5;
+  const tabLimitExceeded = effectiveTabCount >= tabSwitchLimit;
+
+  if (timeExpired || tabLimitExceeded) {
+    const reason = timeExpired ? 'Time expired' : 'Tab switch limit exceeded';
+    const { rows: [autoSub] } = await query(
+      `UPDATE submissions SET
+         status='auto_submitted', tab_switch_count=$1, submitted_at=NOW(), time_taken_seconds=$2
+       WHERE id=$3 RETURNING *`,
+      [Math.max(effectiveTabCount, submission.tab_switch_count), elapsedSec, submission.id]
+    );
+    await deleteActiveSession(userId, testId);
+    return res.json({
+      submission: autoSub,
+      score: 0, maxScore: 0, percentage: 0, passed: false,
+      autoSubmitted: true,
+      reason,
+    });
+  }
+
+  // Server-side validation of coding problem selection
+  for (const section of sections) {
+    if (section.type === 'coding') {
+      const { rows: problems } = await query(
+        'SELECT id, difficulty FROM coding_problems WHERE section_id=$1', [section.id]
+      );
+      if (problems.length > 3) {
+        const selectedForSection = (selectedProblems || []).filter(pid =>
+          problems.some(p => p.id === pid)
+        );
+        if (selectedForSection.length > 3) {
+          return res.status(400).json({ error: 'Cannot select more than 3 coding problems.' });
+        }
+        const easySelected = problems.filter(p =>
+          p.difficulty === 'easy' && selectedForSection.includes(p.id)
+        ).length;
+        const hardSelected = problems.filter(p =>
+          p.difficulty === 'hard' && selectedForSection.includes(p.id)
+        ).length;
+        if (easySelected > 2) {
+          return res.status(400).json({ error: 'Cannot select more than 2 easy coding problems.' });
+        }
+        if (hardSelected > 1) {
+          return res.status(400).json({ error: 'Cannot select more than 1 hard coding problem.' });
+        }
+        // Store validated selection
+        if (!req.body.codeSolutions) req.body.codeSolutions = {};
+        if (req.body.codeSolutions && typeof req.body.codeSolutions === 'object') {
+          // Only grade selected problems
+          const validatedSolutions = {};
+          for (const pid of selectedForSection) {
+            if (req.body.codeSolutions[pid]) {
+              validatedSolutions[pid] = req.body.codeSolutions[pid];
+            }
+          }
+          // Merge back
+          for (const pid of Object.keys(req.body.codeSolutions)) {
+            if (!selectedForSection.includes(pid) || !problems.some(p => p.id === pid)) {
+              delete req.body.codeSolutions[pid];
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const { totalScore, maxScore, detailedResults } = await gradeAnswers({ sections, answers, codeSolutions, test });
+
   const finalScore = Math.max(0, totalScore);
   const elapsed = Math.floor((Date.now() - new Date(submission.started_at).getTime()) / 1000);
   const newStatus = autoSubmitted ? 'auto_submitted' : 'submitted';
-  const finalTabCount = tabSwitchCount !== undefined ? tabSwitchCount : submission.tab_switch_count;
+  const finalTabCount = Math.max(submission.tab_switch_count || 0, tabSwitchCount !== undefined ? tabSwitchCount : 0);
 
   const finalSelectedProblems = selectedProblems !== undefined ? selectedProblems : submission.selected_problems;
 
@@ -344,20 +372,52 @@ async function submitTest(req, res) {
 // GET /api/submissions/my
 async function getMySubmissions(req, res) {
   const { rows } = await query(
-    `SELECT s.*, t.title as test_title, t.settings as test_settings
+    `SELECT s.*, t.title as test_title, t.settings as test_settings,
+       t.end_time as test_end_time, t.results_published_at
      FROM submissions s JOIN tests t ON s.test_id = t.id
      WHERE s.user_id=$1 ORDER BY s.submitted_at DESC NULLS LAST`,
     [req.user.id]
   );
-  res.json({ submissions: rows });
+  const submissions = rows.map(sub =>
+    resultsVisibleToStudent({ settings: sub.test_settings, end_time: sub.test_end_time, results_published_at: sub.results_published_at })
+      ? sub
+      : withheldSubmissionView(sub)
+  );
+  res.json({ submissions });
+}
+
+// PUT /api/submissions/test/:testId/publish-results (admin) — releases
+// results early for 'manual'/'after_end' tests. Idempotent.
+async function publishResults(req, res) {
+  const { rows } = await query(
+    `UPDATE tests SET results_published_at=NOW() WHERE id=$1 AND results_published_at IS NULL RETURNING results_published_at`,
+    [req.params.testId]
+  );
+  if (!rows.length) {
+    const { rows: existing } = await query('SELECT results_published_at FROM tests WHERE id=$1', [req.params.testId]);
+    if (!existing.length) return res.status(404).json({ error: 'Test not found' });
+    return res.json({ results_published_at: existing[0].results_published_at });
+  }
+  res.json({ results_published_at: rows[0].results_published_at });
+}
+
+// PUT /api/submissions/test/:testId/unpublish-results (admin) — puts a
+// manually-released test's results back behind the showResults gate.
+async function unpublishResults(req, res) {
+  const { rows } = await query(
+    'UPDATE tests SET results_published_at=NULL WHERE id=$1 RETURNING id',
+    [req.params.testId]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Test not found' });
+  res.json({ results_published_at: null });
 }
 
 // GET /api/submissions/test/:testId (admin)
 async function getTestSubmissions(req, res) {
   const { rows } = await query(
     `SELECT s.*, u.name as user_name, u.email as user_email, u.branch, u.roll_number,
-       u.department as user_department, u.batch as user_batch, u.year_of_study as user_year,
-       COALESCE(s.batch_snapshot, u.batch) as batch_display,
+       u.department as user_department, u.class_name as user_class, u.year_of_study as user_year,
+       COALESCE(s.class_snapshot, u.class_name) as class_display,
        COALESCE(s.year_snapshot, u.year_of_study) as year_display
      FROM submissions s JOIN users u ON s.user_id = u.id
      WHERE s.test_id=$1 ORDER BY s.score DESC NULLS LAST`,
@@ -369,18 +429,59 @@ async function getTestSubmissions(req, res) {
 // GET /api/submissions/:id (detail)
 async function getSubmission(req, res) {
   const { rows } = await query(
-    `SELECT s.*, u.name as user_name, t.title as test_title, t.settings as test_settings
+    `SELECT s.*, u.name as user_name, t.title as test_title, t.settings as test_settings,
+       t.end_time as test_end_time, t.results_published_at
      FROM submissions s JOIN users u ON s.user_id=u.id JOIN tests t ON s.test_id=t.id
      WHERE s.id=$1`, [req.params.id]
   );
   if (!rows.length) return res.status(404).json({ error: 'Submission not found' });
   const sub = rows[0];
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
 
   // Students can only see their own
-  if (req.user.role !== 'admin' && sub.user_id !== req.user.id) {
+  if (!isAdmin && sub.user_id !== req.user.id) {
     return res.status(403).json({ error: 'Access denied' });
   }
-  res.json({ submission: sub });
+
+  // Score/breakdown release is gated by test.settings.showResults — a direct
+  // API call must not let a student see this any earlier than the admin
+  // configured, even though they own the submission.
+  if (!isAdmin && !resultsVisibleToStudent({ settings: sub.test_settings, end_time: sub.test_end_time, results_published_at: sub.results_published_at })) {
+    return res.json({ submission: withheldSubmissionView(sub), questionInfo: {} });
+  }
+
+  // code_results (see submitTest) is keyed by question/coding_problem id with
+  // no text attached, so the result page has nothing to render but raw ids
+  // unless we also hand back what each id actually is.
+  const { rows: qRows } = await query(
+    `SELECT q.id, q.text, q.type, q.options, q.correct_answer, q.explanation
+     FROM questions q JOIN sections sec ON q.section_id = sec.id
+     WHERE sec.test_id = $1`,
+    [sub.test_id]
+  );
+  const { rows: cpRows } = await query(
+    `SELECT cp.id, cp.title, cp.description, cp.explanation
+     FROM coding_problems cp JOIN sections sec ON cp.section_id = sec.id
+     WHERE sec.test_id = $1`,
+    [sub.test_id]
+  );
+  const questionInfo = {};
+  for (const q of qRows) {
+    questionInfo[q.id] = {
+      text: q.text,
+      type: q.type,
+      options: q.options,
+      correctAnswer: q.correct_answer,
+      explanation: q.explanation || null,
+      // The student's own answer lives in sub.answers (JSONB keyed by
+      // question id) — surfaced here so the frontend doesn't need to
+      // cross-reference two objects to show "your answer" vs "correct".
+      studentAnswer: (sub.answers || {})[q.id] ?? null,
+    };
+  }
+  for (const cp of cpRows) questionInfo[cp.id] = { title: cp.title, description: cp.description, explanation: cp.explanation || null };
+
+  res.json({ submission: sub, questionInfo });
 }
 
 const { v4: uuidv4 } = require('uuid');
@@ -586,6 +687,204 @@ async function resumeTest(req, res) {
   });
 }
 
+// ── POST /api/submissions/:id/force-stop (admin/super_admin only) ──────
+// Ends a student's in-progress test right now — e.g. a device needs to be
+// reclaimed, or the student needs to be pulled from the exam hall. Grades
+// whatever was last auto-saved (periodic saves run every 30s during the
+// test, more often on newer clients), the same way a normal submit would,
+// so the submission is never left permanently unscored the way the
+// time-expiry/tab-limit auto-submit path used to leave it.
+async function forceStopTest(req, res) {
+  const { id } = req.params;
+
+  const { rows: subRows } = await query('SELECT * FROM submissions WHERE id = $1', [id]);
+  if (!subRows.length) return res.status(404).json({ error: 'Submission not found' });
+  const sub = subRows[0];
+
+  if (sub.status !== 'in_progress') {
+    return res.status(400).json({ error: 'Only a test that is currently in progress can be stopped.' });
+  }
+
+  const { rows: [test] } = await query('SELECT * FROM tests WHERE id=$1', [sub.test_id]);
+  if (!test) return res.status(404).json({ error: 'Test not found' });
+  const { rows: sections } = await query('SELECT * FROM sections WHERE test_id=$1 ORDER BY order_index', [sub.test_id]);
+
+  const answers = sub.answers || {};
+  const codeSolutions = sub.code_solutions || {};
+  const { totalScore, maxScore, detailedResults } = await gradeAnswers({ sections, answers, codeSolutions, test });
+  const finalScore = Math.max(0, totalScore);
+
+  const elapsed = Math.floor((Date.now() - new Date(sub.started_at).getTime()) / 1000);
+
+  const { rows: [updated] } = await query(
+    `UPDATE submissions SET
+       status='auto_submitted', score=$1, max_score=$2, code_results=$3,
+       submitted_at=NOW(), time_taken_seconds=$4, ended_by=$5
+     WHERE id=$6 RETURNING *`,
+    [finalScore, maxScore, JSON.stringify(detailedResults), elapsed, req.user.id, id]
+  );
+
+  await deleteActiveSession(sub.user_id, sub.test_id);
+
+  const pct = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
+
+  res.json({
+    submission: updated,
+    score: finalScore,
+    maxScore,
+    percentage: pct,
+    message: 'Test stopped and graded from the student’s last saved answers.',
+  });
+}
+
+// ── PATCH /api/submissions/:id/marks (admin/super_admin only) ─────────
+// Manual score override — for partial-credit cases the auto-grader can't
+// see (a coding solution that's correct but stylistically flagged, an
+// essay-style answer, a dispute resolution, etc).
+async function updateMarks(req, res) {
+  const { id } = req.params;
+  const { score, maxScore, note } = req.body;
+
+  if (score === undefined || score === null || Number.isNaN(Number(score))) {
+    return res.status(400).json({ error: 'A numeric score is required' });
+  }
+
+  const fields = ['score=$1', 'graded_by=$2', 'graded_at=NOW()'];
+  const params = [Number(score), req.user.id];
+
+  if (maxScore !== undefined && maxScore !== null && !Number.isNaN(Number(maxScore))) {
+    params.push(Number(maxScore));
+    fields.push(`max_score=$${params.length}`);
+  }
+  if (note !== undefined) {
+    params.push(note || null);
+    fields.push(`grading_note=$${params.length}`);
+  }
+
+  params.push(id);
+  const { rows } = await query(
+    `UPDATE submissions SET ${fields.join(', ')} WHERE id=$${params.length} RETURNING *`,
+    params
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Submission not found' });
+
+  res.json({ submission: rows[0] });
+}
+
+// PATCH /api/submissions/test/:testId/adjust-marks — moderation-style curve:
+// add (or subtract) the same amount to every graded submission for a test,
+// e.g. +2 to credit a question that turned out to be ambiguous for
+// everyone, or -1 across the board after a re-check. Clamped to
+// [0, max_score] per submission so a flat bonus/penalty can't push anyone
+// negative or above their own max.
+async function adjustAllMarks(req, res) {
+  const { testId } = req.params;
+  const { amount, note } = req.body;
+
+  if (amount === undefined || amount === null || Number.isNaN(Number(amount))) {
+    return res.status(400).json({ error: 'A numeric amount is required' });
+  }
+  const delta = Number(amount);
+  if (delta === 0) return res.status(400).json({ error: 'Amount must be non-zero' });
+
+  const { rows } = await query(
+    `UPDATE submissions
+       SET score = LEAST(max_score, GREATEST(0, score + $1)),
+           graded_by = $2, graded_at = NOW(),
+           grading_note = COALESCE($3, grading_note)
+     WHERE test_id = $4 AND status IN ('submitted', 'auto_submitted')
+     RETURNING id`,
+    [delta, req.user.id, note || null, testId]
+  );
+
+  res.json({ updated: rows.length, delta });
+}
+
+// ── Bulk marks import (admin/super_admin only) ─────────────────────────
+// Matches rows by roll number or email against submissions for one test.
+async function applyBulkMarks(testId, entries, adminId) {
+  const results = { updated: 0, skipped: 0, errors: [] };
+
+  for (let i = 0; i < entries.length; i++) {
+    const row = entries[i];
+    const identifier = (row.rollNumber || row.roll_number || row.email || '').toString().trim();
+    const scoreVal = row.score !== undefined ? row.score : row.marks;
+
+    if (!identifier) { results.errors.push({ row: i + 2, message: 'Missing email or roll number' }); continue; }
+    if (scoreVal === undefined || scoreVal === '' || Number.isNaN(Number(scoreVal))) {
+      results.errors.push({ row: i + 2, message: `${identifier}: missing or invalid score` });
+      continue;
+    }
+
+    const params = [testId, identifier.toLowerCase()];
+    const { rows: subRows } = await query(
+      `SELECT s.id FROM submissions s JOIN users u ON s.user_id = u.id
+       WHERE s.test_id = $1 AND (LOWER(u.email) = $2 OR LOWER(u.roll_number) = $2)
+       LIMIT 1`,
+      params
+    );
+
+    if (!subRows.length) {
+      results.errors.push({ row: i + 2, message: `${identifier}: no submission found for this test` });
+      results.skipped++;
+      continue;
+    }
+
+    const updateParams = [Number(scoreVal), adminId];
+    const setFields = ['score=$1', 'graded_by=$2', 'graded_at=NOW()'];
+    if (row.maxScore !== undefined && !Number.isNaN(Number(row.maxScore))) {
+      updateParams.push(Number(row.maxScore));
+      setFields.push(`max_score=$${updateParams.length}`);
+    }
+    updateParams.push(subRows[0].id);
+
+    await query(`UPDATE submissions SET ${setFields.join(', ')} WHERE id=$${updateParams.length}`, updateParams);
+    results.updated++;
+  }
+
+  return results;
+}
+
+// CSV columns: rollNumber (or email), score, maxScore (optional)
+function parseMarksCsv(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const values = line.split(',').map(v => v.trim());
+    const row = {};
+    headers.forEach((h, j) => { row[h] = values[j]; });
+    rows.push(row);
+  }
+  return rows;
+}
+
+// POST /api/submissions/bulk-marks/csv  { testId, csv }
+async function bulkMarksCsv(req, res) {
+  const { testId, csv } = req.body;
+  if (!testId || !csv) return res.status(400).json({ error: 'testId and csv are required' });
+
+  const rows = parseMarksCsv(csv);
+  if (!rows.length) return res.status(400).json({ error: 'No valid rows found in CSV' });
+
+  const results = await applyBulkMarks(testId, rows, req.user.id);
+  res.json(results);
+}
+
+// POST /api/submissions/bulk-marks/json  { testId, entries: [{ rollNumber|email, score, maxScore? }] }
+async function bulkMarksJson(req, res) {
+  const { testId, entries } = req.body;
+  if (!testId || !Array.isArray(entries) || !entries.length) {
+    return res.status(400).json({ error: 'testId and a non-empty entries array are required' });
+  }
+
+  const results = await applyBulkMarks(testId, entries, req.user.id);
+  res.json(results);
+}
+
 // GET /api/submissions/test/:testId/export-pdf (admin) — formatted summary report
 async function exportResultsPdf(req, res) {
   const { testId } = req.params;
@@ -596,18 +895,18 @@ async function exportResultsPdf(req, res) {
 
   const { rows: submissions } = await query(
     `SELECT s.*, u.name as user_name, u.email as user_email, u.branch, u.roll_number,
-       COALESCE(s.batch_snapshot, u.batch) as batch_display
+       COALESCE(s.class_snapshot, u.class_name) as class_display
      FROM submissions s JOIN users u ON s.user_id = u.id
      WHERE s.test_id=$1 ORDER BY s.score DESC NULLS LAST`,
     [testId]
   );
 
-  const batches = [...new Set(submissions.map(s => s.batch_display).filter(Boolean))].sort();
-  const classBreakdown = batches.map(b => {
-    const rows = submissions.filter(s => s.batch_display === b && s.status === 'submitted' && s.max_score > 0);
+  const classNames = [...new Set(submissions.map(s => s.class_display).filter(Boolean))].sort();
+  const classBreakdown = classNames.map(c => {
+    const rows = submissions.filter(s => s.class_display === c && s.status === 'submitted' && s.max_score > 0);
     const avg = rows.length ? Math.round(rows.reduce((a, s) => a + (s.score / s.max_score) * 100, 0) / rows.length) : 0;
     const passed = rows.filter(s => (s.score / s.max_score) * 100 >= (test.settings?.passingScore || 40)).length;
-    return { batch: b, count: rows.length, avg, passRate: rows.length ? Math.round((passed / rows.length) * 100) : 0 };
+    return { class: c, count: rows.length, avg, passRate: rows.length ? Math.round((passed / rows.length) * 100) : 0 };
   });
 
   res.setHeader('Content-Type', 'application/pdf');
@@ -620,7 +919,7 @@ async function exportResultsPdf(req, res) {
 // GET /api/submissions/test/:testId/export-csv (admin)
 async function exportResultsCsv(req, res) {
   const { testId } = req.params;
-  const { batch } = req.query;
+  const { class_name: classFilter } = req.query;
 
   const { rows: testRows } = await query('SELECT * FROM tests WHERE id=$1', [testId]);
   if (!testRows.length) return res.status(404).json({ error: 'Test not found' });
@@ -628,15 +927,15 @@ async function exportResultsCsv(req, res) {
 
   let subQuery = `
     SELECT s.*, u.name as user_name, u.email as user_email, u.branch, u.roll_number,
-           COALESCE(s.batch_snapshot, u.batch) as batch_display,
+           COALESCE(s.class_snapshot, u.class_name) as class_display,
            COALESCE(s.year_snapshot, u.year_of_study) as year_display
     FROM submissions s JOIN users u ON s.user_id = u.id
     WHERE s.test_id=$1`;
   const params = [testId];
 
-  if (batch && batch !== 'all') {
-    params.push(batch);
-    subQuery += ` AND COALESCE(s.batch_snapshot, u.batch)=$${params.length}`;
+  if (classFilter && classFilter !== 'all') {
+    params.push(classFilter);
+    subQuery += ` AND COALESCE(s.class_snapshot, u.class_name)=$${params.length}`;
   }
 
   subQuery += ' ORDER BY s.score DESC NULLS LAST';
@@ -644,7 +943,7 @@ async function exportResultsCsv(req, res) {
   const { rows: submissions } = await query(subQuery, params);
 
   const csvRows = [];
-  csvRows.push(['Rank', 'Name', 'Email', 'Roll No', 'Branch', 'Batch', 'Year',
+  csvRows.push(['Rank', 'Name', 'Email', 'Roll No', 'Branch', 'Class', 'Year',
     'Score', 'Max', 'Percentage', 'Result', 'Time Taken (s)', 'Submitted At', 'Status',
     'Tab Switches'].join(','));
 
@@ -668,7 +967,7 @@ async function exportResultsCsv(req, res) {
       escaped(s.user_email),
       escaped(s.roll_number),
       escaped(s.branch),
-      escaped(s.batch_display),
+      escaped(s.class_display),
       escaped(s.year_display),
       escaped(s.score),
       escaped(s.max_score),
@@ -802,10 +1101,28 @@ function levenshteinSimilarity(a, b) {
   return 1 - (dp[a.length][b.length] / maxLen);
 }
 
+// Pairs an admin has already reviewed with "Ignore" — plagiarism pairs
+// aren't stored rows, they're recomputed fresh on every check, so without
+// this an ignored pair would just reappear on the next page load. Keyed by
+// the two submission ids (order-independent) + problem id, since that's
+// what uniquely identifies a match.
+function ignoredPairKey(subIdA, subIdB, problemId) {
+  return [subIdA, subIdB].sort().join('|') + '|' + problemId;
+}
+
 async function checkPlagiarism(req, res) {
   const { testId } = req.params;
   const { threshold = 0.7 } = req.query;
   const similarityThreshold = parseFloat(threshold);
+
+  const { rows: ignoredRows } = await query(
+    `SELECT submission_id, metadata->>'pairedWithSubmissionId' as paired_with, metadata->>'problemId' as problem_id
+     FROM suspicious_flags WHERE test_id=$1 AND flag_type='plagiarism' AND action_taken='ignore'`,
+    [testId]
+  );
+  const ignoredPairs = new Set(
+    ignoredRows.filter(r => r.paired_with).map(r => ignoredPairKey(r.submission_id, r.paired_with, r.problem_id))
+  );
 
   const { rows: submissions } = await query(`
     SELECT s.id, s.user_id, s.code_solutions, s.selected_problems,
@@ -846,9 +1163,10 @@ async function checkPlagiarism(req, res) {
       const combined = (jaccard * 0.5 + levenshtein * 0.5);
 
       if (combined >= similarityThreshold) {
+        if (ignoredPairs.has(ignoredPairKey(a.submissionId, b.submissionId, a.problemId))) continue;
         pairs.push({
-          student_a: { name: a.userName, email: a.email, roll: a.rollNumber },
-          student_b: { name: b.userName, email: b.email, roll: b.rollNumber },
+          student_a: { name: a.userName, email: a.email, roll: a.rollNumber, submissionId: a.submissionId },
+          student_b: { name: b.userName, email: b.email, roll: b.rollNumber, submissionId: b.submissionId },
           problem_id: a.problemId, language: a.language,
           similarity: Math.round(combined * 100),
           jaccard: Math.round(jaccard * 100),
@@ -871,12 +1189,91 @@ async function checkPlagiarism(req, res) {
   });
 }
 
+// POST /api/submissions/plagiarism-check/:testId/bulk-action (admin)
+// body: { pairs: [{ submissionIdA, submissionIdB, similarity, problemId }], action: 'ignore'|'warn'|'disqualify' }
+// Plagiarism pairs are computed fresh on every request rather than stored,
+// so acting on one writes a suspicious_flags row per involved submission
+// (the same audit trail Security Alerts uses) instead of updating an
+// existing row. 'ignore' is additionally read back by checkPlagiarism to
+// filter that exact pair out of future results.
+async function plagiarismBulkAction(req, res) {
+  const { testId } = req.params;
+  const { pairs, action } = req.body;
+
+  if (!['ignore', 'warn', 'disqualify'].includes(action)) {
+    return res.status(400).json({ error: 'Action must be ignore, warn, or disqualify' });
+  }
+  if (!Array.isArray(pairs) || !pairs.length) {
+    return res.status(400).json({ error: 'At least one pair is required' });
+  }
+
+  const severityFor = (similarity) => (similarity >= 85 ? 'critical' : similarity >= 70 ? 'high' : 'medium');
+
+  let flagsCreated = 0, disqualified = 0, warned = 0;
+
+  for (const pair of pairs) {
+    const { submissionIdA, submissionIdB, similarity, problemId } = pair;
+    if (!submissionIdA || !submissionIdB) continue;
+
+    for (const [subId, otherId] of [[submissionIdA, submissionIdB], [submissionIdB, submissionIdA]]) {
+      await query(
+        `INSERT INTO suspicious_flags (test_id, submission_id, flag_type, severity, reasons, metadata, reviewed, reviewed_by, action_taken)
+         VALUES ($1, $2, 'plagiarism', $3, $4, $5, TRUE, $6, $7)`,
+        [
+          testId, subId, severityFor(similarity || 0),
+          JSON.stringify([{ type: 'plagiarism_match', detail: `${similarity ?? '?'}% code similarity`, timestamp: new Date().toISOString() }]),
+          JSON.stringify({ pairedWithSubmissionId: otherId, similarity, problemId }),
+          req.user.id, action,
+        ]
+      );
+      flagsCreated++;
+    }
+
+    if (action === 'disqualify') {
+      const { rowCount } = await query(
+        "UPDATE submissions SET status='disqualified' WHERE id = ANY($1::uuid[]) AND status != 'disqualified'",
+        [[submissionIdA, submissionIdB]]
+      );
+      disqualified += rowCount;
+      const { rows: subs } = await query('SELECT id, user_id, test_id FROM submissions WHERE id = ANY($1::uuid[])', [[submissionIdA, submissionIdB]]);
+      for (const sub of subs) {
+        try { await deleteActiveSession(sub.user_id, sub.test_id); } catch { /* not an active session, fine */ }
+      }
+    }
+
+    if (action === 'warn') {
+      const { sendNotification } = require('../services/websocket');
+      const { rows: subs } = await query('SELECT id, user_id FROM submissions WHERE id = ANY($1::uuid[])', [[submissionIdA, submissionIdB]]);
+      for (const sub of subs) {
+        const { rows: [notif] } = await query(
+          `INSERT INTO notifications (user_id, type, title, body, data)
+           VALUES ($1, 'plagiarism_warning', 'Code similarity flagged', $2, $3)
+           RETURNING id, type, title, body, data, is_read, created_at`,
+          [
+            sub.user_id,
+            `Your submission was flagged for ${similarity ?? '?'}% code similarity with another student's. This has been logged — make sure future submissions are your own original work.`,
+            JSON.stringify({ testId, submissionId: sub.id }),
+          ]
+        );
+        warned++;
+        try { sendNotification(sub.user_id, notif); } catch { /* student not connected, notification is still saved */ }
+      }
+    }
+  }
+
+  res.json({ pairsProcessed: pairs.length, flagsCreated, disqualified, warned, action });
+}
+
 // ── POST /api/submissions/fingerprint ──────────────────────
 async function submitFingerprint(req, res) {
   const { submissionId, fingerprint } = req.body;
   if (!submissionId || !fingerprint) {
     return res.status(400).json({ error: 'submissionId and fingerprint required' });
   }
+
+  const { rows: [sub] } = await query('SELECT user_id FROM submissions WHERE id=$1', [submissionId]);
+  if (!sub) return res.status(404).json({ error: 'Submission not found' });
+  if (sub.user_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
 
   const fpHash = require('crypto').createHash('sha256').update(JSON.stringify(fingerprint)).digest('hex');
 
@@ -895,8 +1292,9 @@ async function verifyFingerprint(req, res) {
     return res.status(400).json({ error: 'submissionId and fingerprint required' });
   }
 
-  const { rows } = await query('SELECT fingerprint_hash, device_fingerprint FROM submissions WHERE id=$1', [submissionId]);
+  const { rows } = await query('SELECT user_id, fingerprint_hash, device_fingerprint FROM submissions WHERE id=$1', [submissionId]);
   if (!rows.length) return res.status(404).json({ error: 'Submission not found' });
+  if (rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
 
   const stored = rows[0];
   const fpHash = require('crypto').createHash('sha256').update(JSON.stringify(fingerprint)).digest('hex');
@@ -922,24 +1320,33 @@ async function logFullscreenViolation(req, res) {
   const { submissionId, exitCount } = req.body;
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
 
+  const { rows: [sub] } = await query('SELECT user_id, fullscreen_exit_count FROM submissions WHERE id=$1', [submissionId]);
+  if (!sub) return res.status(404).json({ error: 'Submission not found' });
+  if (sub.user_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
+
+  // Never let a reported count go DOWN from what's already on record — a
+  // client resending a lower number (accidentally or otherwise) shouldn't
+  // erase real violations already logged this session.
+  const newCount = Math.max(sub.fullscreen_exit_count || 0, exitCount || 0);
+
   await query(
     `UPDATE submissions SET fullscreen_exit_count=$1 WHERE id=$2`,
-    [exitCount || 0, submissionId]
+    [newCount, submissionId]
   );
 
-  if (exitCount >= 3) {
+  if (newCount >= 3) {
     await query(
       `INSERT INTO suspicious_flags (test_id, submission_id, suspicion_score, reasons)
        VALUES ($1, $2, 80, $3)`,
       [
         req.body.testId || 'unknown',
         submissionId,
-        JSON.stringify([{ type: 'fullscreen_violation', detail: `Fullscreen exited ${exitCount} times`, timestamp: new Date().toISOString() }])
+        JSON.stringify([{ type: 'fullscreen_violation', detail: `Fullscreen exited ${newCount} times`, timestamp: new Date().toISOString() }])
       ]
     );
   }
 
-  res.json({ logged: true });
+  res.json({ logged: true, exitCount: newCount });
 }
 
 // ── GET /api/submissions/time-bomb-status ────────────────
@@ -986,4 +1393,4 @@ async function getTimeBombStatus(req, res) {
   res.json({ bombs: bombStatus, elapsedSeconds: elapsed });
 }
 
-module.exports = { startTest, saveAnswers, submitTest, getMySubmissions, getTestSubmissions, getSubmission, runCode, getRunCodeResult, deleteSubmission, resumeTest, exportResultsPdf, exportResultsCsv, getQuestionAnalytics, checkPlagiarism, submitFingerprint, verifyFingerprint, logFullscreenViolation, getTimeBombStatus };
+module.exports = { startTest, saveAnswers, submitTest, getMySubmissions, getTestSubmissions, getSubmission, runCode, getRunCodeResult, deleteSubmission, resumeTest, forceStopTest, updateMarks, adjustAllMarks, bulkMarksCsv, bulkMarksJson, exportResultsPdf, exportResultsCsv, getQuestionAnalytics, checkPlagiarism, plagiarismBulkAction, submitFingerprint, verifyFingerprint, logFullscreenViolation, getTimeBombStatus, publishResults, unpublishResults };

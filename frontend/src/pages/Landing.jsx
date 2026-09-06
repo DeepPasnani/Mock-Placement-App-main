@@ -85,11 +85,6 @@ function Nav() {
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
         <div className="flex items-center justify-between h-16 lg:h-20">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-              <svg className="w-4 h-4 text-panel" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 7.5A1.5 1.5 0 118.5 9 1.5 1.5 0 017 7.5zM4.5 12a1.5 1.5 0 111.5 1.5A1.5 1.5 0 014.5 12zm7.5 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM12 7.5A1.5 1.5 0 1113.5 9 1.5 1.5 0 0112 7.5z" />
-              </svg>
-            </div>
             <span className="font-display font-bold text-lg text-ink tracking-tight">CampusTrack</span>
           </Link>
 
@@ -398,11 +393,6 @@ function Footer() {
         <div className="grid lg:grid-cols-4 gap-10">
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center">
-                <svg className="w-3.5 h-3.5 text-panel" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7 7.5A1.5 1.5 0 118.5 9 1.5 1.5 0 017 7.5zM4.5 12h.25m15.75 0h.25M12 17.5a1.5 1.5 0 11-1.5 1.5m3-6a1.5 1.5 0 11-1.5 1.5" />
-                </svg>
-              </div>
               <span className="font-display font-bold text-lg text-ink">CampusTrack</span>
             </div>
             <p className="text-sm text-annotation max-w-sm leading-relaxed">

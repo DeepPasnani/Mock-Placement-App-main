@@ -47,9 +47,9 @@ function buildResultsPdf({ test, submissions, classBreakdown }, res) {
   // ── Class-wise breakdown ────────────────────────────────
   if (classBreakdown?.length > 1) {
     sectionTitle(doc, 'Class-wise Breakdown');
-    tableHeader(doc, ['Batch', 'Submitted', 'Average', 'Pass Rate'], [200, 100, 100, 100]);
+    tableHeader(doc, ['Class', 'Submitted', 'Average', 'Pass Rate'], [200, 100, 100, 100]);
     classBreakdown.forEach((c, i) => {
-      tableRow(doc, [c.batch, String(c.count), `${c.avg}%`, `${c.passRate}%`], [200, 100, 100, 100], i);
+      tableRow(doc, [c.class, String(c.count), `${c.avg}%`, `${c.passRate}%`], [200, 100, 100, 100], i);
     });
     doc.moveDown(1);
   }
@@ -61,7 +61,7 @@ function buildResultsPdf({ test, submissions, classBreakdown }, res) {
       pct(b.score, b.max_score) - pct(a.score, a.max_score)
   );
   const widths = [30, 130, 90, 80, 60, 60, 60];
-  tableHeader(doc, ['#', 'Name', 'Roll No', 'Batch', 'Score', '%', 'Result'], widths);
+  tableHeader(doc, ['#', 'Name', 'Roll No', 'Class', 'Score', '%', 'Result'], widths);
   ranked.forEach((s, i) => {
     checkPageBreak(doc);
     const p = pct(s.score, s.max_score);
@@ -70,7 +70,7 @@ function buildResultsPdf({ test, submissions, classBreakdown }, res) {
       String(i + 1),
       s.user_name || '—',
       s.roll_number || '—',
-      s.batch_display || '—',
+      s.class_display || '—',
       s.status === 'submitted' ? `${s.score}/${s.max_score}` : '—',
       s.status === 'submitted' ? `${p}%` : '—',
       result,

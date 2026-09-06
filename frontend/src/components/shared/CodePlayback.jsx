@@ -9,10 +9,6 @@ const LANG_MAP = {
   java: 'java',
   cpp: 'cpp',
   c: 'c',
-  go: 'go',
-  rust: 'rust',
-  ruby: 'ruby',
-  kotlin: 'kotlin',
   sql: 'sql',
 };
 

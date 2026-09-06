@@ -194,7 +194,7 @@ async function adaptiveNextDifficulty(userId, testId) {
 }
 
 async function generatePlacementPrediction(userId) {
-  const { rows: [student] } = await query('SELECT id, name, email, branch, batch, year_of_study FROM users WHERE id=$1 AND role=\'student\'', [userId]);
+  const { rows: [student] } = await query('SELECT id, name, email, branch, class_name, year_of_study FROM users WHERE id=$1 AND role=\'student\'', [userId]);
   if (!student) throw new Error('Student not found');
 
   const { rows: subs } = await query(`
@@ -243,11 +243,11 @@ async function generatePlacementPrediction(userId) {
   };
 }
 
-async function generateBatchPredictions(batchId) {
+async function generateClassPredictions(classId) {
   const { rows: students } = await query(`
-    SELECT id FROM users WHERE role='student' AND (batch=$1 OR id IN (
-      SELECT user_id FROM student_batches WHERE batch_id=$1
-    ))`, [batchId]);
+    SELECT id FROM users WHERE role='student' AND (class_name=$1 OR id IN (
+      SELECT user_id FROM student_classes WHERE class_id=$1
+    ))`, [classId]);
 
   const predictions = [];
   for (const s of students) {
@@ -261,7 +261,7 @@ async function generateBatchPredictions(batchId) {
     : 0;
 
   return {
-    batch_id: batchId,
+    class_id: classId,
     total_students: students.length,
     analyzed: predictions.length,
     avg_placement_probability: avgProb,
@@ -271,14 +271,14 @@ async function generateBatchPredictions(batchId) {
 
 async function naturalLanguageQuery(queryText, userId) {
   const systemPrompt = `You are a database analyst for a placement testing platform. The database has these tables:
-users(id, name, email, role, branch, batch, year_of_study, is_active, created_at)
+users(id, name, email, role, branch, class_name, year_of_study, is_active, created_at)
 submissions(id, test_id, user_id, status, score, max_score, submitted_at, time_taken_seconds, tab_switch_count)
 tests(id, title, department, status, duration_minutes)
 sections(id, test_id, name, type, order_index)
 questions(id, section_id, genre, difficulty, text, correct_answer, marks)
 coding_problems(id, section_id, title, difficulty, marks)
-batches(id, name, department, year_of_study)
-student_batches(user_id, batch_id)
+classes(id, name, department, year_of_study)
+student_classes(user_id, class_id)
 
 Generate a safe PostgreSQL query (SELECT only, no INSERT/UPDATE/DELETE) to answer the question.
 Return ONLY valid JSON: { "query": "SQL query here", "explanation": "what this query does in simple terms" }`;
@@ -413,7 +413,7 @@ module.exports = {
   generatePerformanceFeedback,
   adaptiveNextDifficulty,
   generatePlacementPrediction,
-  generateBatchPredictions,
+  generateClassPredictions,
   naturalLanguageQuery,
   analyzeCheating,
 };

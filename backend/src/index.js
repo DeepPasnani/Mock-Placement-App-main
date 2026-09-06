@@ -1,4 +1,18 @@
 require('dotenv').config();
+
+// Sentry must be initialized before the modules it instruments (express,
+// pg, etc.) are required, to get full automatic tracing — hence right
+// after dotenv, ahead of everything else. A no-op with no SENTRY_DSN set:
+// every Sentry.* call below is safe to make unconditionally either way.
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+    tracesSampleRate: 0.1,
+  });
+}
+
 const http = require('http');
 const path = require('path');
 const express = require('express');
@@ -187,6 +201,12 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+// Reports the error to Sentry (no-op if SENTRY_DSN isn't set) and calls
+// next(err), so the existing JSON-response error handler below still runs
+// exactly as before — this only adds reporting, it doesn't change any
+// response the client sees.
+if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
+
 // ── Error handler ──────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error({ err }, 'Unhandled error');
@@ -216,9 +236,11 @@ app.use((err, _req, res, _next) => {
 // ── Global error handlers (prevent crash on unhandled promise rejections) ──
 process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'Unhandled promise rejection');
+  Sentry.captureException(reason);
 });
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception');
+  Sentry.captureException(err);
 });
 
 // ── Create HTTP server with WebSocket support ──────────────────

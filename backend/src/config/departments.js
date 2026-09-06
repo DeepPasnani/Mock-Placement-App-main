@@ -1,5 +1,5 @@
 // Only these departments are eligible to use this placement platform.
-// Every new/existing student account, test, drive and batch is restricted to
+// Every new/existing student account, test, drive and class is restricted to
 // this list.
 const ALLOWED_DEPARTMENTS = [
   'Computer Engineering',

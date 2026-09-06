@@ -81,9 +81,29 @@ async function getVersionHistory(req, res) {
 
 async function generateQuestionVariant(req, res) {
   const { questionId } = req.params;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
 
-  const { rows: [q] } = await query('SELECT * FROM questions WHERE id=$1', [questionId]);
+  const { rows: [q] } = await query(
+    `SELECT q.*, sec.test_id
+     FROM questions q JOIN sections sec ON q.section_id = sec.id
+     WHERE q.id=$1`,
+    [questionId]
+  );
   if (!q) return res.status(404).json({ error: 'Question not found' });
+
+  // Only requiring `authenticate` here would let any student read any
+  // question's text/options by id, including ones outside their assigned
+  // test — no correct_answer is exposed, but the content itself shouldn't
+  // be. Require at least a submission for the owning test (i.e. they've
+  // actually been assigned/started it), same gate runCode uses for coding
+  // problems.
+  if (!isAdmin) {
+    const { rows: subRows } = await query(
+      'SELECT 1 FROM submissions WHERE test_id=$1 AND user_id=$2 LIMIT 1',
+      [q.test_id, req.user.id]
+    );
+    if (!subRows.length) return res.status(403).json({ error: 'Not authorized for this question' });
+  }
 
   const template = q.template;
   if (!template || !template.variables || !template.variables.length) {

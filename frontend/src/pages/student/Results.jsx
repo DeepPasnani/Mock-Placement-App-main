@@ -49,8 +49,9 @@ export default function StudentResults() {
       {/* Results list */}
       <div className="space-y-3">
         {subs.map(sub => {
+          const resultsAvailable = sub.max_score != null;
           const pct =
-            sub.max_score > 0
+            resultsAvailable && sub.max_score > 0
               ? Math.round((sub.score / sub.max_score) * 100)
               : 0;
           const passed = pct >= (sub.test_settings?.passingScore || 40);
@@ -67,17 +68,23 @@ export default function StudentResults() {
               <div className="flex items-center gap-4">
                 {/* Score (left) */}
                 <div className="shrink-0 text-center w-16">
-                  <div
-                    className={`text-2xl font-display font-bold score-digit ${
-                      passed ? 'text-verify' : 'text-alert'
-                    }`}
-                  >
-                    {pct}
-                    <span className="text-xs opacity-60">%</span>
-                  </div>
-                  <div className="text-2xs text-annotation/60 font-mono">
-                    {sub.score}/{sub.max_score}
-                  </div>
+                  {resultsAvailable ? (
+                    <>
+                      <div
+                        className={`text-2xl font-display font-bold score-digit ${
+                          passed ? 'text-verify' : 'text-alert'
+                        }`}
+                      >
+                        {pct}
+                        <span className="text-xs opacity-60">%</span>
+                      </div>
+                      <div className="text-2xs text-annotation/60 font-mono">
+                        {sub.score}/{sub.max_score}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-2xs text-annotation/60 font-medium">Pending</div>
+                  )}
                 </div>
 
                 {/* Details (middle) */}
@@ -86,9 +93,13 @@ export default function StudentResults() {
                     <h3 className="font-display font-semibold text-sm text-ink truncate">
                       {sub.test_title}
                     </h3>
-                    <Badge color={passed ? 'verify' : 'alert'}>
-                      {passed ? 'Passed' : 'Failed'}
-                    </Badge>
+                    {resultsAvailable ? (
+                      <Badge color={passed ? 'verify' : 'alert'}>
+                        {passed ? 'Passed' : 'Failed'}
+                      </Badge>
+                    ) : (
+                      <Badge color="accent">Results Pending</Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-annotation/60">
                     <span>
@@ -102,8 +113,8 @@ export default function StudentResults() {
                   </div>
                   <div className="mt-2">
                     <ProgressBar
-                      value={sub.score}
-                      max={sub.max_score}
+                      value={resultsAvailable ? sub.score : 0}
+                      max={resultsAvailable ? sub.max_score : 1}
                       color={passed ? 'bg-verify' : 'bg-alert'}
                     />
                   </div>

@@ -13,6 +13,7 @@ const AdminResults = lazy(() => import('./pages/admin/Results'));
 const AdminUsers = lazy(() => import('./pages/admin/Users'));
 const AdminAdmins = lazy(() => import('./pages/admin/Admins'));
 const AdminQuestionBank = lazy(() => import('./pages/admin/QuestionBank'));
+const AdminResources = lazy(() => import('./pages/admin/Resources'));
 const AdminDrives = lazy(() => import('./pages/admin/Drives'));
 const StudentAnalytics = lazy(() => import('./pages/admin/StudentAnalytics'));
 const QuestionAnalytics = lazy(() => import('./pages/admin/QuestionAnalytics'));
@@ -35,6 +36,7 @@ const ScheduledReports = lazy(() => import('./pages/admin/analytics/ScheduledRep
 const StudentLayout = lazy(() => import('./pages/student/Layout'));
 const StudentTests = lazy(() => import('./pages/student/Tests'));
 const StudentResults = lazy(() => import('./pages/student/Results'));
+const StudentResources = lazy(() => import('./pages/student/Resources'));
 const TestInterface = lazy(() => import('./pages/student/TestInterface'));
 const ResultDetail = lazy(() => import('./pages/student/ResultDetail'));
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
@@ -62,7 +64,7 @@ function needsProfile(user) {
   if (user.profileComplete === true) return false;
   if (user.profileComplete === false) return true;
   // Persisted sessions from before this flag existed
-  return !(user.roll_number && user.batch && user.year_of_study);
+  return !(user.roll_number && user.class_name && user.year_of_study);
 }
 
 function homeFor(user) {
@@ -89,12 +91,17 @@ function RequireAuth({ children, role }) {
 }
 
 export default function App() {
-  const { user, refreshUser } = useStore();
+  const { user, authReady, refreshUser } = useStore();
 
   useEffect(() => {
-    const token = localStorage.getItem('pp_token');
-    if (token) refreshUser();
+    // Always call this (even with no token) so authReady flips regardless —
+    // see store.js's refreshUser. `user` is intentionally never persisted
+    // across tabs/restarts, so until this resolves we don't yet know
+    // whether the tab is logged in.
+    refreshUser();
   }, []);
+
+  if (!authReady) return <SuspenseFallback />;
 
   return (
     <Suspense fallback={<SuspenseFallback />}>
@@ -131,6 +138,7 @@ export default function App() {
         <Route path="users" element={<ErrorBoundary><AdminUsers /></ErrorBoundary>} />
         <Route path="admins" element={<ErrorBoundary><AdminAdmins /></ErrorBoundary>} />
         <Route path="question-bank" element={<ErrorBoundary><AdminQuestionBank /></ErrorBoundary>} />
+        <Route path="resources" element={<ErrorBoundary><AdminResources /></ErrorBoundary>} />
         <Route path="drives" element={<ErrorBoundary><AdminDrives /></ErrorBoundary>} />
         <Route path="email" element={<ErrorBoundary><SendEmail /></ErrorBoundary>} />
         <Route path="analytics/cohort" element={<ErrorBoundary><CohortAnalytics /></ErrorBoundary>} />
@@ -155,6 +163,7 @@ export default function App() {
         <Route path="tests" element={<ErrorBoundary><StudentTests /></ErrorBoundary>} />
         <Route path="results" element={<ErrorBoundary><StudentResults /></ErrorBoundary>} />
         <Route path="results/:submissionId" element={<ErrorBoundary><ResultDetail /></ErrorBoundary>} />
+        <Route path="resources" element={<ErrorBoundary><StudentResources /></ErrorBoundary>} />
         <Route path="leaderboard" element={<ErrorBoundary><Leaderboard /></ErrorBoundary>} />
         <Route path="profile" element={<ErrorBoundary><Profile /></ErrorBoundary>} />
       </Route>

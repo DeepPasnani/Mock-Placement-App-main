@@ -1,6 +1,6 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../store';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Modal } from '../../components/shared/UI';
 
@@ -15,6 +15,7 @@ const NAV_ICONS = {
   Students: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
   Admins: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z',
   'Question Bank': 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s4.332.477 5.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  Resources: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25',
   'Send Email': 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
   Drives: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
   'Question Analytics': 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
@@ -25,15 +26,47 @@ const NAV_ICONS = {
   'AI NL Query': 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z',
   'Dev Tools': 'M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5',
   Profile: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+  'Cohort Analytics': 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 00-9.288 0M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
+  'Question Metrics': 'M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75',
+  'Time-Sink Analysis': 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+  'Placement Predictions': 'M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941',
+  'Report Builder': 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  'Scheduled Reports': 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
 };
 
 export default function AdminLayout() {
   const { user, logout } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [navQuery, setNavQuery] = useState('');
   const [openGroups, setOpenGroups] = useState(() => new Set(['Overview', 'Engineering', 'Analytics']));
+
+  // ── Scroll position memory ────────────────────────────────
+  // The <Outlet> content unmounts/remounts on every navigation, which
+  // resets the scrollable main pane to the top even when returning to a
+  // page (e.g. Results) the admin had scrolled down on. Remember each
+  // route's scroll offset and restore it instead of always snapping to 0.
+  const mainRef = useRef(null);
+  const scrollPositions = useRef(new Map());
+  const prevPathRef = useRef(location.pathname);
+
+  useLayoutEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const prevPath = prevPathRef.current;
+    if (prevPath !== location.pathname) {
+      scrollPositions.current.set(prevPath, el.scrollTop);
+    }
+    el.scrollTop = scrollPositions.current.get(location.pathname) || 0;
+    prevPathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  const handleMainScroll = () => {
+    const el = mainRef.current;
+    if (el) scrollPositions.current.set(location.pathname, el.scrollTop);
+  };
 
   const toggleGroup = (id) => {
     setOpenGroups(prev => {
@@ -60,6 +93,7 @@ export default function AdminLayout() {
         { to: '/admin/drives', label: 'Drives' },
         { to: '/admin/tests', label: 'Tests' },
         { to: '/admin/question-bank', label: 'Question Bank' },
+        { to: '/admin/resources', label: 'Resources' },
         { to: '/admin/results', label: 'Results' },
         { to: '/admin/security/alerts', label: 'Security' },
         { to: '/admin/email', label: 'Send Email' },
@@ -74,7 +108,7 @@ export default function AdminLayout() {
     ];
     // keep existing analytics items in place and sort the users group
     const governance = [];
-    if (user?.role === 'super_admin') {
+    if (user?.role === 'super_admin' || user?.role === 'admin') {
       governance.push({ to: '/admin/admins', label: 'Admins' });
     }
     groups.find(g => g.id === 'Admin').items = [
@@ -92,7 +126,16 @@ export default function AdminLayout() {
     navigate('/login');
   };
 
-  const SidebarContent = () => {
+  // A plain function called as `{renderSidebar()}` below, NOT a JSX
+  // component (`<RenderSidebar />`). If this were re-declared as a
+  // component on every render (as it used to be, under the name
+  // SidebarContent), React would see a new component type each time and
+  // unmount/remount its subtree on every navigation — resetting the nav
+  // list's scroll position to the top even though the admin never touched
+  // it. Calling it as a function keeps its JSX inline in AdminLayout's own
+  // render output, so the underlying <nav> DOM node (and its scrollTop)
+  // survives navigation instead of being torn down.
+  const renderSidebar = () => {
     const q = navQuery.trim().toLowerCase();
     const filteredGroups = NAV_GROUPS
       .map(g => ({ ...g, items: g.items.filter(it => !q || it.label.toLowerCase().includes(q)) }))
@@ -102,16 +145,9 @@ export default function AdminLayout() {
     <div className="flex flex-col h-full">
       {/* Brand */}
       <div className="px-4 py-4 border-b border-rim">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-panel" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-            </svg>
-          </div>
-          <div>
-            <div className="font-display font-bold text-sm text-ink">CampusTrack</div>
-            <div className="text-2xs text-annotation/60 font-mono">Admin Console</div>
-          </div>
+        <div className="flex flex-col items-center text-center">
+          <div className="font-display font-bold text-sm text-ink">CampusTrack</div>
+          <div className="text-2xs text-annotation/60 font-mono">Admin Console</div>
         </div>
       </div>
 
@@ -275,7 +311,7 @@ export default function AdminLayout() {
     <div className="flex h-screen bg-deck overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-52 bg-panel border-r border-rim shrink-0 overflow-y-auto" role="navigation" aria-label="Admin navigation">
-        <SidebarContent />
+        {renderSidebar()}
       </aside>
 
       {/* Mobile sidebar overlay */}
@@ -293,16 +329,16 @@ export default function AdminLayout() {
                 </svg>
               </button>
             </div>
-            <SidebarContent />
+            {renderSidebar()}
           </div>
           <div className="flex-1 bg-black/50" onClick={() => setMobileOpen(false)} />
         </div>
       )}
 
       {/* Main content */}
-      <main id="main-content" className="flex-1 overflow-y-auto">
+      <main id="main-content" ref={mainRef} onScroll={handleMainScroll} className="flex-1 overflow-y-auto">
         {/* Mobile header */}
-        <div className="lg:hidden sticky top-0 z-40 bg-panel border-b border-rim px-4 py-2.5 flex items-center gap-3">
+        <div className="lg:hidden sticky top-0 z-40 bg-panel border-b border-rim px-4 py-2.5 flex items-center gap-3 relative">
           <button
             onClick={() => setMobileOpen(true)}
             className="btn-ghost-icon"
@@ -312,7 +348,7 @@ export default function AdminLayout() {
               <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="font-display font-bold text-sm text-ink">CampusTrack</span>
+          <span className="absolute left-1/2 -translate-x-1/2 font-display font-bold text-sm text-ink">CampusTrack</span>
           <button
             onClick={handleLogout}
             className="ml-auto flex items-center justify-center w-8 h-8 rounded-md text-annotation hover:bg-sunken hover:text-ink transition-colors"

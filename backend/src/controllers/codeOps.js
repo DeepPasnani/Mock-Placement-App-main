@@ -72,10 +72,6 @@ async function formatCode(req, res) {
       java: '.java',
       cpp: '.cpp',
       c: '.c',
-      go: '.go',
-      rust: '.rs',
-      ruby: '.rb',
-      kotlin: '.kt',
     };
 
     const ext = extMap[language];
@@ -92,10 +88,6 @@ async function formatCode(req, res) {
       cpp: `clang-format "${filePath}" 2>/dev/null || cat "${filePath}"`,
       c: `clang-format "${filePath}" 2>/dev/null || cat "${filePath}"`,
       python: `python3 -m black --quiet "${filePath}" 2>/dev/null && cat "${filePath}" || python -m black --quiet "${filePath}" 2>/dev/null && cat "${filePath}"`,
-      go: `gofmt "${filePath}" 2>/dev/null || cat "${filePath}"`,
-      rust: `rustfmt "${filePath}" 2>/dev/null || cat "${filePath}"`,
-      ruby: `rubocop -a "${filePath}" 2>/dev/null && cat "${filePath}" || cat "${filePath}"`,
-      kotlin: `ktlint --format "${filePath}" 2>/dev/null && cat "${filePath}" || cat "${filePath}"`,
       java: `clang-format "${filePath}" 2>/dev/null || cat "${filePath}"`,
     };
 
@@ -127,6 +119,15 @@ async function saveCodeSnapshot(req, res) {
 
   if (!code || !language) return res.status(400).json({ error: 'Code and language required' });
 
+  if (submissionId) {
+    const { rows: [sub] } = await query('SELECT user_id FROM submissions WHERE id=$1', [submissionId]);
+    if (!sub) return res.status(404).json({ error: 'Submission not found' });
+    // Without this, any student could attach a fabricated snapshot to
+    // someone else's submission_id and have it show up in *their* code
+    // playback — the same history admins may review for plagiarism.
+    if (sub.user_id !== userId) return res.status(403).json({ error: 'Access denied' });
+  }
+
   const { rows } = await query(
     `INSERT INTO code_snapshots (submission_id, problem_id, user_id, code, language, snapshot_type, file_path)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
@@ -154,7 +155,7 @@ async function getPlayback(req, res) {
   );
 
   if (!sub) return res.status(404).json({ error: 'Submission not found' });
-  if (req.user.role !== 'admin' && sub.user_id !== userId) {
+  if (req.user.role !== 'admin' && req.user.role !== 'super_admin' && sub.user_id !== userId) {
     return res.status(403).json({ error: 'Access denied' });
   }
 
@@ -191,7 +192,7 @@ async function getQualityReport(req, res) {
     'SELECT * FROM submissions WHERE id = $1', [id]
   );
   if (!sub) return res.status(404).json({ error: 'Submission not found' });
-  if (req.user.role !== 'admin' && sub.user_id !== userId) {
+  if (req.user.role !== 'admin' && req.user.role !== 'super_admin' && sub.user_id !== userId) {
     return res.status(403).json({ error: 'Access denied' });
   }
 
@@ -290,9 +291,12 @@ async function deleteSavedCustomTest(req, res) {
 // GET /api/coding-problems/:id/workspace
 async function getWorkspace(req, res) {
   const { id } = req.params;
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
 
   const { rows } = await query(
-    'SELECT id, title, description, input_format, output_format, constraints, sample_input, sample_output, starter_code, file_structure, test_cases, time_limit_seconds, memory_limit_mb FROM coding_problems WHERE id = $1',
+    `SELECT id, title, description, input_format, output_format, constraints, sample_input, sample_output, starter_code, file_structure,
+     ${isAdmin ? 'test_cases' : "(SELECT jsonb_agg(tc) FROM jsonb_array_elements(test_cases) tc WHERE NOT (tc->>'isHidden')::boolean) as test_cases"},
+     time_limit_seconds, memory_limit_mb FROM coding_problems WHERE id = $1`,
     [id]
   );
 

@@ -31,7 +31,7 @@ export default function ReviewPanel({ form, totalQ, totalM, handleSave, saveMut,
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink">
           <span><span className="text-annotation/60">Departments:</span> {form.departments?.includes('all') ? 'All departments' : (form.departments?.length ? form.departments.join(', ') : 'All departments')}</span>
           <span><span className="text-annotation/60">Years:</span> {form.years?.includes('all') || !form.years?.length ? 'All years' : 'Year ' + [...form.years].sort().join(', Year ')}</span>
-          <span><span className="text-annotation/60">Batches:</span> {form.batches?.includes('all') || !form.batches?.length ? 'All batches' : form.batches.join(', ')}</span>
+          <span><span className="text-annotation/60">Classes:</span> {form.classes?.includes('all') || !form.classes?.length ? 'All classes' : form.classes.join(', ')}</span>
         </div>
       </div>
 

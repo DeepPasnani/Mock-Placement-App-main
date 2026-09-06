@@ -20,9 +20,10 @@ function apiOrigin() {
   return '';
 }
 
-// Attach JWT on every request
+// Attach JWT on every request. Kept in sessionStorage (not localStorage) so
+// a logged-in identity never survives past the browser tab — see store.js.
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('pp_token');
+  const token = sessionStorage.getItem('pp_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -54,17 +55,25 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     const msg = humanizeError(err.response?.data?.error);
-    if (err.response?.status === 401) {
-      localStorage.removeItem('pp_token');
+    // A 401 with no Authorization header on the request (login, register,
+    // Google sign-in, forgot/reset-password, 2FA validate — all called
+    // while logged out) just means "wrong credentials", not "your session
+    // expired". Only an authenticated request getting rejected should wipe
+    // the token and hard-redirect; otherwise this fired on every failed
+    // login attempt and reloaded the page out from under whatever the user
+    // had typed. Let the caller's own .catch() show the real error instead.
+    const wasAuthenticated = !!err.config?.headers?.Authorization;
+    if (err.response?.status === 401 && wasAuthenticated) {
+      sessionStorage.removeItem('pp_token');
       window.location.href = '/login';
-    } else if (err.response?.status !== 400) {
+    } else if (err.response?.status !== 400 && err.response?.status !== 401) {
       toast.error(msg);
     }
     return Promise.reject(err);
   }
 );
 
-// ── Class metadata (years / batches / departments) ─────────────
+// ── Class metadata (years / classes / departments) ─────────────
 export const metaAPI = {
   options: () => api.get('/meta/options').then(r => r.data),
 };
@@ -100,10 +109,18 @@ export const submissionsAPI = {
   runCode:    (data)   => api.post('/submissions/run-code', data).then(r => r.data),
   getMy:      ()       => api.get('/submissions/my').then(r => r.data),
   getForTest: (testId) => api.get(`/submissions/test/${testId}`).then(r => r.data),
+  publishResults:   (testId) => api.put(`/submissions/test/${testId}/publish-results`).then(r => r.data),
+  unpublishResults: (testId) => api.put(`/submissions/test/${testId}/unpublish-results`).then(r => r.data),
   exportPdf:  (testId) => api.get(`/submissions/test/${testId}/export-pdf`, { responseType: 'blob' }).then(r => r.data),
   exportCsv:  (testId, params) => api.get(`/submissions/test/${testId}/export-csv`, { params, responseType: 'blob' }).then(r => r.data instanceof Blob ? r.data : new Blob([r.data], { type: 'text/csv' })),
   get:        (id)     => api.get(`/submissions/${id}`).then(r => r.data),
   delete:     (id)     => api.delete(`/submissions/${id}`).then(r => r.data),
+  resume:     (id)     => api.post(`/submissions/resume/${id}`).then(r => r.data),
+  forceStop:  (id)     => api.post(`/submissions/${id}/force-stop`).then(r => r.data),
+  updateMarks: (id, data) => api.patch(`/submissions/${id}/marks`, data).then(r => r.data),
+  adjustAllMarks: (testId, data) => api.patch(`/submissions/test/${testId}/adjust-marks`, data).then(r => r.data),
+  bulkMarksCsv:  (data) => api.post('/submissions/bulk-marks/csv', data).then(r => r.data),
+  bulkMarksJson: (data) => api.post('/submissions/bulk-marks/json', data).then(r => r.data),
 };
 
 // ── Users ─────────────────────────────────────────────────────
@@ -112,7 +129,7 @@ export const usersAPI = {
   stats:       ()       => api.get('/users/stats').then(r => r.data),
   createAdmin: (data)   => api.post('/users/admin', data).then(r => r.data),
   bulkImport:  (data)   => api.post('/users/bulk-import', data).then(r => r.data),
-  bulkUpdateBatch: (data) => api.post('/users/bulk-update-batch', data).then(r => r.data),
+  bulkUpdateClass: (data) => api.post('/users/bulk-update-class', data).then(r => r.data),
   update:      (id, data) => api.patch(`/users/${id}`, data).then(r => r.data),
   delete:      (id)     => api.delete(`/users/${id}`).then(r => r.data),
   listAdmins:  ()       => api.get('/admins').then(r => r.data),
@@ -121,14 +138,14 @@ export const usersAPI = {
   getAnalytics: (id)    => api.get(`/users/${id}/analytics`).then(r => r.data),      // NEW
 };
 
-// ── Batches ───────────────────────────────────────────────────
-export const batchesAPI = {
-  list:       ()       => api.get('/batches').then(r => r.data),
-  create:     (data)   => api.post('/batches', data).then(r => r.data),
-  delete:     (id)     => api.delete(`/batches/${id}`).then(r => r.data),
-  assign:     (data)   => api.post('/batches/assign', data).then(r => r.data),
-  listForTest: (id)    => api.get(`/tests/${id}/batches`).then(r => r.data),
-  mapToTest:  (id, data) => api.post(`/tests/${id}/batches`, data).then(r => r.data),
+// ── Classes ───────────────────────────────────────────────────
+export const classesAPI = {
+  list:       ()       => api.get('/classes').then(r => r.data),
+  create:     (data)   => api.post('/classes', data).then(r => r.data),
+  delete:     (id)     => api.delete(`/classes/${id}`).then(r => r.data),
+  assign:     (data)   => api.post('/classes/assign', data).then(r => r.data),
+  listForTest: (id)    => api.get(`/tests/${id}/classes`).then(r => r.data),
+  mapToTest:  (id, data) => api.post(`/tests/${id}/classes`, data).then(r => r.data),
 };
 
 // ── Question Bank ─────────────────────────────────────────────
@@ -138,8 +155,12 @@ export const questionBankAPI = {
   import:  (data)   => api.post('/question-bank/import', data).then(r => r.data),
   importCsv: (data) => api.post('/question-bank/import-csv', data).then(r => r.data),
   importJson: (data) => api.post('/question-bank/import-json', data).then(r => r.data),
+  importImages: (formData) => api.post('/question-bank/import-images', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data),
   importFromTest: (testId, data) => api.post(`/question-bank/from-test/${testId}`, data).then(r => r.data),
   delete:  (id)     => api.delete(`/question-bank/${id}`).then(r => r.data),
+  bulkDelete: (ids) => api.post('/question-bank/bulk-delete', { ids }).then(r => r.data),
 };
 
 // ── Upload ────────────────────────────────────────────────────
@@ -156,6 +177,28 @@ export const uploadAPI = {
   deleteImage: (idOrFilename) => api.delete(`/upload/image/${encodeURIComponent(idOrFilename)}`).then(r => r.data),
 };
 
+// ── Resources (study material: Aptitude/Coding/GD/PI) ──────────
+export const resourcesAPI = {
+  list: (category) => api.get('/resources', { params: category ? { category } : undefined }).then(r => r.data),
+  create: ({ title, description, category, departments, years, classes, file }) => {
+    const fd = new FormData();
+    fd.append('title', title);
+    if (description) fd.append('description', description);
+    fd.append('category', category);
+    fd.append('departments', JSON.stringify(departments || []));
+    fd.append('years', JSON.stringify(years || []));
+    fd.append('classes', JSON.stringify(classes || []));
+    fd.append('file', file);
+    return api.post('/resources', fd).then(r => r.data);
+  },
+  update: (id, data) => api.patch(`/resources/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/resources/${id}`).then(r => r.data),
+  // responseType 'blob' so this works for both an in-app <iframe> preview
+  // (URL.createObjectURL) and a client-side "Download" save, the same
+  // pattern already used for CSV/PDF exports elsewhere in this file.
+  getFileBlob: (id) => api.get(`/resources/${id}/file`, { responseType: 'blob' }).then(r => r.data),
+};
+
 // ── Email ────────────────────────────────────────────────────
 // ── Drives ────────────────────────────────────────────────────
 export const drivesAPI = {
@@ -166,8 +209,8 @@ export const drivesAPI = {
   delete:     (id)    => api.delete(`/drives/${id}`).then(r => r.data),
   addTest:    (id, data) => api.post(`/drives/${id}/tests`, data).then(r => r.data),
   removeTest: (id, testId) => api.delete(`/drives/${id}/tests/${testId}`).then(r => r.data),
-  addBatch:   (id, data) => api.post(`/drives/${id}/batches`, data).then(r => r.data),
-  removeBatch: (id, batchId) => api.delete(`/drives/${id}/batches/${batchId}`).then(r => r.data),
+  addClass:   (id, data) => api.post(`/drives/${id}/classes`, data).then(r => r.data),
+  removeClass: (id, classId) => api.delete(`/drives/${id}/classes/${classId}`).then(r => r.data),
   stats:      (id)    => api.get(`/drives/${id}/stats`).then(r => r.data),
 };
 
@@ -204,6 +247,12 @@ export const securityAPI = {
   getSessionDetails:   (submissionId) => api.get(`/admin/security/sessions/${submissionId}`).then(r => r.data),
 };
 
+// ── Plagiarism ─────────────────────────────────────────────────
+export const plagiarismAPI = {
+  bulkAction: (testId, pairs, action) =>
+    api.post(`/submissions/plagiarism-check/${testId}/bulk-action`, { pairs, action }).then(r => r.data),
+};
+
 // ── Submissions extended ──────────────────────────────────────
 export const submissionsAPIExtended = {
   fingerprint:          (data) => api.post('/submissions/fingerprint', data).then(r => r.data),
@@ -220,7 +269,7 @@ export const analyticsAPI = {
   studentGrowth:      (userId) => api.get(`/analytics/student-growth/${userId}`).then(r => r.data),
   questionMetrics:    (testId) => api.get(`/analytics/question-metrics/${testId}`).then(r => r.data),
   timeSink:           (testId) => api.get(`/analytics/time-sink/${testId}`).then(r => r.data),
-  placementBatch:     (params) => api.get('/analytics/placement-probability', { params }).then(r => r.data),
+  placementByClass:     (params) => api.get('/analytics/placement-probability', { params }).then(r => r.data),
   placementStudent:   (userId) => api.get(`/analytics/placement-probability/${userId}`).then(r => r.data),
   reportBuilder:      (data)   => api.post('/analytics/report-builder', data).then(r => r.data),
   scheduledReports:   {

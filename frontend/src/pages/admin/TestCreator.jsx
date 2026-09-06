@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { testsAPI } from '../../services/api';
@@ -29,7 +29,7 @@ const DEFAULT_TEST = {
   department: '',
   departments: [],
   years: [],
-  batches: [],
+  classes: [],
   settings: {
     shuffleQuestions: true,
     shuffleOptions: true,
@@ -60,6 +60,7 @@ function normalizeQuestion(q, sectionType) {
       optionImages: q.optionImages ?? q.option_images ?? ['', '', '', ''],
       correctAnswer: q.correctAnswer ?? q.correct_answer ?? 0,
       questionSet: q.questionSet ?? q.question_set ?? 'A',
+      bankQuestionId: q.bankQuestionId ?? q.bank_question_id ?? null,
     };
   }
   return {
@@ -79,6 +80,7 @@ function normalizeQuestion(q, sectionType) {
     },
     timeLimit: q.timeLimit ?? q.time_limit_seconds ?? 2,
     memoryLimit: q.memoryLimit ?? q.memory_limit_mb ?? 256,
+    bankQuestionId: q.bankQuestionId ?? q.bank_question_id ?? null,
   };
 }
 
@@ -95,6 +97,8 @@ const DEFAULT_APT_Q = () => ({
   difficulty: 'medium',
   genre: 'general',
   questionSet: 'A',
+  saveToBank: false,
+  bankQuestionId: null,
 });
 
 const DEFAULT_CODE_Q = () => ({
@@ -118,13 +122,6 @@ const DEFAULT_CODE_Q = () => ({
       '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your solution\n    return 0;\n}\n',
     c:
       '#include <stdio.h>\n\nint main() {\n    // Write your solution\n    return 0;\n}\n',
-    go:
-      'package main\n\nimport "fmt"\n\nfunc main() {\n    // Write your solution\n    _ = fmt.Sprint\n}\n',
-    rust:
-      'fn main() {\n    // Write your solution\n}\n',
-    ruby: '# Write your solution here\n',
-    kotlin:
-      'fun main() {\n    // Write your solution\n}\n',
     sql: '-- Write your SQL query here\nSELECT *\nFROM table_name;\n',
   },
   timeLimit: 2,
@@ -132,6 +129,8 @@ const DEFAULT_CODE_Q = () => ({
   marks: 10,
   difficulty: 'medium',
   tags: '',
+  saveToBank: false,
+  bankQuestionId: null,
 });
 
 // ── Main Test Creator ───────────────────────────────────────
@@ -139,13 +138,29 @@ export default function TestCreator() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { years: targetYears, batches: targetBatches } = useClassOptions();
+  const { years: targetYears, classes: targetClasses } = useClassOptions();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(DEFAULT_TEST);
   const [activeSection, setActiveSection] = useState(0);
   const [bankOpen, setBankOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const isEdit = !!id;
+
+  // ── Question list filter/sort (view only — never reorders the
+  // underlying array, so the exam sequence a student sees is untouched
+  // unless the admin explicitly drags/removes/adds questions) ────────
+  const DEFAULT_Q_FILTER = { topic: 'all', type: 'all', difficulty: 'all', minMarks: '', maxMarks: '' };
+  const [qFilter, setQFilter] = useState(DEFAULT_Q_FILTER);
+  const [qSort, setQSort] = useState({ field: 'none', dir: 'asc' });
+
+  // Filters/sort are scoped to whatever section is being viewed — reset
+  // them on section switch so a filter that matched nothing in the new
+  // section doesn't silently leave the list looking empty.
+  useEffect(() => {
+    setQFilter(DEFAULT_Q_FILTER);
+    setQSort({ field: 'none', dir: 'asc' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
 
   // ── Keyboard shortcut: Ctrl+S → save draft ───────────────
   useEffect(() => {
@@ -182,7 +197,7 @@ export default function TestCreator() {
         ? editData.departments
         : (editData.department ? [editData.department] : []),
       years: Array.isArray(editData.years) ? editData.years.map(String) : [],
-      batches: Array.isArray(editData.batches) ? editData.batches : [],
+      classes: Array.isArray(editData.classes) ? editData.classes : [],
       settings: editData.settings || DEFAULT_TEST.settings,
       sections: (editData.sections || []).map(s => ({
         ...s,
@@ -196,8 +211,12 @@ export default function TestCreator() {
 
   const saveMut = useMutation({
     mutationFn: (payload) => (isEdit ? testsAPI.update(id, payload) : testsAPI.create(payload)),
-    onSuccess: () => {
-      toast.success(isEdit ? 'Test updated!' : 'Test created!');
+    onSuccess: (data) => {
+      if (data?.sectionsSkipped) {
+        toast.error(data.message, { duration: 8000 });
+      } else {
+        toast.success(isEdit ? 'Test updated!' : 'Test created!');
+      }
       qc.invalidateQueries({ queryKey: ['tests'] });
       navigate('/admin/tests');
     },
@@ -254,31 +273,38 @@ export default function TestCreator() {
     });
   };
 
-  const addQuestionFromBank = (si, bankQ) => {
+  const cloneBankQuestion = (sectionType, bankQ) =>
+    sectionType === 'aptitude'
+      ? {
+          ...DEFAULT_APT_Q(),
+          text: bankQ.data.text || '',
+          options: bankQ.data.options || ['', '', '', ''],
+          correctAnswer: bankQ.data.correctAnswer ?? 0,
+          genre: bankQ.genre || 'general',
+          difficulty: bankQ.difficulty || 'medium',
+          marks: bankQ.marks || 2,
+          bankQuestionId: bankQ.id,
+        }
+      : {
+          ...DEFAULT_CODE_Q(),
+          title: bankQ.data.title || '',
+          description: bankQ.data.description || '',
+          testCases: bankQ.data.testCases?.length ? bankQ.data.testCases : [{ input: '', output: '', isHidden: false }],
+          difficulty: bankQ.difficulty || 'medium',
+          marks: bankQ.marks || 10,
+          bankQuestionId: bankQ.id,
+        };
+
+  // Accepts one or more bank questions (BankPickerModal's checkbox picker
+  // lets the admin select multiple at once) and appends all of them.
+  const addQuestionsFromBank = (si, bankQs) => {
     setForm(p => {
       const s = [...p.sections];
-      const cloned = s[si].type === 'aptitude'
-        ? {
-            ...DEFAULT_APT_Q(),
-            text: bankQ.data.text || '',
-            options: bankQ.data.options || ['', '', '', ''],
-            correctAnswer: bankQ.data.correctAnswer ?? 0,
-            genre: bankQ.genre || 'general',
-            difficulty: bankQ.difficulty || 'medium',
-            marks: bankQ.marks || 2,
-          }
-        : {
-            ...DEFAULT_CODE_Q(),
-            title: bankQ.data.title || '',
-            description: bankQ.data.description || '',
-            testCases: bankQ.data.testCases?.length ? bankQ.data.testCases : [{ input: '', output: '', isHidden: false }],
-            difficulty: bankQ.difficulty || 'medium',
-            marks: bankQ.marks || 10,
-          };
-      s[si].questions = [...s[si].questions, cloned];
+      const cloned = bankQs.map(bankQ => cloneBankQuestion(s[si].type, bankQ));
+      s[si].questions = [...s[si].questions, ...cloned];
       return { ...p, sections: s };
     });
-    toast.success('Added from bank');
+    toast.success(bankQs.length === 1 ? 'Added from bank' : `Added ${bankQs.length} questions from bank`);
   };
 
   const updateQuestion = (si, qi, q) => {
@@ -331,7 +357,7 @@ export default function TestCreator() {
       department: depts.includes('all') ? 'all' : depts[0],
       departments: depts,
       years: form.years || [],
-      batches: form.batches || [],
+      classes: form.classes || [],
       settings: form.settings,
       sections: form.sections.map(s => ({
         id: s.id,
@@ -342,6 +368,77 @@ export default function TestCreator() {
     };
     saveMut.mutate(payload);
   };
+
+  // "Topic" means genre for aptitude questions and the free-text tags
+  // field for coding problems — both are treated the same way below so
+  // one filter bar works for either section type.
+  const sec = form.sections[activeSection];
+  const topicTokens = (q) =>
+    sec?.type === 'aptitude'
+      ? [q.genre || 'general']
+      : String(q.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+  const topicOf = (q) => (sec?.type === 'aptitude' ? (q.genre || 'general') : (q.tags || ''));
+
+  // These three hooks — and everything below them, down to `visibleQuestions`
+  // — must run on every render, loading or not: React tracks hooks by call
+  // order, and the `if (loadingTest) return` below used to sit ABOVE them,
+  // so the very first render (loadingTest=true) skipped all three while a
+  // later render (loadingTest=false) called them — a different hook count
+  // between renders, which is what threw "Rendered more hooks than during
+  // the previous render" (React error #310) every time this page opened in
+  // edit mode. `sec`/`form.sections` are just empty during that initial
+  // loading render, which each memo below already handles via its `!sec`
+  // guard, so moving them earlier changes nothing about what they compute.
+  const topicOptions = useMemo(() => {
+    if (!sec) return [];
+    const set = new Set();
+    sec.questions.forEach(q => topicTokens(q).forEach(t => set.add(t)));
+    return [...set].sort((a, b) => a.localeCompare(b));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sec]);
+
+  const typeOptions = useMemo(() => {
+    if (!sec || sec.type !== 'aptitude') return [];
+    return [...new Set(sec.questions.map(q => q.type).filter(Boolean))].sort();
+  }, [sec]);
+
+  const isQFiltered = qFilter.topic !== 'all' || qFilter.type !== 'all'
+    || qFilter.difficulty !== 'all' || qFilter.minMarks !== '' || qFilter.maxMarks !== '';
+
+  const visibleQuestions = useMemo(() => {
+    if (!sec) return [];
+    let list = sec.questions.map((q, qi) => ({ q, qi }));
+
+    list = list.filter(({ q }) => {
+      if (qFilter.topic !== 'all' && !topicTokens(q).includes(qFilter.topic)) return false;
+      if (qFilter.type !== 'all' && q.type !== qFilter.type) return false;
+      if (qFilter.difficulty !== 'all' && q.difficulty !== qFilter.difficulty) return false;
+      if (qFilter.minMarks !== '' && (q.marks || 0) < Number(qFilter.minMarks)) return false;
+      if (qFilter.maxMarks !== '' && (q.marks || 0) > Number(qFilter.maxMarks)) return false;
+      return true;
+    });
+
+    if (qSort.field !== 'none') {
+      const dir = qSort.dir === 'asc' ? 1 : -1;
+      const difficultyOrder = { easy: 0, medium: 1, hard: 2 };
+      list = [...list].sort((a, b) => {
+        let av, bv;
+        switch (qSort.field) {
+          case 'marks': av = a.q.marks || 0; bv = b.q.marks || 0; break;
+          case 'difficulty': av = difficultyOrder[a.q.difficulty] ?? 1; bv = difficultyOrder[b.q.difficulty] ?? 1; break;
+          case 'topic': av = topicOf(a.q).toLowerCase(); bv = topicOf(b.q).toLowerCase(); break;
+          case 'type': av = a.q.type || ''; bv = b.q.type || ''; break;
+          default: av = 0; bv = 0;
+        }
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }
+
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sec, qFilter, qSort]);
 
   if (loadingTest)
     return (
@@ -356,7 +453,6 @@ export default function TestCreator() {
     (n, s) => n + s.questions.reduce((m, q) => m + (q.marks || 0), 0),
     0,
   );
-  const sec = form.sections[activeSection];
 
   return (
     <div className="animate-fade-up">
@@ -514,7 +610,7 @@ export default function TestCreator() {
               </div>
             </div>
 
-            {/* Years & Batches targeting */}
+            {/* Years & Classes targeting */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="input-label">Target Years (optional)</label>
@@ -553,39 +649,39 @@ export default function TestCreator() {
                 </p>
               </div>
               <div>
-                <label className="input-label">Target Batches (optional)</label>
+                <label className="input-label">Target Classes (optional)</label>
                 <div className="mt-2 p-4 bg-panel border border-rim rounded-xl">
                   <label className="flex items-center gap-2.5 text-sm font-medium text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
                     <input
                       type="checkbox"
-                      checked={form.batches?.includes('all')}
-                      onChange={e => upd('batches', e.target.checked ? ['all'] : [])}
+                      checked={form.classes?.includes('all')}
+                      onChange={e => upd('classes', e.target.checked ? ['all'] : [])}
                       className="accent-accent w-4 h-4 rounded cursor-pointer"
                     />
-                    <span className="font-bold text-accent">All Batches</span>
+                    <span className="font-bold text-accent">All Classes</span>
                   </label>
-                  {targetBatches.map(b => (
-                    <label key={b} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
+                  {targetClasses.map(c => (
+                    <label key={c} className="flex items-center gap-2.5 text-sm text-ink cursor-pointer hover:bg-rim/30 p-1.5 rounded-lg transition-colors">
                       <input
                         type="checkbox"
-                        checked={form.batches?.includes(b)}
+                        checked={form.classes?.includes(c)}
                         onChange={e => {
-                          let bl = form.batches?.includes('all') ? [] : (form.batches || []);
+                          let cl = form.classes?.includes('all') ? [] : (form.classes || []);
                           if (e.target.checked) {
-                            bl = [...bl, b];
+                            cl = [...cl, c];
                           } else {
-                            bl = bl.filter(v => v !== b);
+                            cl = cl.filter(v => v !== c);
                           }
-                          upd('batches', bl);
+                          upd('classes', cl);
                         }}
                         className="accent-accent w-4 h-4 rounded cursor-pointer"
                       />
-                      <span>{b}</span>
+                      <span>{c}</span>
                     </label>
                   ))}
                 </div>
                 <p className="text-2xs text-annotation/60 mt-1.5">
-                  Leave all unchecked (or select "All Batches") to include students from every batch.
+                  Leave all unchecked (or select "All Classes") to include students from every class.
                 </p>
               </div>
             </div>
@@ -745,7 +841,7 @@ export default function TestCreator() {
                   Allowed Coding Languages
                 </p>
                 <div className="flex gap-4 flex-wrap">
-                  {['python', 'javascript', 'java', 'cpp', 'c', 'go', 'rust', 'ruby', 'kotlin', 'sql'].map(lang => (
+                  {['python', 'javascript', 'java', 'cpp', 'c', 'sql'].map(lang => (
                     <label
                       key={lang}
                       className="flex items-center gap-1.5 text-sm text-ink cursor-pointer"
@@ -855,7 +951,118 @@ export default function TestCreator() {
                   </span>
                 </div>
 
-                {sec.questions.map((q, qi) => (
+                {sec.questions.length > 0 && (
+                  <div className="flex flex-wrap items-end gap-2 mb-4 p-2.5 bg-sunken rounded-lg">
+                    <div>
+                      <label className="text-2xs text-annotation/60 block mb-1">Topic</label>
+                      <Select
+                        value={qFilter.topic}
+                        onChange={e => setQFilter(f => ({ ...f, topic: e.target.value }))}
+                        className="w-36 text-xs py-1"
+                      >
+                        <option value="all">All topics</option>
+                        {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                      </Select>
+                    </div>
+                    {sec.type === 'aptitude' && (
+                      <div>
+                        <label className="text-2xs text-annotation/60 block mb-1">Type</label>
+                        <Select
+                          value={qFilter.type}
+                          onChange={e => setQFilter(f => ({ ...f, type: e.target.value }))}
+                          className="w-32 text-xs py-1"
+                        >
+                          <option value="all">All types</option>
+                          {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                        </Select>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-2xs text-annotation/60 block mb-1">Difficulty</label>
+                      <Select
+                        value={qFilter.difficulty}
+                        onChange={e => setQFilter(f => ({ ...f, difficulty: e.target.value }))}
+                        className="w-28 text-xs py-1"
+                      >
+                        <option value="all">All</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-2xs text-annotation/60 block mb-1">Marks</label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          value={qFilter.minMarks}
+                          onChange={e => setQFilter(f => ({ ...f, minMarks: e.target.value }))}
+                          placeholder="Min"
+                          className="w-16 text-xs py-1"
+                        />
+                        <span className="text-annotation/40">–</span>
+                        <Input
+                          type="number"
+                          value={qFilter.maxMarks}
+                          onChange={e => setQFilter(f => ({ ...f, maxMarks: e.target.value }))}
+                          placeholder="Max"
+                          className="w-16 text-xs py-1"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-2xs text-annotation/60 block mb-1">Sort by</label>
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={qSort.field}
+                          onChange={e => setQSort(s => ({ ...s, field: e.target.value }))}
+                          className="w-28 text-xs py-1"
+                        >
+                          <option value="none">Added order</option>
+                          <option value="marks">Marks</option>
+                          <option value="difficulty">Difficulty</option>
+                          <option value="topic">Topic</option>
+                          {sec.type === 'aptitude' && <option value="type">Type</option>}
+                        </Select>
+                        <button
+                          type="button"
+                          disabled={qSort.field === 'none'}
+                          onClick={() => setQSort(s => ({ ...s, dir: s.dir === 'asc' ? 'desc' : 'asc' }))}
+                          className="btn-ghost-icon disabled:opacity-30 disabled:cursor-not-allowed"
+                          title={qSort.dir === 'asc' ? 'Ascending' : 'Descending'}
+                          aria-label="Toggle sort direction"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            {qSort.dir === 'asc'
+                              ? <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h13M3 8h9M3 12h5m6 8V4m0 16l-4-4m4 4l4-4" />
+                              : <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h5m-5 4h9m-9 4h13M17 4v16m0 0l-4-4m4 4l4-4" />}
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1" />
+                    <span className="text-2xs text-annotation/60 whitespace-nowrap pb-1.5">
+                      Showing {visibleQuestions.length} of {sec.questions.length}
+                    </span>
+                    {isQFiltered && (
+                      <button
+                        type="button"
+                        onClick={() => setQFilter(DEFAULT_Q_FILTER)}
+                        className="text-2xs text-accent hover:underline pb-1.5"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {sec.questions.length > 0 && visibleQuestions.length === 0 && (
+                  <div className="panel-muted border-dashed border-2 p-6 text-center mb-3">
+                    <p className="text-sm text-annotation/70">No questions match these filters.</p>
+                  </div>
+                )}
+
+                {visibleQuestions.map(({ q, qi }) => (
                   <div key={q._id || q.id}>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-mono font-bold text-annotation/60">
@@ -865,6 +1072,7 @@ export default function TestCreator() {
                     {sec.type === 'aptitude' ? (
                       <AptQEditor
                         q={q}
+                        index={qi}
                         onChange={nq => updateQuestion(activeSection, qi, nq)}
                         onRemove={() => removeQuestion(activeSection, qi)}
                       />
@@ -904,7 +1112,8 @@ export default function TestCreator() {
                   open={bankOpen}
                   onClose={() => setBankOpen(false)}
                   type={sec.type === 'aptitude' ? 'mcq' : 'coding'}
-                  onPick={(bankQ) => addQuestionFromBank(activeSection, bankQ)}
+                  alreadyAddedIds={sec.questions.map(q => q.bankQuestionId).filter(Boolean)}
+                  onPick={(bankQs) => addQuestionsFromBank(activeSection, bankQs)}
                 />
               </div>
             )}

@@ -27,7 +27,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const googleBtnRef = useRef(null);
-  const { years, batches } = useClassOptions();
+  const { years, classes } = useClassOptions();
 
   const [mode, setMode] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,7 +41,7 @@ export default function LoginPage() {
     password: '',
     department: '',
     rollNumber: '',
-    batch: '',
+    className: '',
     yearOfStudy: '',
     otp: '',
     newPassword: '',
@@ -118,7 +118,7 @@ export default function LoginPage() {
           {
             rollNumber: formData.rollNumber,
             branch: formData.department,
-            batch: formData.batch,
+            className: formData.className,
             yearOfStudy: formData.yearOfStudy ? Number(formData.yearOfStudy) : undefined,
           },
         );
@@ -133,6 +133,12 @@ export default function LoginPage() {
         err.response?.data?.error ||
           (mode === 'login' ? 'Invalid credentials' : 'Registration failed'),
       );
+      // Wrong email or password: keep the email so it doesn't have to be
+      // retyped, but clear the password rather than leaving a wrong guess
+      // sitting in the field.
+      if (mode === 'login') {
+        setFormData(p => ({ ...p, password: '' }));
+      }
     }
   };
 
@@ -200,11 +206,6 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-center px-16 py-20 w-full">
           <div className="mb-14">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
-                <svg className="w-6 h-6 text-panel" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-                </svg>
-              </div>
               <span className="font-display text-xl font-bold text-ink tracking-tight">
                 CampusTrack
               </span>
@@ -225,7 +226,7 @@ export default function LoginPage() {
               { label: 'Code Execution', desc: 'Python, Java, C, C++', icon: 'M14.7 6.3a1 1 0 00-1.4 0L10 9.6 7.7 7.3a1 1 0 00-1.4 1.4l3 3a1 1 0 001.4 0l4-4a1 1 0 000-1.4z', highlight: true },
               { label: 'Exam Integrity', desc: 'Automated tab-switch and fullscreen monitoring with auto-save', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', highlight: false },
               { label: 'Instant Results', desc: 'Real-time scoring', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', highlight: false },
-              { label: 'Scale Ready', desc: 'Built for full batch placement drives', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', highlight: false },
+              { label: 'Scale Ready', desc: 'Built for full-class placement drives', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', highlight: false },
             ].map(({ label, desc, icon, highlight }) => (
               <div key={label} className="panel p-3.5">
                 <svg className={`w-4 h-4 mb-2 ${highlight ? 'text-accent' : 'text-annotation'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -244,11 +245,6 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 text-center">
-            <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mx-auto mb-3">
-              <svg className="w-6 h-6 text-panel" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-              </svg>
-            </div>
             <div className="font-display text-xl font-bold text-ink">CampusTrack</div>
             <p className="text-xs text-annotation/60 mt-0.5">Placement Assessment Portal</p>
           </div>
@@ -491,14 +487,14 @@ export default function LoginPage() {
                         <label className="input-label" htmlFor="class">Class</label>
                         <select
                           id="class"
-                          name="batch"
-                          value={formData.batch}
+                          name="className"
+                          value={formData.className}
                           onChange={handleChange}
                           className="select-field"
                           required={mode === 'register'}
                         >
                           <option value="">Select class</option>
-                          {batches.map(c => (
+                          {classes.map(c => (
                             <option key={c} value={c}>{c}</option>
                           ))}
                         </select>
@@ -589,20 +585,9 @@ export default function LoginPage() {
                   </>
                 )}
 
-                <div className="mt-5 pt-4 border-t border-rim">
-                  <p className="text-center text-2xs text-annotation/50">
-                    Role-based access control, encrypted sessions, and tamper-evident exam records.
-                    <br />
-                    Only authorized institutional accounts.
-                  </p>
-                </div>
               </>
             )}
           </div>
-
-          <p className="text-center text-2xs text-annotation/40 mt-5">
-            &copy; 2026 CampusTrack. All rights reserved.
-          </p>
         </div>
       </div>
     </div>

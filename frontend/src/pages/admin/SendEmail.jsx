@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { emailAPI, usersAPI, batchesAPI } from '../../services/api';
+import { emailAPI, usersAPI, classesAPI } from '../../services/api';
 import { Btn, Modal, Alert, Spinner } from '../../components/shared/UI';
 import { ALLOWED_DEPARTMENTS as DEPARTMENTS } from '../../lib/departments';
 import toast from 'react-hot-toast';
@@ -18,14 +18,14 @@ export default function SendEmail() {
   const [body, setBody] = useState('');
   const [allStudents, setAllStudents] = useState(false);
   const [selectedDepts, setSelectedDepts] = useState([]);
-  const [selectedBatches, setSelectedBatches] = useState([]);
+  const [selectedClasses, setSelectedClasses] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [template, setTemplate] = useState('blank');
   const [studentSearch, setStudentSearch] = useState('');
   const bodyRef = useRef(null);
 
-  const { data: batchData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
+  const { data: classData } = useQuery({ queryKey: ['classes'], queryFn: classesAPI.list });
 
   const { data: studentResults } = useQuery({
     queryKey: ['students-search', studentSearch],
@@ -55,9 +55,9 @@ export default function SendEmail() {
     );
   };
 
-  const toggleBatch = (id) => {
-    setSelectedBatches(prev =>
-      prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
+  const toggleClass = (id) => {
+    setSelectedClasses(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     );
   };
 
@@ -71,7 +71,7 @@ export default function SendEmail() {
     if (allStudents) return 'All students';
     const parts = [];
     if (selectedDepts.length) parts.push(`${selectedDepts.length} dept(s)`);
-    if (selectedBatches.length) parts.push(`${selectedBatches.length} batch(es)`);
+    if (selectedClasses.length) parts.push(`${selectedClasses.length} class(es)`);
     if (selectedStudents.length) parts.push(`${selectedStudents.length} student(s)`);
     return parts.join(', ') || 'No recipients selected';
   };
@@ -87,7 +87,7 @@ export default function SendEmail() {
       recipients: {
         allStudents: allStudents || undefined,
         departments: selectedDepts.length ? selectedDepts : undefined,
-        batches: selectedBatches.length ? selectedBatches : undefined,
+        classes: selectedClasses.length ? selectedClasses : undefined,
         studentIds: selectedStudents.length ? selectedStudents : undefined,
       },
     });
@@ -266,17 +266,17 @@ export default function SendEmail() {
                   </div>
                 </div>
 
-                {/* Batches */}
+                {/* Classes */}
                 <div>
-                  <p className="text-xs text-annotation font-medium mb-2">Batches</p>
+                  <p className="text-xs text-annotation font-medium mb-2">Classes</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {(batchData?.batches || []).map(b => {
-                      const active = selectedBatches.includes(b.id);
+                    {(classData?.classes || []).map(b => {
+                      const active = selectedClasses.includes(b.id);
                       return (
                         <button
                           key={b.id}
                           type="button"
-                          onClick={() => toggleBatch(b.id)}
+                          onClick={() => toggleClass(b.id)}
                           className={`focus-ring text-xs px-1.5 py-1 rounded-sm border cursor-pointer transition-all ${
                             active
                               ? 'border-accent bg-accent/10 text-accent'

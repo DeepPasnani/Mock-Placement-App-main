@@ -40,7 +40,7 @@ const options = {
             department: { type: 'string' },
             branch: { type: 'string' },
             roll_number: { type: 'string' },
-            batch: { type: 'string' },
+            class_name: { type: 'string' },
             year_of_study: { type: 'integer' },
             is_active: { type: 'boolean' },
             avatar_url: { type: 'string' },
@@ -98,7 +98,7 @@ const options = {
             passing_score: { type: 'number' },
           },
         },
-        Batch: {
+        Class: {
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
@@ -197,7 +197,7 @@ const options = {
                     department: { type: 'string' },
                     rollNumber: { type: 'string' },
                     branch: { type: 'string' },
-                    batch: { type: 'string' },
+                    class_name: { type: 'string' },
                     yearOfStudy: { type: 'integer' },
                   },
                 },
@@ -457,27 +457,27 @@ const options = {
           },
         },
       },
-      '/tests/{id}/batches': {
+      '/tests/{id}/classes': {
         get: {
           tags: ['Tests'],
-          summary: 'Get batches mapped to test',
+          summary: 'Get classes mapped to test',
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
           ],
           responses: {
-            200: { description: 'Batches' },
+            200: { description: 'Classes' },
           },
         },
         post: {
           tags: ['Tests'],
-          summary: 'Map batches to test',
+          summary: 'Map classes to test',
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
           ],
           responses: {
-            200: { description: 'Batch mapping updated' },
+            200: { description: 'Class mapping updated' },
           },
         },
       },
@@ -644,7 +644,7 @@ const options = {
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: 'testId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-            { name: 'batch', in: 'query', schema: { type: 'string' } },
+            { name: 'class', in: 'query', schema: { type: 'string' } },
           ],
           responses: {
             200: { description: 'CSV file' },
@@ -1042,30 +1042,30 @@ const options = {
           },
         },
       },
-      '/drives/{id}/batches': {
+      '/drives/{id}/classes': {
         post: {
           tags: ['Drives'],
-          summary: 'Add batch to drive',
+          summary: 'Add class to drive',
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
           ],
           responses: {
-            200: { description: 'Batch added' },
+            200: { description: 'Class added' },
           },
         },
       },
-      '/drives/{id}/batches/{batchId}': {
+      '/drives/{id}/classes/{classId}': {
         delete: {
           tags: ['Drives'],
-          summary: 'Remove batch from drive',
+          summary: 'Remove class from drive',
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
-            { name: 'batchId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+            { name: 'classId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
           ],
           responses: {
-            200: { description: 'Batch removed' },
+            200: { description: 'Class removed' },
           },
         },
       },
@@ -1083,21 +1083,21 @@ const options = {
         },
       },
 
-      // ── Batches ───────────────────────────────────────────────
-      '/batches': {
+      // ── Classes ───────────────────────────────────────────────
+      '/classes': {
         get: {
-          tags: ['Batches'],
-          summary: 'List batches',
+          tags: ['Classes'],
+          summary: 'List classes',
           security: [{ bearerAuth: [] }],
           responses: {
             200: {
-              description: 'List of batches',
+              description: 'List of classes',
               content: {
                 'application/json': {
                   schema: {
                     type: 'object',
                     properties: {
-                      batches: { type: 'array', items: { $ref: '#/components/schemas/Batch' } },
+                      classes: { type: 'array', items: { $ref: '#/components/schemas/Class' } },
                     },
                   },
                 },
@@ -1106,8 +1106,8 @@ const options = {
           },
         },
         post: {
-          tags: ['Batches'],
-          summary: 'Create batch',
+          tags: ['Classes'],
+          summary: 'Create class',
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -1126,27 +1126,27 @@ const options = {
             },
           },
           responses: {
-            201: { description: 'Batch created' },
+            201: { description: 'Class created' },
           },
         },
       },
-      '/batches/{id}': {
+      '/classes/{id}': {
         delete: {
-          tags: ['Batches'],
-          summary: 'Delete batch',
+          tags: ['Classes'],
+          summary: 'Delete class',
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
           ],
           responses: {
-            200: { description: 'Batch deleted' },
+            200: { description: 'Class deleted' },
           },
         },
       },
-      '/batches/assign': {
+      '/classes/assign': {
         post: {
-          tags: ['Batches'],
-          summary: 'Assign students to batch',
+          tags: ['Classes'],
+          summary: 'Assign students to class',
           security: [{ bearerAuth: [] }],
           responses: {
             200: { description: 'Students assigned' },

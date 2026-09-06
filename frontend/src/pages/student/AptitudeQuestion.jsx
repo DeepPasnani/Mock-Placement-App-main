@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { Btn } from '../../components/shared/UI';
-
-function ImgWithFallback({ src, alt, className }) {
-  const [error, setError] = useState(false);
-  if (!src || error) return null;
-  return <img src={src} alt={alt} loading="lazy" className={className} onError={() => setError(true)} />;
-}
+import ImgWithFallback from '../../components/shared/ImgWithFallback';
 
 function DifficultyBadge({ level }) {
   const map = {

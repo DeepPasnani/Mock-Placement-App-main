@@ -49,7 +49,7 @@ export default function NotificationBell() {
 
   // Listen for WebSocket notifications
   useEffect(() => {
-    const token = localStorage.getItem('pp_token');
+    const token = sessionStorage.getItem('pp_token');
     if (!token) return;
 
     let ws = null;

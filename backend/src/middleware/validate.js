@@ -31,7 +31,7 @@ const createTestSchema = Joi.object({
   department: Joi.string().trim().max(200).allow('', null),
   departments: Joi.array().items(Joi.string()).default([]),
   years: Joi.array().items(Joi.any()).default([]),
-  batches: Joi.array().items(Joi.string()).default([]),
+  classes: Joi.array().items(Joi.string()).default([]),
   settings: Joi.object({
     shuffleQuestions: Joi.boolean(),
     shuffleOptions: Joi.boolean(),
@@ -69,7 +69,7 @@ const sendEmailSchema = Joi.object({
   recipients: Joi.object({
     allStudents: Joi.boolean(),
     departments: Joi.array().items(Joi.string()),
-    batches: Joi.array().items(Joi.string()),
+    classes: Joi.array().items(Joi.string()),
     studentIds: Joi.array().items(Joi.string()),
   }).min(1).required(),
 });

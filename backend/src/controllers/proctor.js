@@ -74,7 +74,7 @@ async function getAttendanceReport(req, res) {
 
   const { rows: submissions } = await query(
     `SELECT s.id, s.status, s.started_at, s.submitted_at, s.score, s.max_score,
-            u.id as user_id, u.name, u.email, u.roll_number, u.branch, u.department, u.batch
+            u.id as user_id, u.name, u.email, u.roll_number, u.branch, u.department, u.class_name
      FROM submissions s
      JOIN users u ON s.user_id = u.id
      WHERE s.test_id=$1
@@ -83,7 +83,7 @@ async function getAttendanceReport(req, res) {
   );
 
   const { rows: allStudents } = await query(
-    `SELECT id, name, email, roll_number, branch, department, batch
+    `SELECT id, name, email, roll_number, branch, department, class_name
      FROM users WHERE role='student' AND is_active=true
      AND (department=$1 OR $1 IS NULL OR $1='')
      ORDER BY name`,

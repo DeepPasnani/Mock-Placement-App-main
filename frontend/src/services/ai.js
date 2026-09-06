@@ -37,8 +37,8 @@ export const aiAPI = {
   getPlacementPrediction: (userId) =>
     api.get(`/ai/placement-prediction/${userId}`).then(r => r.data),
 
-  getBatchPredictions: (batchId) =>
-    api.get(`/ai/placement-predictions/batch/${batchId}`).then(r => r.data),
+  getClassPredictions: (classId) =>
+    api.get(`/ai/placement-predictions/class/${classId}`).then(r => r.data),
 
   nlQuery: (query) =>
     api.post('/ai/nl-query', { query }).then(r => r.data),

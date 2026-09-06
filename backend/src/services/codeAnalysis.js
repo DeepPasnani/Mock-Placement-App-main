@@ -59,10 +59,6 @@ function extractFunctions(code, language) {
     python: /(?:def\s+\w+|class\s+\w+)/g,
     java: /(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?\w+\s+\w+\s*\([^)]*\)\s*(?:throws\s+\w+)?\s*{/g,
     cpp: /(?:public|private|protected)?\s*\w+\s+\w+\s*\([^)]*\)\s*(?:const)?\s*{/g,
-    go: /(?:func\s+\w+)/g,
-    rust: /(?:fn\s+\w+)/g,
-    ruby: /(?:def\s+\w+)/g,
-    kotlin: /(?:fun\s+\w+)/g,
     c: /\w+\s+\w+\s*\([^)]*\)\s*{/g,
   };
 
@@ -77,10 +73,6 @@ function extractClasses(code, language) {
     python: /(?:class\s+\w+)/g,
     java: /(?:class\s+\w+)/g,
     cpp: /(?:class\s+\w+)/g,
-    kotlin: /(?:class\s+\w+)/g,
-    ruby: /(?:class\s+\w+)/g,
-    rust: /(?:struct\s+\w+|enum\s+\w+|impl\s+\w+)/g,
-    go: /(?:type\s+\w+\s+struct)/g,
   };
 
   const pattern = patterns[language] || patterns.javascript;

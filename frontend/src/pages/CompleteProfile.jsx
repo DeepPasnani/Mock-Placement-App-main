@@ -17,17 +17,17 @@ function yearLabel(y) {
 
 /**
  * Forced after Google sign-in (and for any student missing cluster fields)
- * so enrollment / batch / year are captured for batch mapping.
+ * so enrollment / class / year are captured for class mapping.
  */
 export default function CompleteProfilePage() {
   const { user, completeProfile, logout, isLoading } = useStore();
   const navigate = useNavigate();
-  const { years, batches } = useClassOptions();
+  const { years, classes } = useClassOptions();
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     rollNumber: user?.roll_number || '',
     department: user?.department || '',
-    batch: user?.batch || '',
+    className: user?.class_name || '',
     yearOfStudy: user?.year_of_study ? String(user.year_of_study) : '',
   });
 
@@ -39,7 +39,7 @@ export default function CompleteProfilePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.rollNumber.trim() || !form.department || !form.batch || !form.yearOfStudy) {
+    if (!form.rollNumber.trim() || !form.department || !form.className || !form.yearOfStudy) {
       setError('Please fill in enrollment number, department, class, and year.');
       return;
     }
@@ -47,7 +47,7 @@ export default function CompleteProfilePage() {
       const { user: updated } = await completeProfile({
         rollNumber: form.rollNumber.trim(),
         department: form.department,
-        batch: form.batch,
+        className: form.className,
         yearOfStudy: Number(form.yearOfStudy),
       });
       toast.success('Profile saved — you are assigned to your class cluster.');
@@ -123,17 +123,17 @@ export default function CompleteProfilePage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="cp-batch" className="input-label">Class / Batch</label>
+              <label htmlFor="cp-class" className="input-label">Class</label>
               <select
-                id="cp-batch"
-                name="batch"
-                value={form.batch}
+                id="cp-class"
+                name="className"
+                value={form.className}
                 onChange={handleChange}
                 className="select-field"
                 required
               >
                 <option value="">Select class</option>
-                {batches.map((c) => (
+                {classes.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>

@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { submissionsAPI, testsAPI, usersAPI } from '../../services/api';
-import { Badge, Spinner, Btn, Modal } from '../../components/shared/UI';
+import { Badge, Spinner, Btn, Modal, Input, Textarea, Tabs } from '../../components/shared/UI';
 import SubmissionAnswersModal from './SubmissionAnswersModal';
 import {
   BarChart,
@@ -58,19 +58,19 @@ export default function AdminResults() {
   const test = tests.find(t => t.id === selectedTest);
 
   // ── Class-wise filter ───────────────────────────────────
-  // Uses batch_snapshot (falls back to the student's live batch for
+  // Uses class_snapshot (falls back to the student's live class for
   // pre-existing rows) so filtering stays accurate even after a
-  // semester reshuffle moves students between batches.
-  const [batchFilter, setBatchFilter] = useState('all');
-  const batchOptions = [...new Set(allSubs.map(s => s.batch_display).filter(Boolean))].sort();
-  const subs = batchFilter === 'all' ? allSubs : allSubs.filter(s => s.batch_display === batchFilter);
+  // semester reshuffle moves students between classes.
+  const [classFilter, setClassFilter] = useState('all');
+  const classOptions = [...new Set(allSubs.map(s => s.class_display).filter(Boolean))].sort();
+  const subs = classFilter === 'all' ? allSubs : allSubs.filter(s => s.class_display === classFilter);
 
   // Class-wise breakdown (always computed off the full, unfiltered set)
-  const classBreakdown = batchOptions.map(b => {
-    const rows = allSubs.filter(s => s.batch_display === b && s.status === 'submitted' && s.max_score > 0);
+  const classBreakdown = classOptions.map(c => {
+    const rows = allSubs.filter(s => s.class_display === c && s.status === 'submitted' && s.max_score > 0);
     const avg = rows.length ? Math.round(rows.reduce((a, s) => a + (s.score / s.max_score) * 100, 0) / rows.length) : 0;
     const passed = rows.filter(s => (s.score / s.max_score) * 100 >= 40).length;
-    return { batch: b, count: rows.length, avg, passRate: rows.length ? Math.round((passed / rows.length) * 100) : 0 };
+    return { className: c, count: rows.length, avg, passRate: rows.length ? Math.round((passed / rows.length) * 100) : 0 };
   });
 
   const scored = subs.filter(
@@ -109,7 +109,7 @@ export default function AdminResults() {
     setExporting(true);
     try {
       const blob = await submissionsAPI.exportCsv(selectedTest, {
-        batch: batchFilter !== 'all' ? batchFilter : undefined,
+        class_name: classFilter !== 'all' ? classFilter : undefined,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -141,6 +141,30 @@ export default function AdminResults() {
       toast.error('Failed to generate PDF report.');
     } finally {
       setExportingPdf(false);
+    }
+  };
+
+  // ── Publish / unpublish results (manual / after_end modes) ─
+  const [publishing, setPublishing] = useState(false);
+  const resultsMode = test?.settings?.showResults || 'after_submit';
+  const resultsPublished = !!test?.results_published_at;
+
+  const togglePublishResults = async () => {
+    if (!selectedTest) return;
+    setPublishing(true);
+    try {
+      if (resultsPublished) {
+        await submissionsAPI.unpublishResults(selectedTest);
+        toast.success('Results hidden from students again.');
+      } else {
+        await submissionsAPI.publishResults(selectedTest);
+        toast.success('Results published to students.');
+      }
+      qc.invalidateQueries({ queryKey: ['tests'] });
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to update results visibility.');
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -184,7 +208,7 @@ export default function AdminResults() {
     onError: () => toast.error('Failed to delete'),
   });
 
-  // ── Resume test (admin) ───────────────────────────────
+  // ── Resume / stop test (admin) ─────────────────────────
   const [resumingId, setResumingId] = useState(null);
   const resumeMut = useMutation({
     mutationFn: (id) => api.post(`/submissions/resume/${id}`).then(r => r.data),
@@ -194,6 +218,32 @@ export default function AdminResults() {
       qc.invalidateQueries({ queryKey: ['submissions', selectedTest] });
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to resume test'),
+  });
+
+  const [stoppingId, setStoppingId] = useState(null);
+  const stopMut = useMutation({
+    mutationFn: submissionsAPI.forceStop,
+    onSuccess: (data) => {
+      toast.success(data.message || 'Test stopped and graded');
+      setStoppingId(null);
+      qc.invalidateQueries({ queryKey: ['submissions', selectedTest] });
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to stop test'),
+  });
+
+  // ── Manual / bulk marks (admin) ────────────────────────
+  const [editingMarksSub, setEditingMarksSub] = useState(null);
+  const [bulkMarksOpen, setBulkMarksOpen] = useState(false);
+  const [adjustAllOpen, setAdjustAllOpen] = useState(false);
+
+  const adjustAllMut = useMutation({
+    mutationFn: (data) => submissionsAPI.adjustAllMarks(selectedTest, data),
+    onSuccess: (res) => {
+      toast.success(`${res.delta > 0 ? '+' : ''}${res.delta} marks applied to ${res.updated} submission${res.updated === 1 ? '' : 's'}`);
+      setAdjustAllOpen(false);
+      qc.invalidateQueries({ queryKey: ['submissions', selectedTest] });
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to adjust marks'),
   });
 
   // ── Search filter ──────────────────────────────────────
@@ -270,6 +320,35 @@ export default function AdminResults() {
         </div>
         {selectedTest && subs.length > 0 && (
           <div className="flex gap-2 flex-wrap">
+            {(resultsMode === 'manual' || resultsMode === 'after_end') && (
+              <Btn
+                variant={resultsPublished ? 'ghost' : 'primary'}
+                size="sm"
+                onClick={togglePublishResults}
+                disabled={publishing}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span className="ml-1.5">
+                  {publishing ? 'Updating…' : resultsPublished ? 'Results Published' : 'Publish Results'}
+                </span>
+              </Btn>
+            )}
+            <Btn variant="ghost" size="sm" onClick={() => setBulkMarksOpen(true)}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" d="M9 17v-2a4 4 0 014-4h4M9 17H5a2 2 0 01-2-2V7a2 2 0 012-2h9l5 5v5a2 2 0 01-2 2h-1" />
+                <path strokeLinecap="round" d="M13 17l3 3 3-3" />
+              </svg>
+              Bulk Marks
+            </Btn>
+            <Btn variant="ghost" size="sm" onClick={() => setAdjustAllOpen(true)}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Adjust All Marks
+            </Btn>
             <Btn variant="ghost" size="sm" onClick={() => setNotifyModal(true)}>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -335,7 +414,7 @@ export default function AdminResults() {
           <select
             id="results-test"
             value={selectedTest}
-            onChange={e => { setSelectedTest(e.target.value); setBatchFilter('all'); setSearchQuery(''); }}
+            onChange={e => { setSelectedTest(e.target.value); setClassFilter('all'); setSearchQuery(''); }}
             className="select-field max-w-sm"
           >
             <option value="">— Select a test —</option>
@@ -346,20 +425,20 @@ export default function AdminResults() {
             ))}
           </select>
         </div>
-        {selectedTest && batchOptions.length > 0 && (
+        {selectedTest && classOptions.length > 0 && (
           <div>
-            <label htmlFor="results-batch" className="text-2xs text-annotation/60 mb-1.5">
-              Class / Batch
+            <label htmlFor="results-class" className="text-2xs text-annotation/60 mb-1.5">
+              Class
             </label>
             <select
-              id="results-batch"
-              value={batchFilter}
-              onChange={e => setBatchFilter(e.target.value)}
+              id="results-class"
+              value={classFilter}
+              onChange={e => setClassFilter(e.target.value)}
               className="select-field max-w-xs"
             >
-              <option value="all">All batches (consolidated)</option>
-              {batchOptions.map(b => (
-                <option key={b} value={b}>{b}</option>
+              <option value="all">All classes (consolidated)</option>
+              {classOptions.map(c => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
@@ -469,7 +548,7 @@ export default function AdminResults() {
           )}
 
           {/* ── Class-wise Breakdown ───────────────────────── */}
-          {batchFilter === 'all' && classBreakdown.length > 1 && (
+          {classFilter === 'all' && classBreakdown.length > 1 && (
             <div className="panel p-4 mb-5">
               <h3 className="text-xs font-display font-bold text-ink mb-3">
                 Class-wise Breakdown
@@ -479,7 +558,7 @@ export default function AdminResults() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Batch</th>
+                        <th>Class</th>
                         <th>Submitted</th>
                         <th>Average</th>
                         <th>Pass Rate</th>
@@ -487,8 +566,8 @@ export default function AdminResults() {
                     </thead>
                     <tbody>
                       {classBreakdown.map(c => (
-                        <tr key={c.batch} className="cursor-pointer hover:bg-panel/60" onClick={() => setBatchFilter(c.batch)}>
-                          <td className="font-medium text-sm text-ink">{c.batch}</td>
+                        <tr key={c.className} className="cursor-pointer hover:bg-panel/60" onClick={() => setClassFilter(c.className)}>
+                          <td className="font-medium text-sm text-ink">{c.className}</td>
                           <td>{c.count}</td>
                           <td className="font-mono">{c.avg}%</td>
                           <td className="font-mono">{c.passRate}%</td>
@@ -498,7 +577,7 @@ export default function AdminResults() {
                   </table>
                 </div>
               </div>
-              <p className="text-2xs text-annotation/50 mt-2">Click a row to filter the leaderboard below to that batch.</p>
+              <p className="text-2xs text-annotation/50 mt-2">Click a row to filter the leaderboard below to that class.</p>
             </div>
           )}
 
@@ -659,16 +738,41 @@ export default function AdminResults() {
                                   </svg>
                                 </button>
                               )}
-                              {s.status === 'auto_submitted' && (
+                              {isPending && (
+                                <button
+                                  onClick={() => setStoppingId(s.id)}
+                                  disabled={stopMut.isLoading && stoppingId === s.id}
+                                  className="btn-ghost-icon text-alert hover:text-alert"
+                                  title="Stop test now for this student"
+                                  aria-label="Stop test now for this student"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                                  </svg>
+                                </button>
+                              )}
+                              {(s.status === 'auto_submitted' || s.status === 'submitted') && (
                                 <button
                                   onClick={() => setResumingId(s.id)}
                                   disabled={resumeMut.isLoading && resumingId === s.id}
                                   className="btn-ghost-icon text-accent hover:text-clarify"
-                                  title="Resume test for student"
-                                  aria-label="Resume test for student"
+                                  title="Start / resume test for student"
+                                  aria-label="Start / resume test for student"
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                </button>
+                              )}
+                              {!isPending && (
+                                <button
+                                  onClick={() => setEditingMarksSub(s)}
+                                  className="btn-ghost-icon text-annotation hover:text-accent"
+                                  title="Edit marks manually"
+                                  aria-label="Edit marks manually"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
                                 </button>
                               )}
@@ -769,15 +873,15 @@ export default function AdminResults() {
         </div>
       </Modal>
 
-      {/* ── Resume Test Modal ────────────────────────────── */}
+      {/* ── Resume/Start Test Modal ────────────────────────── */}
       <Modal
         isOpen={!!resumingId}
         onClose={() => setResumingId(null)}
-        title="Resume Test"
+        title="Start / Resume Test"
         width="max-w-sm"
       >
         <p className="text-sm text-annotation mb-2">
-          Resume this student's <strong className="text-ink">auto-submitted</strong> test.
+          Reopen this student's test so they can continue.
         </p>
         <p className="text-xs text-annotation/60 mb-5">
           The student will regain access with their remaining time preserved. All saved answers will be retained.
@@ -794,10 +898,68 @@ export default function AdminResults() {
             }}
             disabled={resumeMut.isLoading}
           >
-            {resumeMut.isLoading ? 'Resuming…' : 'Resume Test'}
+            {resumeMut.isLoading ? 'Starting…' : 'Start Test'}
           </Btn>
         </div>
       </Modal>
+
+      {/* ── Stop Test Modal ────────────────────────────────── */}
+      <Modal
+        isOpen={!!stoppingId}
+        onClose={() => setStoppingId(null)}
+        title="Stop Test Now"
+        width="max-w-sm"
+      >
+        <p className="text-sm text-annotation mb-2">
+          End this student's test immediately and grade it from their last saved answers.
+        </p>
+        <p className="text-xs text-annotation/60 mb-5">
+          This cannot be undone directly, but you can Start/Resume the test again afterwards if needed.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <Btn variant="ghost" onClick={() => setStoppingId(null)}>
+            Cancel
+          </Btn>
+          <Btn
+            variant="danger"
+            onClick={() => stopMut.mutate(stoppingId)}
+            disabled={stopMut.isLoading}
+          >
+            {stopMut.isLoading ? 'Stopping…' : 'Stop Test'}
+          </Btn>
+        </div>
+      </Modal>
+
+      {/* ── Edit Marks Modal ───────────────────────────────── */}
+      <EditMarksModal
+        submission={editingMarksSub}
+        onClose={() => setEditingMarksSub(null)}
+        onSaved={() => {
+          setEditingMarksSub(null);
+          qc.invalidateQueries({ queryKey: ['submissions', selectedTest] });
+        }}
+      />
+
+      {/* ── Adjust All Marks Modal ───────────────────────────── */}
+      {adjustAllOpen && (
+        <AdjustAllMarksModal
+          count={subs.filter(s => s.status === 'submitted' || s.status === 'auto_submitted').length}
+          onClose={() => setAdjustAllOpen(false)}
+          onConfirm={(data) => adjustAllMut.mutate(data)}
+          isLoading={adjustAllMut.isLoading}
+        />
+      )}
+
+      {/* ── Bulk Marks Modal ───────────────────────────────── */}
+      <BulkMarksModal
+        isOpen={bulkMarksOpen}
+        testId={selectedTest}
+        onClose={() => setBulkMarksOpen(false)}
+        onDone={() => {
+          setBulkMarksOpen(false);
+          qc.invalidateQueries({ queryKey: ['submissions', selectedTest] });
+        }}
+      />
 
       {/* ── Delete Modal ──────────────────────────────────── */}
       <Modal
@@ -864,5 +1026,274 @@ function AlertBox({ type = 'info', children, className = '' }) {
     >
       <span>{children}</span>
     </div>
+  );
+}
+
+/* ── Edit Marks (single submission, manual override) ────────── */
+function EditMarksModal({ submission, onClose, onSaved }) {
+  const [score, setScore] = useState('');
+  const [maxScore, setMaxScore] = useState('');
+  const [note, setNote] = useState('');
+
+  // This modal is one long-lived component instance reused for every
+  // student (only its `submission` prop changes), so its state was never
+  // reset between them. Re-seed it with THIS submission's actual current
+  // values every time a different student is opened: without this,
+  // (a) the score/max-score fields either stayed blank on a fresh open —
+  // Save is disabled while score is blank, so clicking it silently did
+  // nothing, which is exactly "marks did not update at all" — or
+  // (b) kept whatever the *previous* student's edit had left in them,
+  // which is the "previously entered marks stay there" bug, and could
+  // silently re-save the wrong student's number.
+  useEffect(() => {
+    if (submission) {
+      setScore(String(submission.score ?? 0));
+      setMaxScore(String(submission.max_score ?? 0));
+      setNote('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submission?.id]);
+
+  const mut = useMutation({
+    mutationFn: (data) => submissionsAPI.updateMarks(submission.id, data),
+    onSuccess: () => { toast.success('Marks updated'); onSaved(); },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update marks'),
+  });
+
+  const open = !!submission;
+
+  return (
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title="Edit Marks"
+      width="max-w-sm"
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn
+            variant="primary"
+            disabled={score === '' || mut.isLoading}
+            onClick={() => mut.mutate({
+              score: Number(score),
+              maxScore: maxScore === '' ? undefined : Number(maxScore),
+              note: note || undefined,
+            })}
+          >
+            {mut.isLoading ? 'Saving…' : 'Save Marks'}
+          </Btn>
+        </>
+      }
+    >
+      {submission && (
+        <div className="space-y-4">
+          <p className="text-sm text-annotation">
+            Manually set the score for <strong className="text-ink">{submission.user_name}</strong>.
+            Use this for partial credit, disputes, or answers the auto-grader can't evaluate.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Score *"
+              type="number"
+              value={score}
+              onChange={(e) => setScore(e.target.value)}
+            />
+            <Input
+              label="Max score"
+              type="number"
+              value={maxScore}
+              onChange={(e) => setMaxScore(e.target.value)}
+            />
+          </div>
+          <Textarea
+            label="Note (optional)"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Reason for the manual override…"
+          />
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* ── Adjust All Marks (flat curve/penalty across the whole test) ── */
+function AdjustAllMarksModal({ count, onClose, onConfirm, isLoading }) {
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const parsed = Number(amount);
+  const canSave = amount !== '' && !Number.isNaN(parsed) && parsed !== 0;
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Adjust All Marks"
+      width="max-w-sm"
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn
+            variant="primary"
+            disabled={!canSave || isLoading}
+            onClick={() => onConfirm({ amount: parsed, note: note || undefined })}
+          >
+            {isLoading ? 'Applying…' : `Apply to ${count} student${count === 1 ? '' : 's'}`}
+          </Btn>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-annotation">
+          Adds (or subtracts) the same amount to every graded submission for this test — e.g. to credit a
+          question that turned out to be ambiguous for everyone. Each student's score is clamped between
+          0 and their own max score.
+        </p>
+        <Input
+          label="Amount *"
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="e.g. 2 or -1"
+          hint="Positive adds marks, negative subtracts."
+        />
+        <Textarea
+          label="Note (optional)"
+          rows={2}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Reason for this adjustment…"
+        />
+      </div>
+    </Modal>
+  );
+}
+
+/* ── Bulk Marks (CSV/JSON import) ─────────────────────────────── */
+const BULK_MARKS_SAMPLE_CSV = `rollNumber,score,maxScore
+21CE001,42,50
+21CE002,38,50`;
+const BULK_MARKS_SAMPLE_JSON = `[
+  { "rollNumber": "21CE001", "score": 42, "maxScore": 50 },
+  { "email": "student@college.edu", "score": 38 }
+]`;
+
+function BulkMarksModal({ isOpen, testId, onClose, onDone }) {
+  const [mode, setMode] = useState('csv');
+  const [raw, setRaw] = useState('');
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const csvMut = useMutation({
+    mutationFn: submissionsAPI.bulkMarksCsv,
+    onSuccess: (data) => { setResult(data); if (!data.errors?.length) onDone(); },
+    onError: (e) => toast.error(e.response?.data?.error || 'Import failed'),
+  });
+  const jsonMut = useMutation({
+    mutationFn: submissionsAPI.bulkMarksJson,
+    onSuccess: (data) => { setResult(data); if (!data.errors?.length) onDone(); },
+    onError: (e) => toast.error(e.response?.data?.error || 'Import failed'),
+  });
+
+  const isJson = mode === 'json';
+  const loading = csvMut.isLoading || jsonMut.isLoading;
+
+  const submit = () => {
+    setError(null);
+    setResult(null);
+    if (!testId) { setError('Select a test first.'); return; }
+    if (isJson) {
+      try {
+        const entries = JSON.parse(raw);
+        if (!Array.isArray(entries) || !entries.length) throw new Error('JSON must be a non-empty array');
+        jsonMut.mutate({ testId, entries });
+      } catch (e) {
+        setError(e.message);
+      }
+    } else {
+      csvMut.mutate({ testId, csv: raw });
+    }
+  };
+
+  const reset = () => { setRaw(''); setError(null); setResult(null); onClose(); };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={reset}
+      title="Bulk Marks Import"
+      width="max-w-2xl"
+      footer={
+        <>
+          <Btn variant="ghost" onClick={reset}>Close</Btn>
+          <Btn variant="primary" onClick={submit} disabled={!raw.trim() || loading}>
+            {loading ? <Spinner size={14} /> : 'Import Marks'}
+          </Btn>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-xs text-annotation">
+          Match students by roll number or email, then set their score for the currently selected test.
+          Rows that don't match an existing submission are skipped and reported below.
+        </p>
+        <Tabs
+          tabs={[{ id: 'csv', label: 'CSV' }, { id: 'json', label: 'JSON' }]}
+          active={mode}
+          onChange={(m) => { setMode(m); setResult(null); setError(null); }}
+        />
+        {isJson ? (
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="input-label">JSON — array of {`{ rollNumber | email, score, maxScore? }`}</label>
+              <button className="text-xs text-accent hover:underline" onClick={() => setRaw(BULK_MARKS_SAMPLE_JSON)}>Load sample</button>
+            </div>
+            <Textarea rows={8} value={raw} onChange={e => setRaw(e.target.value)} placeholder={BULK_MARKS_SAMPLE_JSON} className="font-mono text-xs" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <label className="input-label">CSV — columns: rollNumber (or email), score, maxScore (optional)</label>
+              <button className="text-xs text-accent hover:underline" onClick={() => setRaw(BULK_MARKS_SAMPLE_CSV)}>Load sample</button>
+            </div>
+            <Textarea rows={6} value={raw} onChange={e => setRaw(e.target.value)} placeholder={BULK_MARKS_SAMPLE_CSV} className="font-mono text-xs" />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-annotation">Or upload a .csv file:</span>
+              <input
+                type="file"
+                accept=".csv"
+                aria-label="Upload CSV file"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setRaw(ev.target.result);
+                  reader.readAsText(file);
+                }}
+                className="text-xs text-annotation file:mr-2 file:py-0.5 file:px-2 file:rounded file:border file:border-rim file:text-xs file:bg-panel file:text-ink hover:file:bg-sunken transition-colors"
+              />
+            </div>
+          </div>
+        )}
+        {error && <AlertBox type="error">{error}</AlertBox>}
+        {result && (
+          <AlertBox type={result.errors?.length ? 'error' : 'success'}>
+            <div>
+              {result.updated || 0} updated
+              {result.skipped ? `, ${result.skipped} skipped` : ''}.
+              {result.errors?.length ? (
+                <ul className="mt-1.5 list-disc pl-4 text-xs space-y-0.5">
+                  {result.errors.slice(0, 8).map((er, i) => (
+                    <li key={i}>{typeof er === 'string' ? er : (er.message || JSON.stringify(er))}</li>
+                  ))}
+                  {result.errors.length > 8 && <li>…and {result.errors.length - 8} more</li>}
+                </ul>
+              ) : null}
+            </div>
+          </AlertBox>
+        )}
+      </div>
+    </Modal>
   );
 }

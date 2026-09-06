@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { aiAPI } from '../../services/ai';
-import { batchesAPI, usersAPI } from '../../services/api';
+import { classesAPI, usersAPI } from '../../services/api';
 import { Btn, Select, Spinner, Badge, Modal, ProgressBar } from '../../components/shared/UI';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -9,24 +9,24 @@ const PROB_COLOR = (p) => p >= 80 ? 'text-verify' : p >= 50 ? 'text-accent' : 't
 const BADGE_COLOR = (p) => p >= 80 ? 'verify' : p >= 50 ? 'accent' : 'alert';
 
 export default function AiPlacementPredictions() {
-  const [selectedBatch, setSelectedBatch] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
 
-  const { data: batches } = useQuery({
-    queryKey: ['batches'],
-    queryFn: batchesAPI.list,
+  const { data: classes } = useQuery({
+    queryKey: ['classes'],
+    queryFn: classesAPI.list,
   });
 
   const { data: predictions, isLoading } = useQuery({
-    queryKey: ['placement-predictions', selectedBatch],
-    queryFn: () => selectedBatch ? aiAPI.getBatchPredictions(selectedBatch) : Promise.resolve(null),
-    enabled: !!selectedBatch,
+    queryKey: ['placement-predictions', selectedClass],
+    queryFn: () => selectedClass ? aiAPI.getClassPredictions(selectedClass) : Promise.resolve(null),
+    enabled: !!selectedClass,
   });
 
   const { data: studentPredictions } = useQuery({
-    queryKey: ['all-students-batch', selectedBatch],
-    queryFn: () => usersAPI.list({ batch: selectedBatch }).then(r => r.users),
-    enabled: !!selectedBatch,
+    queryKey: ['all-students-class', selectedClass],
+    queryFn: () => usersAPI.list({ class_name: selectedClass }).then(r => r.users),
+    enabled: !!selectedClass,
   });
 
   const { data: individualPred } = useQuery({
@@ -35,7 +35,7 @@ export default function AiPlacementPredictions() {
     enabled: !!selectedStudent,
   });
 
-  const batchList = batches?.batches || [];
+  const classList = classes?.classes || [];
   const preds = predictions?.predictions || [];
 
   const chartData = preds.map(p => ({
@@ -53,9 +53,9 @@ export default function AiPlacementPredictions() {
       </div>
 
       <div className="panel p-4">
-        <Select label="Select Batch" value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)} className="max-w-xs">
-          <option value="">Choose a batch...</option>
-          {batchList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        <Select label="Select Class" value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="max-w-xs">
+          <option value="">Choose a class...</option>
+          {classList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
       </div>
 

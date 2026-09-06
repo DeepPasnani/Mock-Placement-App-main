@@ -21,9 +21,9 @@ async function listUsers(req, res) {
 
   params.push(limit, offset);
   const { rows } = await query(
-    `SELECT id, name, email, role, branch, department, batch, year_of_study,
+    `SELECT id, name, email, role, branch, department, class_name, year_of_study,
             roll_number, is_active, avatar_url, last_login, created_at
-     FROM users ${where} ORDER BY department, year_of_study, batch, name LIMIT $${params.length-1} OFFSET $${params.length}`,
+     FROM users ${where} ORDER BY department, year_of_study, class_name, name LIMIT $${params.length-1} OFFSET $${params.length}`,
     params
   );
 
@@ -106,7 +106,7 @@ async function getStats(req, res) {
   const { rows: recentSubmissions } = await query(`
     SELECT s.id, s.score, s.max_score, s.submitted_at, s.status,
       u.name as user_name, t.title as test_title,
-      u.department as user_department, u.batch as user_batch, u.year_of_study as user_year
+      u.department as user_department, u.class_name as user_class, u.year_of_study as user_year
     FROM submissions s
     JOIN users u ON s.user_id = u.id
     JOIN tests t ON s.test_id = t.id
@@ -119,19 +119,32 @@ async function getStats(req, res) {
 }
 
 // ── POST /api/users/admin ─────────────────────────────────────
+// Only super admins can reach this route (see routes/index.js). A super
+// admin can create either a department-scoped admin or another super
+// admin — this is the only way a new super admin ever gets made.
 async function createAdmin(req, res) {
-  const { name, email, password } = req.body;
+  const { name, email, password, department, role } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password required' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+  const finalRole = role === 'super_admin' ? 'super_admin' : 'admin';
+
+  let finalDepartment = null;
+  if (finalRole === 'admin') {
+    finalDepartment = normalizeDepartment(department);
+    if (!finalDepartment) {
+      return res.status(400).json({ error: `Department is required for an admin account. Choose one of: ${ALLOWED_DEPARTMENTS.join(', ')}` });
+    }
+  }
 
   const existing = await query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
   if (existing.rows.length) return res.status(400).json({ error: 'Email already registered' });
 
   const hash = await bcrypt.hash(password, 12);
   const { rows: [user] } = await query(
-    `INSERT INTO users (name, email, password_hash, role, created_by)
-     VALUES ($1,$2,$3,'admin',$4) RETURNING id, name, email, role, created_at`,
-    [name, email.toLowerCase(), hash, req.user.id]
+    `INSERT INTO users (name, email, password_hash, role, department, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, email, role, department, created_at`,
+    [name, email.toLowerCase(), hash, finalRole, finalDepartment, req.user.id]
   );
 
   // Email the new admin their credentials
@@ -187,24 +200,69 @@ async function bulkImport(req, res) {
 }
 
 // ── PATCH /api/users/:id ──────────────────────────────────────
+// Regular admins may edit any student's profile; editing an admin or
+// super_admin account (any field, not just role) is super-admin-only.
 async function updateUser(req, res) {
   const { id } = req.params;
-  const { name, role, is_active, branch, roll_number } = req.body;
+  const body = req.body;
+  // Accept both namings — the frontend historically sent isActive/rollNumber
+  // in some places and is_active/roll_number in others (the "Activate" /
+  // "Deactivate" toggle was actually silently broken by this exact
+  // mismatch: it sent isActive but this handler only ever read is_active).
+  const name = body.name;
+  const email = body.email;
+  const role = body.role;
+  const isActive = body.is_active !== undefined ? body.is_active : body.isActive;
+  const branch = body.branch;
+  const rollNumber = body.roll_number !== undefined ? body.roll_number : body.rollNumber;
+  const department = body.department;
+  const className = body.class_name !== undefined ? body.class_name : body.className;
+  const yearOfStudy = body.year_of_study !== undefined ? body.year_of_study : body.yearOfStudy;
+
+  const { rows: [target] } = await query('SELECT role FROM users WHERE id=$1', [id]);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const targetIsAdmin = target.role === 'admin' || target.role === 'super_admin';
+
+  // Changing a role is a privilege-escalation vector — requireAdmin alone
+  // would let any department admin PATCH their own row to 'super_admin'.
+  // Only a super admin may change anyone's role, and never their own (same
+  // "can't act on yourself" rule deleteUser already applies below).
+  if (role !== undefined) {
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Only a super admin can change roles' });
+    }
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot change your own role' });
+    }
+  }
+
+  // Same super-admin-only boundary extends to every other field once the
+  // target is an admin account — a department admin can fix a student's
+  // roll number, but not another admin's profile.
+  if (targetIsAdmin && req.user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Only a super admin can edit admin accounts' });
+  }
 
   const fields = [];
   const params = [];
+  const set = (col, val) => { params.push(val); fields.push(`${col}=$${params.length}`); };
 
-  if (name       !== undefined) { params.push(name);       fields.push(`name=$${params.length}`); }
-  if (role       !== undefined) { params.push(role);       fields.push(`role=$${params.length}`); }
-  if (is_active  !== undefined) { params.push(is_active);  fields.push(`is_active=$${params.length}`); }
-  if (branch     !== undefined) { params.push(branch);     fields.push(`branch=$${params.length}`); }
-  if (roll_number !== undefined){ params.push(roll_number);fields.push(`roll_number=$${params.length}`); }
+  if (name !== undefined) set('name', name);
+  if (email !== undefined) set('email', String(email).toLowerCase().trim());
+  if (role !== undefined) set('role', role);
+  if (isActive !== undefined) set('is_active', isActive);
+  if (branch !== undefined) set('branch', branch);
+  if (rollNumber !== undefined) set('roll_number', rollNumber);
+  if (department !== undefined) set('department', department);
+  if (className !== undefined) set('class_name', className);
+  if (yearOfStudy !== undefined) set('year_of_study', yearOfStudy === '' || yearOfStudy === null ? null : Number(yearOfStudy));
 
   if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
 
   params.push(id);
   const { rows: [user] } = await query(
-    `UPDATE users SET ${fields.join(', ')}, updated_at=NOW() WHERE id=$${params.length} RETURNING id, name, email, role, is_active`,
+    `UPDATE users SET ${fields.join(', ')}, updated_at=NOW() WHERE id=$${params.length}
+     RETURNING id, name, email, role, is_active, branch, roll_number, department, class_name, year_of_study`,
     params
   );
 
@@ -226,10 +284,25 @@ async function deleteUser(req, res) {
 }
 
 // ── GET /api/admins ───────────────────────────────────────────
+// Super admins see every admin account. A department admin only sees
+// admins from their own department (plus super admins, so they always
+// know who to escalate to) — admin accounts are not visible across
+// departments.
 async function listAdmins(req, res) {
+  if (req.user.role === 'super_admin') {
+    const { rows } = await query(
+      `SELECT id, name, email, role, department, is_active, created_at, last_login
+       FROM users WHERE role IN ('admin','super_admin') ORDER BY created_at DESC`
+    );
+    return res.json({ admins: rows });
+  }
+
   const { rows } = await query(
-    `SELECT id, name, email, role, is_active, created_at, last_login
-     FROM users WHERE role IN ('admin','super_admin') ORDER BY created_at DESC`
+    `SELECT id, name, email, role, department, is_active, created_at, last_login
+     FROM users
+     WHERE role = 'super_admin' OR (role = 'admin' AND department = $1)
+     ORDER BY created_at DESC`,
+    [req.user.department]
   );
   res.json({ admins: rows });
 }
@@ -300,10 +373,10 @@ async function sendResults(req, res) {
   res.json({ message: `Results queued for ${sent} student${sent !== 1 ? 's' : ''}.`, sent });
 }
 
-// ── POST /api/users/bulk-update-batch ────────────────────────
-// Bulk update student batch and year_of_study via CSV data.
-// For semester-start re-shuffling. Accepts array of { email, batch, year_of_study }.
-async function bulkUpdateBatch(req, res) {
+// ── POST /api/users/bulk-update-class ────────────────────────
+// Bulk update student class and year_of_study via CSV data.
+// For semester-start re-shuffling. Accepts array of { email, class_name, year_of_study }.
+async function bulkUpdateClass(req, res) {
   const { students } = req.body;
   if (!Array.isArray(students) || !students.length) {
     return res.status(400).json({ error: 'Student list required' });
@@ -316,7 +389,7 @@ async function bulkUpdateBatch(req, res) {
     try {
       const fields = [];
       const params = [];
-      if (s.batch !== undefined) { params.push(s.batch); fields.push(`batch=$${params.length}`); }
+      if (s.class_name !== undefined) { params.push(s.class_name); fields.push(`class_name=$${params.length}`); }
       if (s.year_of_study !== undefined) { params.push(parseInt(s.year_of_study)); fields.push(`year_of_study=$${params.length}`); }
       if (!fields.length) { results.errors.push(`${s.email}: No fields to update`); continue; }
 
@@ -340,7 +413,7 @@ async function bulkUpdateBatch(req, res) {
 // Individual student drill-down analytics
 async function getStudentAnalytics(req, res) {
   const { id } = req.params;
-  const { rows: [student] } = await query('SELECT id, name, email, branch, roll_number, batch, year_of_study FROM users WHERE id=$1 AND role=\'student\'', [id]);
+  const { rows: [student] } = await query('SELECT id, name, email, branch, roll_number, class_name, year_of_study FROM users WHERE id=$1 AND role=\'student\'', [id]);
   if (!student) return res.status(404).json({ error: 'Student not found' });
 
   // Overall stats
@@ -443,7 +516,7 @@ module.exports = {
   listAdmins,
   notifyTestScheduled,
   sendResults,
-  bulkUpdateBatch,
+  bulkUpdateClass,
   getStudentAnalytics,
   updateLanguage,
 };

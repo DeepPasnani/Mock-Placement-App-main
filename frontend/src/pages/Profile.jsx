@@ -38,13 +38,13 @@ function DetailRow({ label, value }) {
 
 export default function ProfilePage() {
   const { user, completeProfile } = useStore();
-  const { years, batches } = useClassOptions();
+  const { years, classes } = useClassOptions();
   const isStudent = user?.role === 'student';
 
   const [details, setDetails] = useState({
     rollNumber: user?.roll_number || '',
     department: user?.department || '',
-    batch: user?.batch || '',
+    className: user?.class_name || '',
     yearOfStudy: user?.year_of_study ? String(user.year_of_study) : '',
   });
   const [detailsError, setDetailsError] = useState('');
@@ -62,7 +62,7 @@ export default function ProfilePage() {
   const handleSaveDetails = async (e) => {
     e.preventDefault();
     setDetailsError('');
-    if (!details.rollNumber.trim() || !details.department || !details.batch || !details.yearOfStudy) {
+    if (!details.rollNumber.trim() || !details.department || !details.className || !details.yearOfStudy) {
       setDetailsError('Please fill in enrollment number, department, class, and year.');
       return;
     }
@@ -71,7 +71,7 @@ export default function ProfilePage() {
       await completeProfile({
         rollNumber: details.rollNumber.trim(),
         department: details.department,
-        batch: details.batch,
+        className: details.className,
         yearOfStudy: Number(details.yearOfStudy),
       });
       toast.success('Profile details updated.');
@@ -150,7 +150,7 @@ export default function ProfilePage() {
               <>
                 <DetailRow label="Enrollment No." value={user?.roll_number} />
                 <DetailRow label="Department" value={user?.department || user?.branch} />
-                <DetailRow label="Class / Batch" value={user?.batch} />
+                <DetailRow label="Class" value={user?.class_name} />
                 <DetailRow label="Year of Study" value={user?.year_of_study ? yearLabel(user?.year_of_study) : ''} />
               </>
             )}
@@ -199,16 +199,16 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="profile-batch" className="input-label">Class / Batch</label>
+                  <label htmlFor="profile-class" className="input-label">Class</label>
                   <select
-                    id="profile-batch"
-                    name="batch"
-                    value={details.batch}
+                    id="profile-class"
+                    name="className"
+                    value={details.className}
                     onChange={handleDetailsChange}
                     className="select-field"
                   >
                     <option value="">Select class</option>
-                    {batches.map((c) => (
+                    {classes.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>

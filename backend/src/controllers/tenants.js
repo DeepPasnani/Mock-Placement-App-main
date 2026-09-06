@@ -20,7 +20,17 @@ async function listTenants(req, res) {
   res.json({ tenants: rows });
 }
 
+// Only this tenant's own admins (or a super admin, who oversees every
+// tenant) may read its config — the route only requires `authenticate`, so
+// this check is what actually stops a student (or an admin belonging to a
+// different tenant) from reading another institution's branding/SSO setup.
+function canAccessTenant(req) {
+  if (req.user.role === 'super_admin') return true;
+  return req.user.role === 'admin' && req.user.tenant_id === req.params.id;
+}
+
 async function getTenant(req, res) {
+  if (!canAccessTenant(req)) return res.status(403).json({ error: 'Admin access required' });
   const { rows } = await query('SELECT * FROM tenants WHERE id = $1', [req.params.id]);
   if (!rows.length) return res.status(404).json({ error: 'Tenant not found' });
   res.json({ tenant: rows[0] });
@@ -80,6 +90,7 @@ async function verifyDomain(req, res) {
 }
 
 async function getTenantUsage(req, res) {
+  if (!canAccessTenant(req)) return res.status(403).json({ error: 'Admin access required' });
   const { id } = req.params;
 
   const { rows: [students] } = await query('SELECT COUNT(*) as count FROM users WHERE tenant_id=$1 AND role=$2', [id, 'student']);

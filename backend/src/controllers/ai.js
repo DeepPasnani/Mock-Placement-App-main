@@ -158,13 +158,13 @@ async function getPlacementPrediction(req, res) {
   }
 }
 
-async function getBatchPredictions(req, res) {
+async function getClassPredictions(req, res) {
   try {
-    const { batchId } = req.params;
-    const result = await aiService.generateBatchPredictions(batchId);
+    const { classId } = req.params;
+    const result = await aiService.generateClassPredictions(classId);
     res.json(result);
   } catch (err) {
-    logger.error({ err }, 'getBatchPredictions failed');
+    logger.error({ err }, 'getClassPredictions failed');
     res.status(500).json({ error: err.message });
   }
 }
@@ -237,7 +237,7 @@ module.exports = {
   autoTagBatch,
   generateFeedback,
   getPlacementPrediction,
-  getBatchPredictions,
+  getClassPredictions,
   naturalLanguageQueryHandler,
   logKeystroke,
   getCheatingAnalysis,

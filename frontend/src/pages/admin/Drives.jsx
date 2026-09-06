@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { drivesAPI, testsAPI, batchesAPI } from '../../services/api';
+import { drivesAPI, testsAPI, classesAPI } from '../../services/api';
 import { Btn, Spinner, Modal, Badge, ConfirmModal } from '../../components/shared/UI';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -28,11 +28,11 @@ export default function AdminDrives() {
 
   const { data: drivesData, isLoading } = useQuery({ queryKey: ['drives'], queryFn: drivesAPI.list });
   const { data: testsData } = useQuery({ queryKey: ['tests'], queryFn: testsAPI.list });
-  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: batchesAPI.list });
+  const { data: classesData } = useQuery({ queryKey: ['classes'], queryFn: classesAPI.list });
 
   const drives = drivesData?.drives || [];
   const tests = testsData?.tests || [];
-  const batches = batchesData?.batches || [];
+  const classes = classesData?.classes || [];
 
   const deleteMut = useMutation({
     mutationFn: drivesAPI.delete,
@@ -58,15 +58,15 @@ export default function AdminDrives() {
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),
   });
 
-  const addBatchMut = useMutation({
-    mutationFn: ({ id, data }) => drivesAPI.addBatch(id, data),
-    onSuccess: () => { toast.success('Batch added to drive'); qc.invalidateQueries({ queryKey: ['drives'] }); },
+  const addClassMut = useMutation({
+    mutationFn: ({ id, data }) => drivesAPI.addClass(id, data),
+    onSuccess: () => { toast.success('Class added to drive'); qc.invalidateQueries({ queryKey: ['drives'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),
   });
 
-  const removeBatchMut = useMutation({
-    mutationFn: ({ id, batchId }) => drivesAPI.removeBatch(id, batchId),
-    onSuccess: () => { toast.success('Batch removed'); qc.invalidateQueries({ queryKey: ['drives'] }); },
+  const removeClassMut = useMutation({
+    mutationFn: ({ id, classId }) => drivesAPI.removeClass(id, classId),
+    onSuccess: () => { toast.success('Class removed'); qc.invalidateQueries({ queryKey: ['drives'] }); },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed'),
   });
 
@@ -98,7 +98,7 @@ export default function AdminDrives() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
           <p className="empty-state-title">No drives yet</p>
-          <p className="empty-state-desc">Create a placement drive to group tests and batches together.</p>
+          <p className="empty-state-desc">Create a placement drive to group tests and classes together.</p>
           <Btn variant="primary" size="sm" onClick={() => setShowCreate(true)}>Create First Drive</Btn>
         </div>
       ) : (
@@ -153,12 +153,12 @@ export default function AdminDrives() {
 
       {/* Drive Detail Modal */}
       <DriveDetailModal isOpen={!!showDetail} drive={showDetail}
-        tests={tests} batches={batches}
+        tests={tests} classes={classes}
         onClose={() => setShowDetail(null)}
         onAddTest={(testId, round) => addTestMut.mutate({ id: showDetail.id, data: { test_id: testId, round_number: round, round_type: 'aptitude' } })}
         onRemoveTest={(testId) => removeTestMut.mutate({ id: showDetail.id, testId })}
-        onAddBatch={(batchId) => addBatchMut.mutate({ id: showDetail.id, data: { batch_id: batchId } })}
-        onRemoveBatch={(batchId) => removeBatchMut.mutate({ id: showDetail.id, batchId })}
+        onAddClass={(classId) => addClassMut.mutate({ id: showDetail.id, data: { class_id: classId } })}
+        onRemoveClass={(classId) => removeClassMut.mutate({ id: showDetail.id, classId })}
         onDelete={() => { deleteMut.mutate(showDetail.id); setShowDetail(null); }}
       />
     </div>
@@ -228,20 +228,20 @@ function DriveFormModal({ isOpen, onClose, initial, onSave }) {
   );
 }
 
-function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, onRemoveTest, onAddBatch, onRemoveBatch, onDelete }) {
+function DriveDetailModal({ isOpen, drive, tests, classes, onClose, onAddTest, onRemoveTest, onAddClass, onRemoveClass, onDelete }) {
   const [addTestId, setAddTestId] = useState('');
-  const [addBatchId, setAddBatchId] = useState('');
+  const [addClassId, setAddClassId] = useState('');
   const [roundNum, setRoundNum] = useState(1);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!isOpen || !drive) return null;
 
   const driveTests = Array.isArray(drive.tests) ? drive.tests : [];
-  const driveBatches = Array.isArray(drive.batches) ? drive.batches : [];
+  const driveClasses = Array.isArray(drive.classes) ? drive.classes : [];
   const addedTestIds = driveTests.map(t => t.test_id);
-  const addedBatchIds = driveBatches.map(b => b.batch_id);
+  const addedClassIds = driveClasses.map(c => c.class_id);
   const availableTests = tests.filter(t => !addedTestIds.includes(t.id));
-  const availableBatches = batches.filter(b => !addedBatchIds.includes(b.id));
+  const availableClasses = classes.filter(c => !addedClassIds.includes(c.id));
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={drive.title} width="max-w-2xl">
@@ -295,28 +295,28 @@ function DriveDetailModal({ isOpen, drive, tests, batches, onClose, onAddTest, o
           )}
         </div>
 
-        {/* Batches in Drive */}
+        {/* Classes in Drive */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold text-ink">Batches ({driveBatches.length})</h4>
-            {availableBatches.length > 0 && (
+            <h4 className="text-xs font-bold text-ink">Classes ({driveClasses.length})</h4>
+            {availableClasses.length > 0 && (
               <div className="flex gap-2 items-center">
-                <select className="select-field text-xs py-1 max-w-40" value={addBatchId} onChange={e => setAddBatchId(e.target.value)} aria-label="Batch to add to drive">
-                  <option value="">Select batch…</option>
-                  {availableBatches.map(b => <option key={b.id} value={b.id}>{b.batch_name} ({b.department})</option>)}
+                <select className="select-field text-xs py-1 max-w-40" value={addClassId} onChange={e => setAddClassId(e.target.value)} aria-label="Class to add to drive">
+                  <option value="">Select class…</option>
+                  {availableClasses.map(c => <option key={c.id} value={c.id}>{c.class_name} ({c.department})</option>)}
                 </select>
-                <Btn variant="primary" size="sm" disabled={!addBatchId} onClick={() => { onAddBatch(addBatchId); setAddBatchId(''); }}>Add</Btn>
+                <Btn variant="primary" size="sm" disabled={!addClassId} onClick={() => { onAddClass(addClassId); setAddClassId(''); }}>Add</Btn>
               </div>
             )}
           </div>
-          {driveBatches.length === 0 ? (
-            <p className="text-xs text-annotation/50 py-2">No batches mapped to this drive yet.</p>
+          {driveClasses.length === 0 ? (
+            <p className="text-xs text-annotation/50 py-2">No classes mapped to this drive yet.</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
-              {driveBatches.map(b => (
-                <span key={b.id} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-accent/10 text-xs text-accent">
-                  {b.batch_name}
-                  <button onClick={() => onRemoveBatch(b.batch_id)} className="hover:text-alert" aria-label={`Remove ${b.batch_name} batch`}>
+              {driveClasses.map(c => (
+                <span key={c.id} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-accent/10 text-xs text-accent">
+                  {c.class_name}
+                  <button onClick={() => onRemoveClass(c.class_id)} className="hover:text-alert" aria-label={`Remove ${c.class_name} class`}>
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>

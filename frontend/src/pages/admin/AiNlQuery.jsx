@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 const EXAMPLES = [
   'show me students who scored >80% in aptitude',
-  'which batch has the highest coding average',
+  'which class has the highest coding average',
   'students with the most tab switches in tests',
   'average score per genre across all submitted tests',
   'top 10 students by overall percentage',

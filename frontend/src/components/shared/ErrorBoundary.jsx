@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import * as Sentry from '@sentry/react';
 import { Btn } from './UI';
 
 export default class ErrorBoundary extends Component {
@@ -8,6 +9,13 @@ export default class ErrorBoundary extends Component {
   }
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    // A no-op if Sentry was never initialized (no VITE_SENTRY_DSN) — React
+    // render errors don't reach window.onerror on their own, so without
+    // this an error boundary catching one would otherwise never get
+    // reported.
+    Sentry.captureException(error, { extra: errorInfo });
   }
   render() {
     if (this.state.hasError) {

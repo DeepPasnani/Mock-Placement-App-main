@@ -26,9 +26,9 @@ async function sendBulkEmail(req, res) {
       params.push(recipients.departments);
       conditions.push(`department = ANY($${++idx})`);
     }
-    if (recipients?.batches?.length) {
-      params.push(recipients.batches);
-      conditions.push(`id IN (SELECT user_id FROM student_batches WHERE batch_id = ANY($${++idx}))`);
+    if (recipients?.classes?.length) {
+      params.push(recipients.classes);
+      conditions.push(`id IN (SELECT user_id FROM student_classes WHERE class_id = ANY($${++idx}))`);
     }
     if (recipients?.studentIds?.length) {
       params.push(recipients.studentIds);
@@ -64,10 +64,12 @@ async function sendBulkEmail(req, res) {
   let errors = 0;
   for (const student of unique) {
     try {
+      const personalizedSubject = subject.replaceAll('{name}', student.name);
+      const personalizedHtml = html.replaceAll('{name}', student.name);
       await sendEmail({
         to: student.email,
-        subject,
-        html: wrap(subject, html),
+        subject: personalizedSubject,
+        html: wrap(personalizedSubject, personalizedHtml),
       });
       sent++;
     } catch {
@@ -89,12 +91,12 @@ async function sendBulkEmail(req, res) {
 async function sendTestReminder(req, res) {
   const { testId } = req.params;
 
-  // Fetch test with its batch info
+  // Fetch test with its class info
   const { rows: [test] } = await query(`
-    SELECT t.*, array_agg(DISTINCT b.name) as batch_names
+    SELECT t.*, array_agg(DISTINCT c.name) as class_names
     FROM tests t
-    LEFT JOIN test_batches tb ON tb.test_id = t.id
-    LEFT JOIN batches b ON b.id = tb.batch_id
+    LEFT JOIN test_classes tc ON tc.test_id = t.id
+    LEFT JOIN classes c ON c.id = tc.class_id
     WHERE t.id = $1
     GROUP BY t.id
   `, [testId]);

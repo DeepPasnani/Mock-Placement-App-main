@@ -7,7 +7,7 @@ const PERMISSION_MAP = {
     'tests:create', 'tests:edit', 'tests:delete', 'tests:publish',
     'results:view', 'results:export',
     'users:view', 'users:create', 'users:edit',
-    'question-bank:manage', 'batches:manage',
+    'question-bank:manage', 'classes:manage',
   ],
   proctor: ['proctor:view-sessions', 'proctor:terminate', 'proctor:attendance', 'results:view'],
   auditor: ['audit:view', 'audit:export', 'results:view'],

@@ -23,7 +23,7 @@ async function globalSetup() {
         password: 'testpass123',
         department: 'Computer Engineering',
         rollNumber: 'TEST001',
-        batch: 'Batch 1',
+        className: 'Class 1',
       },
     });
   } catch {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { gamificationAPI, batchesAPI } from '../../services/api';
+import { gamificationAPI, classesAPI } from '../../services/api';
 import { Badge, Spinner } from '../../components/shared/UI';
 import { useStore } from '../../store';
 import { Trophy, Medal, Award, User, Users } from 'lucide-react';
@@ -14,7 +14,7 @@ const rankIcons = {
 export default function Leaderboard() {
   const { user } = useStore();
   const [testId, setTestId] = useState('');
-  const [batchFilter, setBatchFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
 
   const { data: testsData, isLoading: testsLoading } = useQuery({
     queryKey: ['leaderboard-tests'],
@@ -25,27 +25,28 @@ export default function Leaderboard() {
   const activeTest = tests.find(t => t.id === activeTestId);
 
   const { data: lbData, isLoading: lbLoading } = useQuery({
-    queryKey: ['leaderboard', activeTestId, batchFilter],
-    queryFn: () => gamificationAPI.getLeaderboard({ testId: activeTestId || undefined, batch: batchFilter || undefined }),
+    queryKey: ['leaderboard', activeTestId, classFilter],
+    queryFn: () => gamificationAPI.getLeaderboard({ testId: activeTestId || undefined, class: classFilter || undefined }),
     enabled: !!activeTestId,
   });
 
-  // Only the batches inside the student's own department + year are shown,
+  // Only the classes inside the student's own department + year are shown,
   // so they can drill into their class without ever seeing other scopes.
-  const { data: batchesData } = useQuery({
-    queryKey: ['batches'],
-    queryFn: batchesAPI.list,
+  const { data: classesData } = useQuery({
+    queryKey: ['classes'],
+    queryFn: classesAPI.list,
   });
   const myDept = user?.branch || user?.department;
   const myYear = user?.year_of_study;
-  const myBatches = (batchesData?.batches || []).filter(b =>
-    (!myDept || b.department === myDept) &&
-    (!myYear || String(b.year_of_study) === String(myYear))
+  const myClasses = (classesData?.classes || []).filter(c =>
+    (!myDept || c.department === myDept) &&
+    (!myYear || String(c.year_of_study) === String(myYear))
   );
 
   const leaderboard = lbData?.leaderboard || [];
   const myRank = lbData?.myRank;
   const maxScore = lbData?.maxScore;
+  const resultsAvailable = lbData?.resultsAvailable !== false;
 
   const scoreLabel = (entry) => {
     const label = `${Number(entry.score ?? 0).toLocaleString()} / ${Number(entry.max_score ?? 0).toLocaleString()}`;
@@ -84,16 +85,16 @@ export default function Leaderboard() {
           ))}
         </select>
         <div className="flex items-center gap-2 ml-auto">
-          {myBatches.length > 0 && (
+          {myClasses.length > 0 && (
             <select
-              value={batchFilter}
-              onChange={e => setBatchFilter(e.target.value)}
+              value={classFilter}
+              onChange={e => setClassFilter(e.target.value)}
               className="select-field text-xs"
-              aria-label="Filter by batch"
+              aria-label="Filter by class"
             >
-              <option value="">All Batches</option>
-              {myBatches.map(b => (
-                <option key={b.id} value={b.name}>{b.name}</option>
+              <option value="">All Classes</option>
+              {myClasses.map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
               ))}
             </select>
           )}
@@ -117,8 +118,12 @@ export default function Leaderboard() {
       {!activeTestId || leaderboard.length === 0 ? (
         <div className="empty-state py-16">
           <Trophy size={40} className="empty-state-icon" />
-          <h3 className="empty-state-title">No rankings yet</h3>
-          <p className="empty-state-desc">This test has no submitted papers yet — results will appear here once students finish.</p>
+          <h3 className="empty-state-title">{resultsAvailable ? 'No rankings yet' : 'Rankings not available yet'}</h3>
+          <p className="empty-state-desc">
+            {resultsAvailable
+              ? 'This test has no submitted papers yet — results will appear here once students finish.'
+              : 'Your placement coordinator hasn’t published results for this test yet.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -145,7 +150,7 @@ export default function Leaderboard() {
                     </span>
                   </div>
                   <div className="text-xs text-annotation/60">
-                    {entry.branch || ''} {entry.batch ? `• ${entry.batch}` : ''}
+                    {entry.branch || ''} {entry.class_name ? `• ${entry.class_name}` : ''}
                   </div>
                 </div>
                 <div className="text-right">

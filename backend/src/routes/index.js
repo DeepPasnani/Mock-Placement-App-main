@@ -4,9 +4,7 @@ const { authenticate, requireAdmin, requireSuperAdmin } = require('../middleware
 const { checkPermission } = require('../middleware/rbac');
 const { detectTenant } = require('../middleware/tenant');
 const rawBody = express.raw({ type: 'application/json' });
-const { apiLimiter, authLimiter, codeLimiter, bulkImportLimiter, emailLimiter } = require('../middleware/rateLimit');
 
-router.use(apiLimiter);
 router.use(detectTenant);
 
 const { upload } = require('../services/cloudinary');
@@ -21,15 +19,15 @@ const procCtrl = require('../controllers/proctoring');
 const shuffleCtrl = require('../controllers/shuffle');
 const securityCtrl = require('../controllers/security');
 
-router.post('/auth/login',            authLimiter, authCtrl.login);
-router.post('/auth/register',         authLimiter, authCtrl.register);
-router.post('/auth/google',           authLimiter, authCtrl.googleLogin);
+router.post('/auth/login',            authCtrl.login);
+router.post('/auth/register',         authCtrl.register);
+router.post('/auth/google',           authCtrl.googleLogin);
 router.post('/auth/complete-profile', authenticate, authCtrl.completeProfile);
 router.post('/auth/logout',           authenticate, authCtrl.logout);
 router.get ('/auth/me',               authenticate, authCtrl.getMe);
 router.post('/auth/change-password',  authenticate, authCtrl.changePassword);
-router.post('/auth/forgot-password',  authLimiter,  authCtrl.forgotPassword);
-router.post('/auth/reset-password',   authLimiter,  authCtrl.resetPassword);
+router.post('/auth/forgot-password',  authCtrl.forgotPassword);
+router.post('/auth/reset-password',   authCtrl.resetPassword);
 
 // ── Tests ─────────────────────────────────────────────────────
 router.get   ('/tests',                   authenticate, testCtrl.listTests);
@@ -44,7 +42,7 @@ router.put   ('/tests/:id/schedule',      authenticate, requireAdmin, testCtrl.s
 router.post('/submissions/start',          authenticate, subCtrl.startTest);
 router.post('/submissions/save',           authenticate, subCtrl.saveAnswers);
 router.post('/submissions/submit',         authenticate, validate(submitTestSchema), subCtrl.submitTest);
-router.post('/submissions/run-code',            authenticate, codeLimiter, subCtrl.runCode);
+router.post('/submissions/run-code',            authenticate, subCtrl.runCode);
 router.get ('/submissions/run-code/result/:id', authenticate, subCtrl.getRunCodeResult);
 // NOTE: these four were previously missing — submitFingerprint, verifyFingerprint,
 // logFullscreenViolation, and getTimeBombStatus all already existed fully
@@ -58,19 +56,22 @@ router.post('/submissions/fullscreen-violation', authenticate, subCtrl.logFullsc
 router.get ('/submissions/time-bomb-status',   authenticate, subCtrl.getTimeBombStatus);
 router.get ('/submissions/my',             authenticate, subCtrl.getMySubmissions);
 router.get ('/submissions/test/:testId',   authenticate, requireAdmin, subCtrl.getTestSubmissions);
+router.put ('/submissions/test/:testId/publish-results',   authenticate, requireAdmin, subCtrl.publishResults);
+router.put ('/submissions/test/:testId/unpublish-results', authenticate, requireAdmin, subCtrl.unpublishResults);
 router.get ('/submissions/test/:testId/export-pdf', authenticate, requireAdmin, subCtrl.exportResultsPdf);
 router.get ('/submissions/test/:testId/export-csv', authenticate, requireAdmin, subCtrl.exportResultsCsv);
 router.delete('/submissions/:id',          authenticate, requireAdmin, subCtrl.deleteSubmission);
 router.get ('/submissions/question-analytics', authenticate, requireAdmin, subCtrl.getQuestionAnalytics);
 router.get ('/submissions/plagiarism-check/:testId', authenticate, requireAdmin, subCtrl.checkPlagiarism);
+router.post('/submissions/plagiarism-check/:testId/bulk-action', authenticate, requireAdmin, subCtrl.plagiarismBulkAction);
 router.get ('/submissions/:id',            authenticate, subCtrl.getSubmission);
 
 // ── Users ─────────────────────────────────────────────────────
 router.get   ('/users',                authenticate, requireAdmin, userCtrl.listUsers);
 router.get   ('/users/stats',          authenticate, requireAdmin, userCtrl.getStats);
 router.post  ('/users/admin',          authenticate, requireSuperAdmin, userCtrl.createAdmin);
-router.post  ('/users/bulk-import',    authenticate, requireAdmin, bulkImportLimiter, validate(bulkImportSchema), userCtrl.bulkImport);
-router.post  ('/users/bulk-update-batch', authenticate, requireAdmin, userCtrl.bulkUpdateBatch);
+router.post  ('/users/bulk-import',    authenticate, requireAdmin, validate(bulkImportSchema), userCtrl.bulkImport);
+router.post  ('/users/bulk-update-class', authenticate, requireAdmin, userCtrl.bulkUpdateClass);
 // NOTE: sendResults already existed fully implemented in controllers/users.js
 // but was never routed — the admin "email results to students" action 404'd.
 router.post  ('/users/send-results',      authenticate, requireAdmin, userCtrl.sendResults);
@@ -81,7 +82,7 @@ router.delete('/users/:id',            authenticate, requireSuperAdmin, userCtrl
 router.put   ('/users/preferences/language', authenticate, userCtrl.updateLanguage);
 
 // ── Admins ────────────────────────────────────────────────────
-router.get('/admins', authenticate, requireSuperAdmin, userCtrl.listAdmins);
+router.get('/admins', authenticate, requireAdmin, userCtrl.listAdmins);
 
 // ── Image Upload ──────────────────────────────────────────────
 router.post  ('/upload/image',             authenticate, requireAdmin, upload.single('image'), upCtrl.uploadImage);
@@ -93,19 +94,24 @@ router.delete('/upload/image/:publicId',   authenticate, requireAdmin, upCtrl.de
 // test-builder page and the student's test-taking page.
 router.get   ('/images/:id',               upCtrl.getImage);
 
-// ── Batches ───────────────────────────────────────────────────
-const batchCtrl = require('../controllers/batches');
+// ── Classes ───────────────────────────────────────────────────
+const classCtrl = require('../controllers/classes');
 // Read-only and not sensitive (just name/department/year) — left open to any
-// authenticated user because the student Leaderboard page's batch filter
+// authenticated user because the student Leaderboard page's class filter
 // calls this too; students were previously getting a 403 here.
-router.get  ('/batches',                  authenticate, batchCtrl.listBatches);
-router.post ('/batches',                  authenticate, requireAdmin, batchCtrl.createBatch);
-router.delete('/batches/:id',             authenticate, requireAdmin, batchCtrl.deleteBatch);
-router.post ('/batches/assign',           authenticate, requireAdmin, batchCtrl.assignBatch);
-router.post ('/tests/:id/batches',        authenticate, requireAdmin, batchCtrl.mapTestBatches);
-router.get  ('/tests/:id/batches',        authenticate, requireAdmin, batchCtrl.getTestBatches);
+router.get  ('/classes',                  authenticate, classCtrl.listClasses);
+router.post ('/classes',                  authenticate, requireAdmin, classCtrl.createClass);
+router.delete('/classes/:id',             authenticate, requireAdmin, classCtrl.deleteClass);
+router.post ('/classes/assign',           authenticate, requireAdmin, classCtrl.assignClass);
+router.post ('/tests/:id/classes',        authenticate, requireAdmin, classCtrl.mapTestClasses);
+router.get  ('/tests/:id/classes',        authenticate, requireAdmin, classCtrl.getTestClasses);
 
 router.post('/submissions/resume/:id',    authenticate, requireAdmin, subCtrl.resumeTest);
+router.post('/submissions/:id/force-stop', authenticate, requireAdmin, subCtrl.forceStopTest);
+router.patch('/submissions/:id/marks',     authenticate, requireAdmin, subCtrl.updateMarks);
+router.patch('/submissions/test/:testId/adjust-marks', authenticate, requireAdmin, subCtrl.adjustAllMarks);
+router.post('/submissions/bulk-marks/csv',  authenticate, requireAdmin, subCtrl.bulkMarksCsv);
+router.post('/submissions/bulk-marks/json', authenticate, requireAdmin, subCtrl.bulkMarksJson);
 
 // ── Question Bank ─────────────────────────────────────────────
 const bankCtrl = require('../controllers/questionBank');
@@ -115,6 +121,7 @@ router.post  ('/question-bank/import',    authenticate, requireAdmin, bankCtrl.b
 router.delete('/question-bank/:id',       authenticate, requireAdmin, bankCtrl.deleteBank);
 router.post('/question-bank/import-csv',    authenticate, requireAdmin, bankCtrl.importCsv);
 router.post('/question-bank/import-json',   authenticate, requireAdmin, bankCtrl.importJson);
+router.post('/question-bank/import-images', authenticate, requireAdmin, upload.array('images', 30), bankCtrl.importImages);
 router.post('/question-bank/from-test/:testId', authenticate, requireAdmin, bankCtrl.importFromTest);
 
 // ── Drives ────────────────────────────────────────────────
@@ -126,17 +133,17 @@ router.put   ('/drives/:id',                authenticate, requireAdmin, driveCtr
 router.delete('/drives/:id',                authenticate, requireAdmin, driveCtrl.deleteDrive);
 router.post  ('/drives/:id/tests',          authenticate, requireAdmin, driveCtrl.addTestToDrive);
 router.delete('/drives/:id/tests/:testId',  authenticate, requireAdmin, driveCtrl.removeTestFromDrive);
-router.post  ('/drives/:id/batches',        authenticate, requireAdmin, driveCtrl.addBatchToDrive);
-router.delete('/drives/:id/batches/:batchId', authenticate, requireAdmin, driveCtrl.removeBatchFromDrive);
+router.post  ('/drives/:id/classes',        authenticate, requireAdmin, driveCtrl.addClassToDrive);
+router.delete('/drives/:id/classes/:classId', authenticate, requireAdmin, driveCtrl.removeClassFromDrive);
 router.get   ('/drives/:id/stats',          authenticate, requireAdmin, driveCtrl.getDriveStats);
 
 // ── Email ─────────────────────────────────────────────────
 const emailCtrl = require('../controllers/email');
-router.post('/email/send', authenticate, requireAdmin, emailLimiter, validate(sendEmailSchema), emailCtrl.sendBulkEmail);
+router.post('/email/send', authenticate, requireAdmin, validate(sendEmailSchema), emailCtrl.sendBulkEmail);
 // NOTE: sendTestReminder already existed fully implemented in
 // controllers/email.js but was never routed — the admin "remind students"
 // button on a scheduled test 404'd.
-router.post('/email/test-reminder/:testId', authenticate, requireAdmin, emailLimiter, emailCtrl.sendTestReminder);
+router.post('/email/test-reminder/:testId', authenticate, requireAdmin, emailCtrl.sendTestReminder);
 
 // ── Leaderboard ──────────────────────────────────────────
 const gamifyCtrl = require('../controllers/gamification');
@@ -154,7 +161,7 @@ router.get   ('/analytics/cohort/distribution',          authenticate, requireAd
 router.get   ('/analytics/student-growth/:userId',       authenticate, requireAdmin, analyticsCtrl.getStudentGrowth);
 router.get   ('/analytics/question-metrics/:testId',     authenticate, requireAdmin, analyticsCtrl.getQuestionMetrics);
 router.get   ('/analytics/time-sink/:testId',            authenticate, requireAdmin, analyticsCtrl.getTimeSinkAnalysis);
-router.get   ('/analytics/placement-probability',        authenticate, requireAdmin, analyticsCtrl.getPlacementProbabilityBatch);
+router.get   ('/analytics/placement-probability',        authenticate, requireAdmin, analyticsCtrl.getPlacementProbabilityByClass);
 router.get   ('/analytics/placement-probability/:userId', authenticate, requireAdmin, analyticsCtrl.getPlacementProbabilityStudent);
 router.post  ('/analytics/report-builder',               authenticate, requireAdmin, analyticsCtrl.reportBuilder);
 router.get   ('/analytics/scheduled-reports',            authenticate, requireAdmin, analyticsCtrl.listScheduledReports);
@@ -179,7 +186,7 @@ router.post  ('/ai/auto-tag',                authenticate, requireAdmin, aiCtrl.
 router.post  ('/ai/auto-tag-batch',          authenticate, requireAdmin, aiCtrl.autoTagBatch);
 router.post  ('/ai/performance-feedback',    authenticate, aiCtrl.generateFeedback);
 router.get   ('/ai/placement-prediction/:userId', authenticate, requireAdmin, aiCtrl.getPlacementPrediction);
-router.get   ('/ai/placement-predictions/batch/:batchId', authenticate, requireAdmin, aiCtrl.getBatchPredictions);
+router.get   ('/ai/placement-predictions/class/:classId', authenticate, requireAdmin, aiCtrl.getClassPredictions);
 router.post  ('/ai/nl-query',                authenticate, requireAdmin, aiCtrl.naturalLanguageQueryHandler);
 router.post  ('/submissions/log-keystroke',  authenticate, aiCtrl.logKeystroke);
 router.get   ('/submissions/cheating-analysis/:testId', authenticate, requireAdmin, aiCtrl.getCheatingAnalysis);
@@ -308,7 +315,7 @@ router.post ('/admin/sessions/:id/revoke',   authenticate, requireAdmin, session
 // ── Health check ──────────────────────────────────────────────
 router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// ── Class metadata (years / batches / departments) ─────────────
+// ── Class metadata (years / classes / departments) ─────────────
 // Deliberately unauthenticated: the public Login/register form fetches
 // these options before the student has a token. Only non-sensitive
 // static lists are returned.
@@ -335,7 +342,7 @@ router.post  ('/code/format',                     authenticate, codeOpsCtrl.form
 router.post  ('/submissions/code-snapshot',       authenticate, codeOpsCtrl.saveCodeSnapshot);
 router.get   ('/submissions/:id/playback',        authenticate, codeOpsCtrl.getPlayback);
 router.post  ('/submissions/:id/quality-report',  authenticate, codeOpsCtrl.getQualityReport);
-router.post  ('/submissions/run-custom-test',     authenticate, codeLimiter, codeOpsCtrl.runCustomTest);
+router.post  ('/submissions/run-custom-test',     authenticate, codeOpsCtrl.runCustomTest);
 router.post  ('/submissions/save-custom-test',    authenticate, codeOpsCtrl.saveCustomTest);
 router.get   ('/saved-custom-tests/:problemId',   authenticate, codeOpsCtrl.getSavedCustomTests);
 router.delete('/saved-custom-tests/:id',          authenticate, codeOpsCtrl.deleteSavedCustomTest);
@@ -373,5 +380,13 @@ router.post  ('/forum/threads/:id/reply',            authenticate, forumCtrl.rep
 router.post  ('/forum/replies/:id/upvote',           authenticate, forumCtrl.upvoteReply);
 router.put   ('/forum/replies/:id',                  authenticate, forumCtrl.updateReply);
 router.delete('/forum/replies/:id',                  authenticate, forumCtrl.deleteReply);
+
+// ── Resources (admin-uploaded study material: Aptitude/Coding/GD/PI) ───
+const resourceCtrl = require('../controllers/resources');
+router.get   ('/resources',           authenticate, resourceCtrl.listResources);
+router.get   ('/resources/:id/file',  authenticate, resourceCtrl.getResourceFile);
+router.post  ('/resources',           authenticate, requireAdmin, resourceCtrl.upload.single('file'), resourceCtrl.createResource);
+router.patch ('/resources/:id',       authenticate, requireAdmin, resourceCtrl.updateResource);
+router.delete('/resources/:id',       authenticate, requireAdmin, resourceCtrl.deleteResource);
 
 module.exports = router;

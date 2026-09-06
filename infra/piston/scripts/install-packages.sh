@@ -21,10 +21,6 @@ PACKAGES=(
   "node 18.15.0"       # backs the "javascript" language
   "java 15.0.2"
   "gcc 10.2.0"         # backs both "c" and "c++" (cpp)
-  "go 1.16.2"
-  "ruby 3.0.1"
-  "rust 1.68.2"
-  "kotlin 1.8.20"
   "sqlite3 3.36.0"     # backs the "sql" language
 )
 
