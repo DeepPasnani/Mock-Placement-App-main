@@ -404,6 +404,45 @@ async function resetPassword(req, res) {
   res.json({ message: 'Password reset successfully. Please log in.' });
 }
 
+// ── DELETE /api/auth/me (student self-service only) ───────────
+// Permanently deletes the student's own account. Everything keyed to
+// user_id (submissions, saved custom tests, bookmarks, drive applications,
+// etc.) cascades via the same ON DELETE CASCADE foreign keys the admin
+// bulk-delete-users path already relies on — this isn't a soft delete.
+async function deleteMyAccount(req, res) {
+  if (req.user.role !== 'student') {
+    return res.status(403).json({ error: 'Self-service account deletion is only available for student accounts.' });
+  }
+
+  const { password, confirm } = req.body;
+  if (confirm !== 'DELETE') {
+    return res.status(400).json({ error: 'Type DELETE to confirm.' });
+  }
+
+  const { rows } = await query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+  if (rows[0]?.password_hash) {
+    if (!password) return res.status(400).json({ error: 'Password is required to delete your account.' });
+    const valid = await bcrypt.compare(password, rows[0].password_hash);
+    if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
+  }
+
+  // A test still in progress holds Redis session state (timer, tab-switch
+  // count) that nothing would clean up if the row disappears mid-exam —
+  // same reasoning as the edit-test guard for in-progress submissions.
+  const { rows: activeRows } = await query(
+    "SELECT COUNT(*)::int AS n FROM submissions WHERE user_id=$1 AND status='in_progress'",
+    [req.user.id]
+  );
+  if (activeRows[0]?.n > 0) {
+    return res.status(400).json({ error: 'You have a test in progress. Finish it (or wait for it to auto-submit) before deleting your account.' });
+  }
+
+  await query('DELETE FROM users WHERE id = $1', [req.user.id]);
+  await cacheDel(`user:${req.user.id}`);
+
+  res.json({ message: 'Your account and all associated data have been permanently deleted.' });
+}
+
 module.exports = {
   login,
   register,
@@ -414,5 +453,6 @@ module.exports = {
   changePassword,
   forgotPassword,
   resetPassword,
+  deleteMyAccount,
   isStudentProfileComplete,
 };

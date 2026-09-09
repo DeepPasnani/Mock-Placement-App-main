@@ -100,6 +100,36 @@ function clusterByTest(questions) {
   return groups;
 }
 
+// Bulk "set marks" modal shared by both the MCQ and Coding bank tabs —
+// applies one marks value to every selected bank question at once.
+function BulkMarksModal({ isOpen, count, onClose, onConfirm, isLoading }) {
+  const [marks, setMarks] = useState('');
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Set marks for selected">
+      <p className="text-sm text-annotation mb-3">
+        Apply one marks value to all {count} selected question{count === 1 ? '' : 's'}.
+      </p>
+      <Input
+        type="number"
+        min="0"
+        value={marks}
+        onChange={e => setMarks(e.target.value)}
+        placeholder="Marks"
+        autoFocus
+      />
+      <div className="flex justify-end gap-2 mt-4">
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn
+          disabled={marks === '' || Number.isNaN(Number(marks)) || Number(marks) < 0 || isLoading}
+          onClick={() => onConfirm(Number(marks))}
+        >
+          {isLoading ? 'Applying…' : 'Apply'}
+        </Btn>
+      </div>
+    </Modal>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════
 // MCQ Tab
 // ═══════════════════════════════════════════════════════════
@@ -114,6 +144,7 @@ function McqBankTab() {
   const [imagesOpen, setImagesOpen] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkMarksOpen, setBulkMarksOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['question-bank', 'mcq', genre, search],
@@ -134,6 +165,17 @@ function McqBankTab() {
       qc.invalidateQueries({ queryKey: ['question-bank', 'mcq'] });
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to delete questions'),
+  });
+
+  const bulkMarksMut = useMutation({
+    mutationFn: ({ marks }) => questionBankAPI.bulkUpdateMarks([...selected], marks),
+    onSuccess: (res) => {
+      toast.success(`Updated marks for ${res.updated} question${res.updated === 1 ? '' : 's'}`);
+      setSelected(new Set());
+      setBulkMarksOpen(false);
+      qc.invalidateQueries({ queryKey: ['question-bank', 'mcq'] });
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update marks'),
   });
 
   const questions = data?.questions || [];
@@ -193,9 +235,14 @@ function McqBankTab() {
         </Select>
         <div className="ml-auto flex gap-2">
           {selected.size > 0 && (
-            <Btn variant="danger" onClick={() => setBulkDeleteOpen(true)}>
-              Delete Selected ({selected.size})
-            </Btn>
+            <>
+              <Btn variant="ghost" onClick={() => setBulkMarksOpen(true)}>
+                Set Marks ({selected.size})
+              </Btn>
+              <Btn variant="danger" onClick={() => setBulkDeleteOpen(true)}>
+                Delete Selected ({selected.size})
+              </Btn>
+            </>
           )}
           <Btn variant="ghost" onClick={() => setImagesOpen(true)}>Import Images</Btn>
           <Btn variant="ghost" onClick={() => setImportOpen(true)}>Import JSON</Btn>
@@ -237,6 +284,13 @@ function McqBankTab() {
         onConfirm={() => bulkDeleteMut.mutate([...selected])}
         title="Delete selected questions"
         message={`Remove ${selected.size} question${selected.size === 1 ? '' : 's'} from the bank? Tests that already used them are unaffected. This can't be undone.`}
+      />
+      <BulkMarksModal
+        isOpen={bulkMarksOpen}
+        count={selected.size}
+        onClose={() => setBulkMarksOpen(false)}
+        onConfirm={(marks) => bulkMarksMut.mutate({ marks })}
+        isLoading={bulkMarksMut.isLoading}
       />
     </div>
   );
@@ -588,6 +642,7 @@ function CodingBankTab() {
   const [groupBy, setGroupBy] = useState('none');
   const [selected, setSelected] = useState(() => new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkMarksOpen, setBulkMarksOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['question-bank', 'coding'],
@@ -606,6 +661,16 @@ function CodingBankTab() {
       qc.invalidateQueries({ queryKey: ['question-bank', 'coding'] });
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Failed to delete questions'),
+  });
+  const bulkMarksMut = useMutation({
+    mutationFn: ({ marks }) => questionBankAPI.bulkUpdateMarks([...selected], marks),
+    onSuccess: (res) => {
+      toast.success(`Updated marks for ${res.updated} question${res.updated === 1 ? '' : 's'}`);
+      setSelected(new Set());
+      setBulkMarksOpen(false);
+      qc.invalidateQueries({ queryKey: ['question-bank', 'coding'] });
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update marks'),
   });
 
   const questions = data?.questions || [];
@@ -658,9 +723,14 @@ function CodingBankTab() {
         </Select>
         <div className="ml-auto flex gap-2">
           {selected.size > 0 && (
-            <Btn variant="danger" onClick={() => setBulkDeleteOpen(true)}>
-              Delete Selected ({selected.size})
-            </Btn>
+            <>
+              <Btn variant="ghost" onClick={() => setBulkMarksOpen(true)}>
+                Set Marks ({selected.size})
+              </Btn>
+              <Btn variant="danger" onClick={() => setBulkDeleteOpen(true)}>
+                Delete Selected ({selected.size})
+              </Btn>
+            </>
           )}
           <Btn variant="ghost" onClick={() => setImportOpen(true)}>Import CSV</Btn>
           <Btn onClick={() => setCreateOpen(true)}>New Coding Question</Btn>
@@ -706,6 +776,13 @@ function CodingBankTab() {
         onConfirm={() => bulkDeleteMut.mutate([...selected])}
         title="Delete selected questions"
         message={`Remove ${selected.size} question${selected.size === 1 ? '' : 's'} from the bank? Tests that already used them are unaffected. This can't be undone.`}
+      />
+      <BulkMarksModal
+        isOpen={bulkMarksOpen}
+        count={selected.size}
+        onClose={() => setBulkMarksOpen(false)}
+        onConfirm={(marks) => bulkMarksMut.mutate({ marks })}
+        isLoading={bulkMarksMut.isLoading}
       />
     </div>
   );

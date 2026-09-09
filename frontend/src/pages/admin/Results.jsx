@@ -67,14 +67,14 @@ export default function AdminResults() {
 
   // Class-wise breakdown (always computed off the full, unfiltered set)
   const classBreakdown = classOptions.map(c => {
-    const rows = allSubs.filter(s => s.class_display === c && s.status === 'submitted' && s.max_score > 0);
+    const rows = allSubs.filter(s => s.class_display === c && (s.status === 'submitted' || s.status === 'auto_submitted') && s.max_score > 0);
     const avg = rows.length ? Math.round(rows.reduce((a, s) => a + (s.score / s.max_score) * 100, 0) / rows.length) : 0;
     const passed = rows.filter(s => (s.score / s.max_score) * 100 >= 40).length;
     return { className: c, count: rows.length, avg, passRate: rows.length ? Math.round((passed / rows.length) * 100) : 0 };
   });
 
   const scored = subs.filter(
-    s => s.status === 'submitted' && s.max_score > 0,
+    s => (s.status === 'submitted' || s.status === 'auto_submitted') && s.max_score > 0,
   );
   const inProgress = subs.filter(s => s.status === 'in_progress');
   const pendingCount = inProgress.length;
@@ -282,9 +282,10 @@ export default function AdminResults() {
         return 0;
       });
     } else {
+      const isDone = (s) => s.status === 'submitted' || s.status === 'auto_submitted';
       list.sort(
         (a, b) =>
-          (b.status === 'submitted' ? 1 : 0) - (a.status === 'submitted' ? 1 : 0) ||
+          (isDone(b) ? 1 : 0) - (isDone(a) ? 1 : 0) ||
           (b.max_score > 0 ? b.score / b.max_score : 0) -
             (a.max_score > 0 ? a.score / a.max_score : 0),
       );

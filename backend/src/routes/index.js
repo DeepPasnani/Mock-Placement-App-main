@@ -26,6 +26,7 @@ router.post('/auth/complete-profile', authenticate, authCtrl.completeProfile);
 router.post('/auth/logout',           authenticate, authCtrl.logout);
 router.get ('/auth/me',               authenticate, authCtrl.getMe);
 router.post('/auth/change-password',  authenticate, authCtrl.changePassword);
+router.delete('/auth/me',             authenticate, authCtrl.deleteMyAccount);
 router.post('/auth/forgot-password',  authCtrl.forgotPassword);
 router.post('/auth/reset-password',   authCtrl.resetPassword);
 
@@ -274,6 +275,7 @@ const bulkCtrl = require('../controllers/bulk');
 router.post('/tests/bulk-delete',       authenticate, requireAdmin, bulkCtrl.bulkDeleteTests);
 router.post('/tests/bulk-archive',      authenticate, requireAdmin, bulkCtrl.bulkArchiveTests);
 router.post('/question-bank/bulk-delete', authenticate, requireAdmin, bulkCtrl.bulkDeleteQuestions);
+router.post('/question-bank/bulk-marks', authenticate, requireAdmin, bulkCtrl.bulkUpdateQuestionMarks);
 router.post('/users/bulk-delete',       authenticate, requireSuperAdmin, bulkCtrl.bulkDeleteUsers);
 
 // ═══════════════════════════════════════════════════════════════

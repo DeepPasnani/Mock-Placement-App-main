@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { authAPI } from '../services/api';
-import { Spinner, Btn, Alert } from '../components/shared/UI';
+import { Spinner, Btn, Alert, Modal, Input } from '../components/shared/UI';
 import { ALLOWED_DEPARTMENTS as DEPARTMENTS } from '../lib/departments';
 import { useClassOptions } from '../hooks/useClassOptions';
 import toast from 'react-hot-toast';
@@ -37,7 +38,8 @@ function DetailRow({ label, value }) {
 }
 
 export default function ProfilePage() {
-  const { user, completeProfile } = useStore();
+  const { user, completeProfile, deleteAccount } = useStore();
+  const navigate = useNavigate();
   const { years, classes } = useClassOptions();
   const isStudent = user?.role === 'student';
 
@@ -116,6 +118,38 @@ export default function ProfilePage() {
       }
     } finally {
       setSavingPw(false);
+    }
+  };
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const closeDeleteModal = () => {
+    setDeleteOpen(false);
+    setDeleteConfirm('');
+    setDeletePassword('');
+    setDeleteError('');
+  };
+
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault();
+    setDeleteError('');
+    if (deleteConfirm !== 'DELETE') {
+      setDeleteError('Type DELETE (in capitals) to confirm.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteAccount({ confirm: deleteConfirm, password: deletePassword || undefined });
+      toast.success('Your account has been deleted.');
+      navigate('/login', { replace: true });
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || 'Could not delete your account. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -297,6 +331,65 @@ export default function ProfilePage() {
           </Btn>
         </form>
       </section>
+
+      {/* Danger zone */}
+      {isStudent && (
+        <section className="panel p-5 max-w-2xl border-alert/30">
+          <h2 className="font-display font-bold text-sm text-alert mb-1">Danger Zone</h2>
+          <p className="text-xs text-annotation/70 mb-4">
+            Permanently delete your account and everything tied to it — submissions, scores,
+            bookmarks, and saved custom tests. This cannot be undone.
+          </p>
+          <Btn variant="danger" onClick={() => setDeleteOpen(true)}>
+            Delete My Account
+          </Btn>
+        </section>
+      )}
+
+      <Modal isOpen={deleteOpen} onClose={closeDeleteModal} title="Delete your account">
+        <form onSubmit={handleDeleteAccount} className="space-y-3.5">
+          <Alert type="error">
+            This permanently deletes your account, profile, test submissions and scores,
+            bookmarks, and any saved custom tests. There is no way to undo this.
+          </Alert>
+
+          {deleteError && <Alert type="error">{deleteError}</Alert>}
+
+          <div>
+            <label htmlFor="delete-password" className="input-label">
+              Current Password <span className="text-annotation/50 font-normal">(leave blank if you sign in with Google)</span>
+            </label>
+            <Input
+              id="delete-password"
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="delete-confirm" className="input-label">
+              Type <span className="font-mono font-bold text-alert">DELETE</span> to confirm
+            </label>
+            <Input
+              id="delete-confirm"
+              type="text"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Btn type="button" variant="ghost" onClick={closeDeleteModal}>Cancel</Btn>
+            <Btn type="submit" variant="danger" disabled={deleting || deleteConfirm !== 'DELETE'}>
+              {deleting && <Spinner size={14} />}
+              Permanently Delete My Account
+            </Btn>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

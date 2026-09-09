@@ -32,4 +32,18 @@ async function bulkDeleteUsers(req, res) {
   res.json({ deleted: rowCount });
 }
 
-module.exports = { bulkDeleteTests, bulkArchiveTests, bulkDeleteQuestions, bulkDeleteUsers };
+async function bulkUpdateQuestionMarks(req, res) {
+  const { ids, marks } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Question IDs required' });
+  if (marks === undefined || marks === null || Number.isNaN(Number(marks)) || Number(marks) < 0) {
+    return res.status(400).json({ error: 'A non-negative numeric marks value is required' });
+  }
+
+  const { rowCount } = await query(
+    'UPDATE bank_questions SET marks=$1 WHERE id = ANY($2::uuid[])',
+    [Number(marks), ids]
+  );
+  res.json({ updated: rowCount });
+}
+
+module.exports = { bulkDeleteTests, bulkArchiveTests, bulkDeleteQuestions, bulkDeleteUsers, bulkUpdateQuestionMarks };

@@ -152,6 +152,8 @@ export default function TestCreator() {
   const DEFAULT_Q_FILTER = { topic: 'all', type: 'all', difficulty: 'all', minMarks: '', maxMarks: '' };
   const [qFilter, setQFilter] = useState(DEFAULT_Q_FILTER);
   const [qSort, setQSort] = useState({ field: 'none', dir: 'asc' });
+  const [selectedQs, setSelectedQs] = useState(() => new Set());
+  const [bulkMarks, setBulkMarks] = useState('');
 
   // Filters/sort are scoped to whatever section is being viewed — reset
   // them on section switch so a filter that matched nothing in the new
@@ -159,6 +161,7 @@ export default function TestCreator() {
   useEffect(() => {
     setQFilter(DEFAULT_Q_FILTER);
     setQSort({ field: 'none', dir: 'asc' });
+    setSelectedQs(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
@@ -265,10 +268,13 @@ export default function TestCreator() {
   const addQuestion = (si) => {
     setForm(p => {
       const s = [...p.sections];
-      s[si].questions = [
-        ...s[si].questions,
-        s[si].type === 'aptitude' ? DEFAULT_APT_Q() : DEFAULT_CODE_Q(),
-      ];
+      s[si] = {
+        ...s[si],
+        questions: [
+          ...s[si].questions,
+          s[si].type === 'aptitude' ? DEFAULT_APT_Q() : DEFAULT_CODE_Q(),
+        ],
+      };
       return { ...p, sections: s };
     });
   };
@@ -301,7 +307,7 @@ export default function TestCreator() {
     setForm(p => {
       const s = [...p.sections];
       const cloned = bankQs.map(bankQ => cloneBankQuestion(s[si].type, bankQ));
-      s[si].questions = [...s[si].questions, ...cloned];
+      s[si] = { ...s[si], questions: [...s[si].questions, ...cloned] };
       return { ...p, sections: s };
     });
     toast.success(bankQs.length === 1 ? 'Added from bank' : `Added ${bankQs.length} questions from bank`);
@@ -310,7 +316,22 @@ export default function TestCreator() {
   const updateQuestion = (si, qi, q) => {
     setForm(p => {
       const s = [...p.sections];
-      s[si].questions = s[si].questions.map((qq, i) => (i === qi ? q : qq));
+      s[si] = { ...s[si], questions: s[si].questions.map((qq, i) => (i === qi ? q : qq)) };
+      return { ...p, sections: s };
+    });
+  };
+
+  // Bulk-set marks on a set of questions (identified by _id/id) within a
+  // section in one go, instead of opening each question's editor.
+  const setMarksForQuestions = (si, ids, marks) => {
+    setForm(p => {
+      const s = [...p.sections];
+      s[si] = {
+        ...s[si],
+        questions: s[si].questions.map(q =>
+          ids.has(q._id || q.id) ? { ...q, marks } : q
+        ),
+      };
       return { ...p, sections: s };
     });
   };
@@ -318,7 +339,7 @@ export default function TestCreator() {
   const removeQuestion = (si, qi) => {
     setForm(p => {
       const s = [...p.sections];
-      s[si].questions = s[si].questions.filter((_, i) => i !== qi);
+      s[si] = { ...s[si], questions: s[si].questions.filter((_, i) => i !== qi) };
       return { ...p, sections: s };
     });
   };
@@ -1062,9 +1083,63 @@ export default function TestCreator() {
                   </div>
                 )}
 
+                {visibleQuestions.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 mb-3 p-2.5 bg-sunken rounded-lg">
+                    <label className="flex items-center gap-1.5 text-xs text-annotation cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={visibleQuestions.every(({ q }) => selectedQs.has(q._id || q.id))}
+                        onChange={() => {
+                          const visIds = visibleQuestions.map(({ q }) => q._id || q.id);
+                          const allSelected = visIds.every(qid => selectedQs.has(qid));
+                          setSelectedQs(allSelected ? new Set() : new Set(visIds));
+                        }}
+                        className="accent-accent w-3.5 h-3.5 cursor-pointer"
+                      />
+                      Select all ({visibleQuestions.length})
+                    </label>
+                    {selectedQs.size > 0 && (
+                      <>
+                        <span className="text-2xs text-annotation/60">{selectedQs.size} selected</span>
+                        <Input
+                          type="number"
+                          value={bulkMarks}
+                          onChange={e => setBulkMarks(e.target.value)}
+                          placeholder="Marks"
+                          className="w-20 text-xs py-1"
+                        />
+                        <Btn
+                          size="sm"
+                          variant="ghost"
+                          disabled={bulkMarks === '' || Number.isNaN(Number(bulkMarks))}
+                          onClick={() => {
+                            setMarksForQuestions(activeSection, selectedQs, Number(bulkMarks));
+                            toast.success(`Set marks to ${bulkMarks} for ${selectedQs.size} question${selectedQs.size === 1 ? '' : 's'}`);
+                            setSelectedQs(new Set());
+                            setBulkMarks('');
+                          }}
+                        >
+                          Apply to selected
+                        </Btn>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {visibleQuestions.map(({ q, qi }) => (
                   <div key={q._id || q.id}>
                     <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedQs.has(q._id || q.id)}
+                        onChange={() => setSelectedQs(prev => {
+                          const next = new Set(prev);
+                          const key = q._id || q.id;
+                          next.has(key) ? next.delete(key) : next.add(key);
+                          return next;
+                        })}
+                        className="accent-accent w-3.5 h-3.5 cursor-pointer"
+                      />
                       <span className="text-xs font-mono font-bold text-annotation/60">
                         Q{qi + 1}
                       </span>

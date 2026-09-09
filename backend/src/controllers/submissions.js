@@ -273,18 +273,40 @@ async function submitTest(req, res) {
 
   if (timeExpired || tabLimitExceeded) {
     const reason = timeExpired ? 'Time expired' : 'Tab switch limit exceeded';
+    // Grade whatever the client sent (or, failing that, the last auto-saved
+    // state) instead of forcing a 0 — see gradeAnswers' comment above; this
+    // path used to skip grading entirely and left every timer/tab-limit
+    // auto-submit permanently scored 0 regardless of what was answered.
+    const finalAnswers = answers !== undefined ? answers : (submission.answers || {});
+    const finalCodeSolutions = codeSolutions !== undefined ? codeSolutions : (submission.code_solutions || {});
+    const { totalScore, maxScore, detailedResults } = await gradeAnswers({
+      sections, answers: finalAnswers, codeSolutions: finalCodeSolutions, test
+    });
+    const finalScore = Math.max(0, totalScore);
+    const finalTabCount = Math.max(effectiveTabCount, submission.tab_switch_count);
+    const finalSelectedProblems = selectedProblems !== undefined ? selectedProblems : submission.selected_problems;
+
     const { rows: [autoSub] } = await query(
       `UPDATE submissions SET
-         status='auto_submitted', tab_switch_count=$1, submitted_at=NOW(), time_taken_seconds=$2
-       WHERE id=$3 RETURNING *`,
-      [Math.max(effectiveTabCount, submission.tab_switch_count), elapsedSec, submission.id]
+         status='auto_submitted', score=$1, max_score=$2, answers=$3, code_solutions=$4,
+         flagged_questions=$5, code_results=$6, tab_switch_count=$7, selected_problems=$8,
+         submitted_at=NOW(), time_taken_seconds=$9
+       WHERE id=$10 RETURNING *`,
+      [finalScore, maxScore, JSON.stringify(finalAnswers), JSON.stringify(finalCodeSolutions),
+       JSON.stringify(flaggedQuestions || []), JSON.stringify(detailedResults), finalTabCount,
+       JSON.stringify(finalSelectedProblems || []), elapsedSec, submission.id]
     );
     await deleteActiveSession(userId, testId);
+
+    const pct = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
+    const passed = pct >= (test.settings?.passingScore || 40);
+
     return res.json({
       submission: autoSub,
-      score: 0, maxScore: 0, percentage: 0, passed: false,
+      score: finalScore, maxScore, percentage: pct, passed,
       autoSubmitted: true,
       reason,
+      details: test.settings?.showResults === 'after_submit' ? detailedResults : null,
     });
   }
 
@@ -1393,4 +1415,4 @@ async function getTimeBombStatus(req, res) {
   res.json({ bombs: bombStatus, elapsedSeconds: elapsed });
 }
 
-module.exports = { startTest, saveAnswers, submitTest, getMySubmissions, getTestSubmissions, getSubmission, runCode, getRunCodeResult, deleteSubmission, resumeTest, forceStopTest, updateMarks, adjustAllMarks, bulkMarksCsv, bulkMarksJson, exportResultsPdf, exportResultsCsv, getQuestionAnalytics, checkPlagiarism, plagiarismBulkAction, submitFingerprint, verifyFingerprint, logFullscreenViolation, getTimeBombStatus, publishResults, unpublishResults };
+module.exports = { startTest, saveAnswers, submitTest, getMySubmissions, getTestSubmissions, getSubmission, runCode, getRunCodeResult, deleteSubmission, resumeTest, forceStopTest, updateMarks, adjustAllMarks, bulkMarksCsv, bulkMarksJson, exportResultsPdf, exportResultsCsv, getQuestionAnalytics, checkPlagiarism, plagiarismBulkAction, submitFingerprint, verifyFingerprint, logFullscreenViolation, getTimeBombStatus, publishResults, unpublishResults, gradeAnswers };

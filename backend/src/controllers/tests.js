@@ -351,13 +351,16 @@ async function updateTest(req, res) {
   // keyed to the *old* ids — swapping the question set out from under them
   // orphans those answers (they silently score 0 at grading time) and can
   // shuffle question order on their screen the moment their client refetches.
-  // So once a student is actively taking this test, structural edits are
-  // refused; everything else (title, schedule, settings, targeting) can
-  // still be saved.
+  // The same orphaning hits submitted/auto_submitted rows too, not just
+  // in_progress ones: their stored answers/detailedResults still key off the
+  // old question ids, so a later regrade (or just reviewing "what did I get
+  // wrong") silently breaks. So once *any* submission exists for this test,
+  // structural edits are refused; everything else (title, schedule, settings,
+  // targeting) can still be saved.
   let sectionsSkipped = false;
   if (sections?.length) {
     const { rows: activeRows } = await query(
-      "SELECT COUNT(*)::int AS n FROM submissions WHERE test_id=$1 AND status='in_progress'",
+      "SELECT COUNT(*)::int AS n FROM submissions WHERE test_id=$1",
       [id]
     );
     if (activeRows[0]?.n > 0) sectionsSkipped = true;
@@ -428,7 +431,7 @@ async function updateTest(req, res) {
     res.json({
       test: rows[0],
       message: sectionsSkipped
-        ? 'Test details updated. Question/section changes were NOT applied because students are currently taking this test — wait until they finish, or duplicate the test to create a new version.'
+        ? 'Test details updated. Question/section changes were NOT applied because at least one student has already started or submitted this test — duplicate the test to create a new version instead.'
         : 'Test updated successfully',
       sectionsSkipped,
     });

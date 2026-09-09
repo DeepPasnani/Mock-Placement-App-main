@@ -38,6 +38,11 @@ export default function BankPickerModal({ open, onClose, type, onPick, alreadyAd
     });
   };
 
+  const allSelected = questions.length > 0 && selected.size === questions.length;
+  const toggleAll = () => {
+    setSelected(allSelected ? new Set() : new Set(questions.map(q => q.id)));
+  };
+
   const deleteMut = useMutation({
     mutationFn: questionBankAPI.delete,
     onSuccess: () => {
@@ -81,6 +86,10 @@ export default function BankPickerModal({ open, onClose, type, onPick, alreadyAd
           </div>
         ) : (
           <>
+            <label className="flex items-center gap-2 mb-2 text-xs text-annotation/70 cursor-pointer select-none">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+              Select all ({questions.length})
+            </label>
             <div className="max-h-96 overflow-y-auto space-y-2">
               {questions.map(q => (
                 <div

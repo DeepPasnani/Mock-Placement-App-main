@@ -94,6 +94,17 @@ export const useStore = create(
         set({ user: null, token: null });
       },
 
+      // Permanently deletes the signed-in student's account server-side,
+      // then logs the (now nonexistent) session out client-side the same
+      // way `logout()` does.
+      deleteAccount: async (data) => {
+        const res = await authAPI.deleteAccount(data);
+        sessionStorage.removeItem('pp_token');
+        clearPerUserClientState();
+        set({ user: null, token: null });
+        return res;
+      },
+
       // Re-derives `user` from the token on every fresh mount instead of
       // trusting a persisted `user` object — see the storage note below on
       // why the session token itself isn't persisted across tabs either.

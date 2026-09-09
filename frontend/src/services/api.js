@@ -89,6 +89,7 @@ export const authAPI = {
   changePassword:  (data)       => api.post('/auth/change-password', data).then(r => r.data),
   forgotPassword:  (data)       => api.post('/auth/forgot-password', data).then(r => r.data),
   resetPassword:   (data)       => api.post('/auth/reset-password', data).then(r => r.data),
+  deleteAccount:   (data)       => api.delete('/auth/me', { data }).then(r => r.data),
 };
 
 // ── Tests ─────────────────────────────────────────────────────
@@ -161,6 +162,7 @@ export const questionBankAPI = {
   importFromTest: (testId, data) => api.post(`/question-bank/from-test/${testId}`, data).then(r => r.data),
   delete:  (id)     => api.delete(`/question-bank/${id}`).then(r => r.data),
   bulkDelete: (ids) => api.post('/question-bank/bulk-delete', { ids }).then(r => r.data),
+  bulkUpdateMarks: (ids, marks) => api.post('/question-bank/bulk-marks', { ids, marks }).then(r => r.data),
 };
 
 // ── Upload ────────────────────────────────────────────────────
